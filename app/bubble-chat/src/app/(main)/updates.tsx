@@ -132,6 +132,22 @@ export default function UpdatesScreen() {
   // Sub-tabs: Agenda (calendar + day items) vs Action Items (meeting-sourced tasks).
   const [subTab, setSubTab] = useState<'agenda' | 'actions'>('agenda');
 
+  // Morning Brief digest — the AI-synthesized daily brief (parity with the web
+  // dashboard + mobile calendar). Best-effort; hidden if none is available.
+  const [digest, setDigest] = useState<any | null>(null);
+  const [digestExpanded, setDigestExpanded] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getDailyDigest } = await import('../../lib/api');
+        const d = await getDailyDigest();
+        if (!cancelled) setDigest(d?.digest || d?.data || d || null);
+      } catch { /* digest is optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Real org calendar events (holidays, company events, scheduled meetings) for the
   // visible month + past/live meetings — mirrors the web Events & Meet data flow so the
   // agenda shows the same unified dataset, not just personal tasks.
@@ -942,6 +958,22 @@ export default function UpdatesScreen() {
 
         {subTab === 'agenda' ? (
         <View className="p-6">
+          {/* Morning Brief — AI daily digest, aligned with calendar/web dashboards */}
+          {digest?.morningBrief ? (
+            <View style={{ borderLeftWidth: 3, borderLeftColor: COLOR_TASK }} className="p-4 rounded-2xl bg-purple-50/60 dark:bg-white/[0.04] border border-purple-100 dark:border-white/10 mb-4">
+              <TouchableOpacity onPress={() => setDigestExpanded(e => !e)} activeOpacity={0.8} className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-1.5">
+                  <Sparkles size={14} color={COLOR_TASK} />
+                  <Text style={{ color: COLOR_TASK }} className="text-[11px] font-bold uppercase font-sans">Morning Brief</Text>
+                </View>
+                <ChevronDown size={16} color="#9a9aab" style={{ transform: [{ rotate: digestExpanded ? '180deg' : '0deg' }] }} />
+              </TouchableOpacity>
+              {digestExpanded && (
+                <Text className="text-[13px] text-ink dark:text-[#f4f5fb] mt-2 font-sans leading-5">{digest.morningBrief}</Text>
+              )}
+            </View>
+          ) : null}
+
           <Text className="text-xs font-bold uppercase tracking-wider text-black/30 dark:text-white/40 italic mb-1 font-sans">Agenda for</Text>
           <Text className="text-lg font-bold text-ink dark:text-[#f4f5fb] mb-3 font-sans">{selectedDate.toLocaleDateString('en-US', { dateStyle: 'medium' })}</Text>
 

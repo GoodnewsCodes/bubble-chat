@@ -537,3 +537,20 @@ export const setupCallSocketListeners = (socket: any) => {
     }
   });
 };
+
+/**
+ * Remove every call listener this module registered. Call on root-layout
+ * unmount (logout / app teardown) — previously listeners were only cleared on
+ * RE-setup, so a dead layout kept reacting to call events.
+ */
+export const teardownCallSocketListeners = (socket: any) => {
+  if (!socket) return;
+  socket.off('incoming_call');
+  socket.off('call_accepted');
+  socket.off('call_rejected');
+  socket.off('call_ended');
+  socket.off('meeting_ended');
+  socket.off('room_knock');
+  socket.off('room_knock_response');
+  stopRingtone();
+};

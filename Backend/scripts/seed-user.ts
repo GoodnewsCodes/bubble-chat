@@ -32,6 +32,19 @@ import { User } from '../models/users';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble';
 
+// Guard: seeding creates a pre-verified admin account with a known password.
+// Never allow that against a production database unless explicitly forced.
+const looksLocal = /localhost|127\.0\.0\.1/.test(MONGODB_URI);
+if ((process.env.NODE_ENV === 'production' || !looksLocal) && process.env.SEED_FORCE !== '1') {
+    console.error('✋ Refusing to seed: non-local MONGODB_URI or NODE_ENV=production.');
+    console.error('   Set SEED_FORCE=1 (and a strong SEED_PASSWORD) if you really mean it.');
+    process.exit(1);
+}
+if (!looksLocal && !process.env.SEED_PASSWORD) {
+    console.error('✋ SEED_PASSWORD is required when seeding a non-local database — no default password.');
+    process.exit(1);
+}
+
 const NAME = process.env.SEED_NAME || 'Test Founder';
 const EMAIL = (process.env.SEED_EMAIL || 'founder@bubble.test').toLowerCase();
 const PASSWORD = process.env.SEED_PASSWORD || 'BubbleTest2026!';

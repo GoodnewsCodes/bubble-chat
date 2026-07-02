@@ -75,10 +75,25 @@ brainEventBus.on('group_message_sent', async (payload: { messageId: string; chat
     if (!org) return;
 
     const message = await Message.findById(messageId).populate('sender', 'full_name username');
-    if (!message || !message.content || message.content.trim().length < 10) return;
+    if (!message || !message.content) return;
+
+    // E2EE group messages arrive as ciphertext; the Brain is a key recipient
+    // for group chats and decrypts through its isolated key service. If it
+    // can't (missing/rotated key), skip rather than ingest ciphertext noise.
+    let messageText = message.content;
+    if (message.is_encrypted) {
+      const { decryptForBrain } = await import('./brainKeyService');
+      const plain = await decryptForBrain(chatId, message.content);
+      if (!plain) {
+        console.warn(`[Brain Event] Could not decrypt group message ${messageId} — skipped.`);
+        return;
+      }
+      messageText = plain;
+    }
+    if (messageText.trim().length < 10) return;
 
     const senderName = (message.sender as any)?.full_name || (message.sender as any)?.username || 'User';
-    const content = `[${chat.chatName}] ${senderName}: ${message.content}`;
+    const content = `[${chat.chatName}] ${senderName}: ${messageText}`;
     const namespace = org.pineconeNamespace || `org-${org._id}`;
 
     await ingestTextToOrg(

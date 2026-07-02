@@ -51,45 +51,107 @@ export const extractMeetingIntelligence = async (
   const attendeeLine =
     attendeeNames.length > 0 ? `Attendees: ${attendeeNames.join(', ')}.` : '';
 
-  try {
-    const response = await deepseekClient.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: `You are Aida, an expert meeting intelligence assistant. Analyze transcripts and extract structured data. Write a highly detailed explanation explaining everything in key exciting details (who said what, key decisions made, technical context, details discussed, and future plans) rather than a brief summary. Always return valid JSON only.`,
-        },
-        {
-          role: 'user',
-          content: `Analyze this meeting transcript and return a JSON object.
+  // A single extraction call. Long meetings are map-reduced below: each chunk is
+  // analyzed with this, then the per-chunk results are merged in one final pass —
+  // previously only the FIRST 3000 chars were analyzed, so anything decided later
+  // in a long meeting silently vanished from summaries and action items.
+  const runExtraction = async (
+    text: string,
+    mode: 'full' | 'chunk',
+    chunkInfo = ''
+  ): Promise<{ summary: string; actionItems: { text: string; assignedToName?: string }[] } | null> => {
+    const detailInstruction =
+      mode === 'full'
+        ? 'A highly detailed, premium explanation of the meeting. This explanation should explain everything in key exciting details, highlighting who said what, key decisions, technical context, files shared, and future steps.'
+        : 'A thorough summary of THIS PORTION of the meeting: who said what, decisions made, technical context, files shared, next steps.';
+    try {
+      const response = await deepseekClient.chat.completions.create({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: `You are Aida, an expert meeting intelligence assistant. Analyze transcripts and extract structured data. Always return valid JSON only.`,
+          },
+          {
+            role: 'user',
+            content: `Analyze this meeting transcript${chunkInfo} and return a JSON object.
 ${attendeeLine}
 
 TRANSCRIPT:
-${transcript.substring(0, 3000)}
+${text}
 
 Extract:
-1. A highly detailed, premium explanation of the meeting. This explanation should explain everything in key exciting details, highlighting who said what, key decisions, technical context, files shared, and future steps.
+1. ${detailInstruction}
 2. All action items with who they are assigned to
 
 Return ONLY this JSON (no other text):
 {"summary": "...", "actionItems": [{"text": "...", "assignedToName": "...or null"}]}`,
-        },
-      ],
-      max_tokens: 1500,
-      temperature: 0.3,
-    });
+          },
+        ],
+        max_tokens: 1500,
+        temperature: 0.3,
+      });
+      const raw = response.choices[0].message?.content?.trim() || '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          summary: parsed.summary || '',
+          actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+        };
+      }
+    } catch (err) {
+      console.error('[Meeting AI] DeepSeek transcript extraction error:', err);
+    }
+    return null;
+  };
 
-    const raw = response.choices[0].message?.content?.trim() || '';
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        summary: parsed.summary || 'No summary generated.',
-        actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
-      };
+  const SINGLE_PASS_LIMIT = 12000; // chars — comfortably within DeepSeek's context
+  const CHUNK_SIZE = 10000;
+  const MAX_CHUNKS = 12;
+
+  try {
+    // Short meetings: one pass over the WHOLE transcript.
+    if (transcript.length <= SINGLE_PASS_LIMIT) {
+      const result = await runExtraction(transcript, 'full');
+      if (result && result.summary) return result;
+    } else {
+      // Long meetings: map (per chunk) → reduce (merge pass).
+      const chunks: string[] = [];
+      const effectiveSize = Math.max(CHUNK_SIZE, Math.ceil(transcript.length / MAX_CHUNKS));
+      for (let i = 0; i < transcript.length; i += effectiveSize) {
+        chunks.push(transcript.substring(i, i + effectiveSize + 200)); // 200-char overlap
+      }
+      const chunkResults = await Promise.all(
+        chunks.map((c, i) => runExtraction(c, 'chunk', ` (part ${i + 1} of ${chunks.length})`))
+      );
+      const valid = chunkResults.filter((r): r is NonNullable<typeof r> => !!r && !!r.summary);
+      if (valid.length > 0) {
+        const mergedActionItems = valid.flatMap(r => r.actionItems);
+        const combinedSummaries = valid.map((r, i) => `Part ${i + 1}: ${r.summary}`).join('\n\n');
+        const mergeResult = await runExtraction(
+          `The following are sequential summaries of one meeting. Merge them into a single coherent, highly detailed meeting explanation (who said what, key decisions, technical context, future steps) and consolidate the action items, removing duplicates.\n\n${combinedSummaries}\n\nACTION ITEMS SO FAR: ${JSON.stringify(mergedActionItems)}`,
+          'full'
+        );
+        if (mergeResult && mergeResult.summary) {
+          // Merge pass may drop items — union with the per-chunk set, dedup by text.
+          const seen = new Set(mergeResult.actionItems.map(a => a.text.trim().toLowerCase()));
+          for (const item of mergedActionItems) {
+            const key = item.text?.trim().toLowerCase();
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              mergeResult.actionItems.push(item);
+            }
+          }
+          return mergeResult;
+        }
+        // Merge pass failed — still better to return concatenated chunk results
+        // than the first 300 chars.
+        return { summary: combinedSummaries, actionItems: mergedActionItems };
+      }
     }
   } catch (err) {
-    console.error('[Meeting AI] DeepSeek transcript extraction error:', err);
+    console.error('[Meeting AI] extraction pipeline error:', err);
   }
 
   return {
@@ -930,7 +992,15 @@ export const runBackgroundMeetingAI = async (
       },
     });
 
-    // Auto-create synced Calendar tasks
+    // Auto-create synced Calendar tasks. Re-processing (scheduler catch-up or a
+    // manual regenerate) must not duplicate: remove this meeting's previously
+    // auto-created tasks that are still open — completed ones are kept as history.
+    await Task.deleteMany({
+      meetingRef: meeting._id,
+      source: 'meeting',
+      status: { $nin: ['done', 'cancelled'] },
+    }).catch((err: any) => console.error('[Meeting AI] stale task cleanup failed:', err));
+
     const createdTasks = [];
     for (const ai of resolvedActionItems) {
       if (ai.text) {
@@ -1013,7 +1083,7 @@ export const runBackgroundMeetingAI = async (
       for (const participantId of allParticipants) {
         try {
           const user = await User.findById(participantId);
-          if (user && user.email) {
+          if (user && user.email && (user as any).privacy_settings?.email_notifications !== false) {
             await sendMeetingTranscriptEmail(
               user.email,
               user.full_name || user.username || 'Attendee',
@@ -1040,6 +1110,7 @@ export const runBackgroundMeetingAI = async (
             _id: { $nin: Array.from(participantIds) },
             email: { $exists: true, $ne: '' },
             is_bot: { $ne: true },
+            'privacy_settings.email_notifications': { $ne: false },
           }).select('email full_name username').limit(200);
 
           for (const member of absentees) {

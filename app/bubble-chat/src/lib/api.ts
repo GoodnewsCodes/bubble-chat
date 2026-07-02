@@ -609,12 +609,33 @@ export const sendTextMessage = async (
         mentions?: string[];
         is_forwarded?: boolean;
         clientId?: string;
+        is_encrypted?: boolean;
     }
 ) => {
     const res = await fetch(`${BASE_URL}/message`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ chatId, content, message_type: 'text', ...opts }),
+    });
+    return handleResponse(res);
+};
+
+// ─── E2EE key exchange ────────────────────────────────────────────────────────
+
+export const getChatKeys = async (chatId: string) => {
+    const res = await fetch(`${BASE_URL}/chat/${chatId}/keys`, { headers: getAuthHeaders() });
+    return handleResponse(res);
+};
+
+export const postChatKeys = async (
+    chatId: string,
+    epoch: number,
+    keys: { recipientId: string; encryptedKey: string }[]
+) => {
+    const res = await fetch(`${BASE_URL}/chat/${chatId}/keys`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ epoch, keys }),
     });
     return handleResponse(res);
 };

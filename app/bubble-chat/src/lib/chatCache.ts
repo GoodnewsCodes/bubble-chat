@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAllUserChats, fetchMessages, getMyContacts, getSecureMediaUrl, sendTextMessage } from './api';
 import { authStorage } from './authStorage';
 import { getCachedNickname } from './nicknames';
+import { prepareChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from './e2ee';
 
 // Storage Keys
 const KEYS = {
@@ -11,6 +12,7 @@ const KEYS = {
   FOLDER_MAPPINGS: 'bubble_chat_folder_mappings',
   MESSAGES_PREFIX: 'bubble_cached_messages_',
   OFFLINE_QUEUE: 'bubble_offline_message_queue',
+  DRAFTS: 'bubble_chat_drafts',
 };
 
 const DEFAULT_FOLDERS = ["All", "Unread", "Friends", "Work", "Archive"];
@@ -207,7 +209,11 @@ export const chatCache = {
         time: formatChatTime(latestMessageTime || c.updatedAt),
         unreadCount: effectiveUnreadCount,
         isPinned: isPinned,
-        isMuted: isMuted || isArchived,
+        // Muted (notifications off) and archived (hidden from main tabs) are
+        // separate user actions — conflating them made the Archive tab show
+        // muted chats and vice versa.
+        isMuted: isMuted,
+        isArchived: isArchived,
         isOnline: !isGroup && !!otherUser?.isOnline,
         is_bot: !isGroup && (!!otherUser?.is_bot || otherUser?.username === 'aida' || otherUser?.username?.toLowerCase() === 'aida'),
         username: !isGroup ? (otherUser?.username || "") : "",
@@ -259,6 +265,18 @@ export const chatCache = {
     const response = await fetchMessages(chatId);
     const list = Array.isArray(response) ? response : [];
 
+    // Resolve E2EE state once per sync; failures degrade to lock placeholders.
+    const hasEncrypted = list.some((m: any) => m.is_encrypted && m.content);
+    const cipher = hasEncrypted
+      ? await prepareChat(chatId, currentUserId).catch(() => null)
+      : null;
+    const decryptText = (m: any): string | null => {
+      if (!m.is_encrypted || !m.content) return null;
+      const env = parseEnvelope(m.content);
+      const plain = env ? decryptEnvelope(chatId, env, cipher) : null;
+      return plain ?? ENCRYPTED_PLACEHOLDER;
+    };
+
     const mapped = list.map((m: any) => {
       const senderId = String(m.sender?.id || m.sender?._id || m.sender);
       const isMe = senderId === currentUserId;
@@ -266,7 +284,8 @@ export const chatCache = {
 
       return {
         id: String(m.id || m._id),
-        text: m.content || (m.mediaUrl ? `📎 [${m.message_type || 'Media'}]` : ''),
+        text: decryptText(m) ?? (m.content || (m.mediaUrl ? `📎 [${m.message_type || 'Media'}]` : '')),
+        is_encrypted: !!m.is_encrypted,
         sender: isMe ? 'me' : (isSystem ? 'system' : 'other'),
         senderName: m.sender ? (getCachedNickname(senderId) || m.sender?.full_name || m.sender?.username) : undefined,
         senderIsBot: m.senderIsBot || (m.sender && (m.sender.is_bot || m.sender.username === 'aida' || m.sender.username?.toLowerCase() === 'aida')),
@@ -327,6 +346,39 @@ export const chatCache = {
     return deduped;
   },
 
+  // ─── Per-chat message drafts ─────────────────────────────────────────────────
+  // Unsent compose text survives navigation and app restarts. Stored plaintext
+  // on-device only (never sent anywhere until the user hits send).
+
+  async saveDraft(chatId: string, text: string): Promise<void> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.DRAFTS);
+      const drafts = raw ? JSON.parse(raw) : {};
+      if (text && text.trim()) drafts[String(chatId)] = text;
+      else delete drafts[String(chatId)];
+      await AsyncStorage.setItem(KEYS.DRAFTS, JSON.stringify(drafts));
+    } catch { /* drafts are best-effort */ }
+  },
+
+  async getDraft(chatId: string): Promise<string> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.DRAFTS);
+      const drafts = raw ? JSON.parse(raw) : {};
+      return drafts[String(chatId)] || '';
+    } catch { return ''; }
+  },
+
+  async getAllDrafts(): Promise<Record<string, string>> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.DRAFTS);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  },
+
+  async clearDraft(chatId: string): Promise<void> {
+    return this.saveDraft(chatId, '');
+  },
+
   // ─── Offline Queue ─────────────────────────────────────────────────────────
   async getOfflineQueue(): Promise<any[]> {
     try {
@@ -340,13 +392,14 @@ export const chatCache = {
   // clientId lets a queued retry be matched against an attempt that actually reached
   // the server (e.g. the response was lost to a network drop) — without it, the offline
   // queue would create a genuine duplicate message every time it had to retry.
-  async addToOfflineQueue(chatId: string, text: string, clientId?: string): Promise<string> {
+  async addToOfflineQueue(chatId: string, text: string, clientId?: string, isEncrypted?: boolean): Promise<string> {
     const queue = await this.getOfflineQueue();
     const tempId = clientId || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newItem = {
       id: tempId,
       chatId,
-      text,
+      text, // already ciphertext when isEncrypted — encrypted at compose time
+      isEncrypted: !!isEncrypted,
       timestamp: new Date().toISOString(),
     };
     queue.push(newItem);
@@ -376,7 +429,7 @@ export const chatCache = {
       console.log(`Processing offline queue: ${queue.length} items`);
       for (const item of queue) {
         try {
-          await sendTextMessage(item.chatId, item.text, { clientId: item.id });
+          await sendTextMessage(item.chatId, item.text, { clientId: item.id, is_encrypted: !!item.isEncrypted });
           await this.removeFromOfflineQueue(item.id);
         } catch (err) {
           console.warn("Offline queue processing failed, stopping queue send:", err);

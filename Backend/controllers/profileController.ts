@@ -291,7 +291,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     'gender', 'date_of_birth', 'hobbies', 'location',
     'notification_settings', 'privacy_settings', 'username',
     'phone_number', 'organization', 'org_role', 'app_background', 'custom_background',
-    'actionItemEmailMode'
+    'actionItemEmailMode', 'digestPreferences', 'publicKey'
   ];
 
   // Check username uniqueness if being updated

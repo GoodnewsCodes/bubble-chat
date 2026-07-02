@@ -5,7 +5,7 @@ import { User, Pencil, Mail, Phone, Briefcase, X, Check, LogOut, Copy, Share, Ch
 import { useTheme, Scheme } from '../../lib/theme';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { fetchOrgDocs, fetchOrgDoc, createOrgDoc, updateOrgDoc, deleteOrgDoc, ingestOrgFile } from '../../lib/api';
+import { fetchOrgDocs, fetchOrgDoc, createOrgDoc, updateOrgDoc, deleteOrgDoc, ingestOrgFile, brainIngestUrl } from '../../lib/api';
 import { Avatar } from '../../components/Avatar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRouter } from 'expo-router';
@@ -90,6 +90,7 @@ function OrgKnowledgeBase({ active, isAdmin }: { active: boolean; isAdmin: boole
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [ingestUrl, setIngestUrl] = useState('');
   const [newDoc, setNewDoc] = useState({ title: '', content: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDoc, setEditDoc] = useState({ title: '', content: '' });
@@ -227,6 +228,43 @@ function OrgKnowledgeBase({ active, isAdmin }: { active: boolean; isAdmin: boole
           >
             <Plus color="#fff" size={15} />
             <Text className="text-[12px] font-bold text-white">New entry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* URL / YouTube ingestion — parity with web onboarding's link imports */}
+      {isAdmin && (
+        <View className="flex-row items-center rounded-xl mb-3" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, paddingLeft: 12, paddingRight: 6, paddingVertical: 4, gap: 6 }}>
+          <TextInput
+            value={ingestUrl}
+            onChangeText={setIngestUrl}
+            placeholder="Paste a web page or YouTube link…"
+            placeholderTextColor={colors.textSoft}
+            autoCapitalize="none"
+            keyboardType="url"
+            style={{ flex: 1, fontSize: 12, fontFamily: 'Poppins_400Regular', color: colors.text, paddingVertical: 6 }}
+          />
+          <TouchableOpacity
+            disabled={busy || !ingestUrl.trim()}
+            onPress={async () => {
+              const url = ingestUrl.trim();
+              if (!/^https?:\/\//i.test(url)) { Alert.alert('Add link', 'Enter a full URL starting with http(s)://'); return; }
+              setBusy(true);
+              try {
+                await brainIngestUrl(url);
+                setIngestUrl('');
+                Alert.alert('Importing', 'The link is being processed into the brain. It will appear once indexed.');
+                setTimeout(load, 2500);
+              } catch (e: any) {
+                Alert.alert('Import failed', e?.message || 'Could not import that link.');
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-lg px-3 py-2"
+            style={{ backgroundColor: colors.purple, opacity: busy || !ingestUrl.trim() ? 0.5 : 1 }}
+          >
+            <Text className="text-[11px] font-bold text-white">Import</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1252,6 +1290,50 @@ export default function ProfileScreen() {
                 );
               })}
             </View>
+          </View>
+
+          {/* Notifications & Privacy — persisted to the backend via PUT /profile/me */}
+          <View className="w-full p-6 border-b mt-3" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+            <View className="flex-row items-center border-b pb-3 mb-4" style={{ borderColor: colors.borderStrong }}>
+              <Mail color={colors.purple} size={18} />
+              <Text className="text-[15px] font-bold ml-2 font-sans" style={{ color: colors.text }}>Notifications & Privacy</Text>
+            </View>
+            {([
+              { key: 'digest_enabled', label: 'Daily digest', desc: 'Morning brief push + email', get: (u: any) => u.digestPreferences?.enabled !== false, build: (v: boolean, u: any) => ({ digestPreferences: { ...(u.digestPreferences || {}), enabled: v } }) },
+              { key: 'email_notifications', label: 'Email notifications', desc: 'Meeting recaps, reminders and digests by email', get: (u: any) => u.privacy_settings?.email_notifications !== false, build: (v: boolean, u: any) => ({ privacy_settings: { ...(u.privacy_settings || {}), email_notifications: v } }) },
+              { key: 'read_receipts', label: 'Read receipts', desc: 'Let others see when you read messages', get: (u: any) => u.privacy_settings?.read_receipts !== false, build: (v: boolean, u: any) => ({ privacy_settings: { ...(u.privacy_settings || {}), read_receipts: v } }) },
+              { key: 'show_online_status', label: 'Online status', desc: 'Show when you are online', get: (u: any) => u.privacy_settings?.show_online_status !== false, build: (v: boolean, u: any) => ({ privacy_settings: { ...(u.privacy_settings || {}), show_online_status: v } }) },
+              { key: 'sounds', label: 'Notification sounds', desc: 'Play a sound for new messages', get: (u: any) => u.notification_settings?.sounds !== false, build: (v: boolean, u: any) => ({ notification_settings: { ...(u.notification_settings || {}), sounds: v } }) },
+              { key: 'preview', label: 'Message previews', desc: 'Show message text in notifications', get: (u: any) => u.notification_settings?.preview !== false, build: (v: boolean, u: any) => ({ notification_settings: { ...(u.notification_settings || {}), preview: v } }) },
+            ] as const).map((row, idx, arr) => {
+              const value = row.get(user as any);
+              return (
+                <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: idx < arr.length - 1 ? 1 : 0, borderColor: colors.border }}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: colors.text }}>{row.label}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: 'Poppins_400Regular', color: colors.textSoft, marginTop: 1 }}>{row.desc}</Text>
+                  </View>
+                  <Switch
+                    value={value}
+                    onValueChange={async (next) => {
+                      const patch = row.build(next, user as any);
+                      const prevUser = user;
+                      // Optimistic; roll back and surface on failure.
+                      setUser(prev => ({ ...prev, ...patch } as any));
+                      try {
+                        const res = await updateProfile(patch);
+                        if (res?.data) await authStorage.updateUser(res.data);
+                      } catch (err: any) {
+                        setUser(prevUser);
+                        Alert.alert('Error', err?.message || 'Could not save that setting.');
+                      }
+                    }}
+                    trackColor={{ false: colors.border, true: colors.purple }}
+                    thumbColor="#fff"
+                  />
+                </View>
+              );
+            })}
           </View>
 
           {/* Appearance / Dark Mode */}

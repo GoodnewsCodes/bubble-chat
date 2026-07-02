@@ -44,6 +44,7 @@ import {
   getChatById,
 } from '../../../lib/api';
 import { startOutgoingCall, startGroupCall } from '../../../lib/callManager';
+import { prepareChat, encryptForChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from '../../../lib/e2ee';
 import { useTheme } from '../../../lib/theme';
 import { useIsOnline } from '../../../lib/presence';
 import { authStorage } from '../../../lib/authStorage';
@@ -116,6 +117,26 @@ export default function ChatScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [messageText, setMessageText] = useState('');
+
+  // Draft persistence: restore unsent text when the chat opens, save (debounced)
+  // as the user types, clear on send. Survives navigation and app restarts.
+  const draftTimerRef = useRef<any>(null);
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    draftRestoredRef.current = false;
+    chatCache.getDraft(String(id)).then(draft => {
+      if (draft) setMessageText(prev => prev || draft);
+      draftRestoredRef.current = true;
+    }).catch(() => { draftRestoredRef.current = true; });
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [id]);
+  useEffect(() => {
+    if (!draftRestoredRef.current) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      chatCache.saveDraft(String(id), messageText).catch(() => undefined);
+    }, 400);
+  }, [messageText, id]);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chat, setChat] = useState<any>(null);
@@ -149,6 +170,15 @@ export default function ChatScreen() {
   // User details for own-typing socket filters
   const currentUserIdRef = useRef<string | null>(null);
   const chatRef = useRef<any>(null);
+
+  // E2EE cipher state for this chat (null = plaintext / keys unavailable).
+  const cipherRef = useRef<Awaited<ReturnType<typeof prepareChat>>>(null);
+  const decryptIncoming = (data: any): string | null => {
+    if (!data?.is_encrypted || !data?.content) return null;
+    const env = parseEnvelope(data.content);
+    const plain = env ? decryptEnvelope(String(id), env, cipherRef.current) : null;
+    return plain ?? ENCRYPTED_PLACEHOLDER;
+  };
 
   // @mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null); // null = not in mention mode
@@ -506,7 +536,8 @@ export default function ChatScreen() {
 
       const formatted = {
         id: String(data.id || data._id || Date.now()),
-        text: data.content || data.text || '',
+        text: decryptIncoming(data) ?? (data.content || data.text || ''),
+        is_encrypted: !!data.is_encrypted,
         sender: isMe ? 'me' : (isSystem ? 'system' : 'other'),
         senderName: data.sender?.full_name || data.sender?.username || undefined,
         senderIsBot: data.sender?.is_bot || data.sender?.username === 'aida',
@@ -564,7 +595,7 @@ export default function ChatScreen() {
       if (editedChatId && editedChatId !== String(id)) return;
       setMessages(prev => prev.map((m: any) =>
         String(m.id) === editedId
-          ? { ...m, text: data.content ?? data.text ?? m.text, isEdited: true }
+          ? { ...m, text: decryptIncoming(data) ?? data.content ?? data.text ?? m.text, isEdited: true }
           : m
       ));
     };
@@ -758,6 +789,14 @@ export default function ChatScreen() {
   useEffect(() => {
     loadCachedChatAndMessages();
     syncChatAndMessages();
+    // Resolve E2EE keys for this chat so sends encrypt and incoming decrypt.
+    (async () => {
+      const user = await authStorage.getUser().catch(() => null);
+      const myId = String(user?.id || user?._id || '');
+      if (!myId) return;
+      cipherRef.current = await prepareChat(String(id), myId).catch(() => null);
+      if (cipherRef.current) syncChatAndMessages();
+    })();
   }, [id]);
 
   useEffect(() => {
@@ -886,8 +925,13 @@ export default function ChatScreen() {
         setIsAttachmentOpen(false);
         setIsEmojiOpen(false);
 
+        // E2EE: encrypt at compose time so both the live send AND any offline
+        // queue retry carry ciphertext. The optimistic bubble keeps plaintext.
+        const cipher = cipherRef.current;
+        const wire = cipher ? await encryptForChat(cipher, text) : text;
+
         try {
-          await sendTextMessage(chat.id, text, { clientId: tempId, ...(replyParentId && { parent_message: replyParentId }) });
+          await sendTextMessage(chat.id, wire, { clientId: tempId, is_encrypted: !!cipher, ...(replyParentId && { parent_message: replyParentId }) });
           // Mark as sent; sync will reconcile the server id shortly.
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, status: 'sent' } : m
@@ -899,7 +943,7 @@ export default function ChatScreen() {
           // reached the server and only the response was lost, the retry carries the same
           // clientId and the backend's unique index returns the existing message instead
           // of creating a duplicate.
-          const queueId = await chatCache.addToOfflineQueue(chat.id, text, tempId);
+          const queueId = await chatCache.addToOfflineQueue(chat.id, wire, tempId, !!cipher);
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, id: queueId, status: 'queued' } : m
           ));

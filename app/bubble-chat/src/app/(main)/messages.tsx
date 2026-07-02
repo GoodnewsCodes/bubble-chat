@@ -169,9 +169,14 @@ export default function Messages() {
   const navigation = useNavigation();
   const [isFocused, setIsFocused] = useState(navigation.isFocused());
 
+  // Per-chat unsent drafts ("Draft: …" preview) + sync-failure banner state.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [syncFailed, setSyncFailed] = useState(false);
+
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener("focus", () => {
       setIsFocused(true);
+      chatCache.getAllDrafts().then(setDrafts).catch(() => undefined);
     });
     const unsubscribeBlur = navigation.addListener("blur", () => {
       setIsFocused(false);
@@ -205,8 +210,11 @@ export default function Messages() {
       setContactsList(freshContacts);
       setFoldersList(freshFolders);
       setFolderMappings(freshMappings);
+      setSyncFailed(false);
     } catch (err) {
-      console.warn("Silent sync failed in messages.tsx:", err);
+      // Surface the failure instead of silently showing stale data.
+      console.warn("Sync failed in messages.tsx:", err);
+      setSyncFailed(true);
     }
   };
 
@@ -409,7 +417,9 @@ export default function Messages() {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
 
-    const isArchived = !!c.isMuted;
+    // Archived = user chose "archive" (Conversation.archivedBy) — distinct from
+    // muted, which only silences notifications and stays in the main list.
+    const isArchived = !!(c as any).isArchived;
     if (activeFilter === "Archive") return isArchived;
     if (isArchived) return false; // Hide archived from other tabs
 
@@ -470,6 +480,16 @@ export default function Messages() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {syncFailed && (
+          <TouchableOpacity
+            onPress={() => { setSyncFailed(false); syncWithBackend(); }}
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(244,102,59,0.1)", borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 10 }}
+          >
+            <Text style={{ fontSize: 12, fontFamily: "Poppins_500Medium", color: "#f4663b" }}>
+              Couldn't refresh — showing cached chats. Tap to retry.
+            </Text>
+          </TouchableOpacity>
+        )}
         {isEmpty ? (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
             <MessageSquarePlus size={36} color="rgba(31,32,48,0.12)" />
@@ -502,6 +522,7 @@ export default function Messages() {
                         isSelectionMode={isSelectionMode}
                         isSelected={isSelected}
                         isTyping={typingChats[chat.id]}
+                        draft={drafts[String(chat.id)]}
                         onPress={() => handlePressItem('chat', chat.id)}
                         onLongPress={() => handleLongPressItem('chat', chat.id, chat.name, chat.isPinned, !!chat.isMuted)}
                       />
@@ -1191,6 +1212,7 @@ function ChatRow({
   isSelectionMode,
   isSelected,
   isTyping,
+  draft,
   onPress,
   onLongPress
 }: {
@@ -1199,6 +1221,7 @@ function ChatRow({
   isSelectionMode: boolean;
   isSelected: boolean;
   isTyping: { fromUserId: string; fromUsername?: string; fromName?: string } | false | undefined;
+  draft?: string;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -1261,6 +1284,11 @@ function ChatRow({
           {isTyping ? (
             <Text style={{ fontSize: 13, color: "#6c5ce7", fontFamily: "Poppins_600SemiBold" }}>
               {(getCachedNickname(isTyping.fromUserId) || isTyping.fromName) ? `${getCachedNickname(isTyping.fromUserId) || isTyping.fromName} is typing...` : 'typing...'}
+            </Text>
+          ) : draft ? (
+            <Text numberOfLines={1} style={{ fontSize: 13, fontFamily: "Poppins_400Regular", color: colors.textSoft, flex: 1, paddingRight: 8 }}>
+              <Text style={{ color: "#f4663b", fontFamily: "Poppins_600SemiBold" }}>Draft: </Text>
+              {draft}
             </Text>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center", flex: 1, minWidth: 0, paddingRight: 8 }}>

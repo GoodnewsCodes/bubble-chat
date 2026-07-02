@@ -19,6 +19,12 @@ import Svg, { Path, Rect, Ellipse, Circle, Text as SvgText } from "react-native-
 import { login as apiLogin, clerkSyncApi } from "../lib/api";
 import { useOAuth } from "@clerk/clerk-expo";
 import { authStorage } from "../lib/authStorage";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+
+// Dismisses the in-app browser and returns to the app once Clerk's OAuth
+// redirect completes. Must run at module scope (Clerk/Expo requirement).
+WebBrowser.maybeCompleteAuthSession();
 
 const BubbleLogo = ({ size = 40 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
@@ -154,7 +160,11 @@ export default function Login() {
     setError("");
     setGoogleLoading(true);
     try {
-      const { createdSessionId, setActive } = await startOAuthFlow();
+      // Pass an explicit app redirect (bubblechat://) so the OAuth browser
+      // reliably returns to the app on native builds instead of stranding on
+      // the web callback.
+      const redirectUrl = Linking.createURL("/", { scheme: "bubblechat" });
+      const { createdSessionId, setActive } = await startOAuthFlow({ redirectUrl });
       if (!createdSessionId) {
         // User cancelled or OAuth flow didn't complete
         return;

@@ -13,6 +13,37 @@ import mongoose from 'mongoose';
 import { queryVectors, hasPinecone } from '../utils/pinecone';
 import { generateEmbedding } from '../utils/embeddings';
 import { Organization } from '../models/organizations';
+import { decryptForBrain } from '../utils/brainKeyService';
+
+// ─── E2EE-aware message text resolution ──────────────────────────────────────
+// Group messages: the Brain is a key recipient and may decrypt via its isolated
+// key service. DM messages: the Brain has NO key by design — encrypted DM
+// content is dropped (returned as null) so Aida never sees private 1:1 text.
+const resolveMessageText = async (
+  m: any,
+  conversationId: string,
+  isGroupChat: boolean
+): Promise<string | null> => {
+  if (!m?.content) return m?.content ?? null;
+  if (!m.is_encrypted) return m.content;
+  if (!isGroupChat) return null; // private DM — cryptographically off-limits
+  return decryptForBrain(conversationId, m.content);
+};
+
+/** Map messages → "Sender: text" lines, silently skipping undecryptable ones. */
+const buildTranscriptLines = async (
+  messages: any[],
+  conversationId: string,
+  isGroupChat: boolean,
+  senderLabel: (m: any) => string
+): Promise<string[]> => {
+  const lines: string[] = [];
+  for (const m of messages) {
+    const text = await resolveMessageText(m, conversationId, isGroupChat);
+    if (text) lines.push(`${senderLabel(m)}: ${text}`);
+  }
+  return lines;
+};
 
 // ─── DeepSeek Client (sole AI engine) ────────────────────────────────────────
 const deepseekClient = new OpenAI({
@@ -387,10 +418,12 @@ export const chatWithAidaInConversation = async (req: Request, res: Response): P
       .limit(26)
       .populate('sender', 'full_name username is_bot')
       .lean();
-    const historyText = history.reverse().map((m: any) => {
-      const senderName = m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || 'User');
-      return `${senderName}: ${m.content}`;
-    }).join('\n');
+    const historyText = (await buildTranscriptLines(
+      history.reverse(),
+      String(conv._id),
+      !!(conv as any).isGroupChat,
+      (m: any) => (m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || 'User'))
+    )).join('\n');
 
     const fileContext = recentFiles.length > 0
       ? `Workspace files: ${recentFiles.map((f: any) => `${f.name} (${f.fileType})`).join(', ')}.`
@@ -560,10 +593,22 @@ export const summarizeConversation = async (req: Request, res: Response): Promis
       return;
     }
 
-    const transcript = messages.reverse().map((m: any) => {
-      const name = m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || m.sender?.username || 'User');
-      return `${name}: ${m.content}`;
-    }).join('\n');
+    const transcriptLines = await buildTranscriptLines(
+      messages.reverse(),
+      String(id),
+      !!(conv as any).isGroupChat,
+      (m: any) => (m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || m.sender?.username || 'User'))
+    );
+    if (transcriptLines.length === 0) {
+      // Every message was E2EE and outside the Brain's reach (private DM).
+      res.status(200).json({
+        summary: 'This conversation is end-to-end encrypted and private — Aida cannot read or summarize it.',
+        messageCount: messages.length,
+        encrypted: true,
+      });
+      return;
+    }
+    const transcript = transcriptLines.join('\n');
 
     let summary = '';
     if (hasKey()) {
@@ -576,7 +621,8 @@ export const summarizeConversation = async (req: Request, res: Response): Promis
     }
 
     if (!summary) {
-      summary = `Conversation with ${messages.length} message(s). Latest: "${messages[messages.length - 1]?.content?.substring(0, 100)}..."`;
+      const lastLine = transcriptLines[transcriptLines.length - 1] || '';
+      summary = `Conversation with ${messages.length} message(s). Latest: "${lastLine.substring(0, 100)}..."`;
     }
 
     res.status(200).json({ summary, messageCount: messages.length });
@@ -1291,11 +1337,17 @@ export const getConversationContext = async (req: Request, res: Response): Promi
       return;
     }
 
-    const transcript = messages
-      .reverse()
-      .map((m: any) => {
+    const resolvedForContext = await Promise.all(
+      messages.reverse().map(async (m: any) => ({
+        m,
+        text: (await resolveMessageText(m, String(conversationId), !!(conv as any).isGroupChat)) || (m.content ? null : '[media]'),
+      }))
+    );
+    const transcript = resolvedForContext
+      .filter(r => r.text !== null)
+      .map(({ m, text }: any) => {
         const name = m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || 'User');
-        return `${name}: ${m.content || '[media]'}`;
+        return `${name}: ${text}`;
       })
       .join('\n');
 
@@ -1479,10 +1531,12 @@ export const getAidaWritingSuggestions = async (req: Request, res: Response): Pr
         .limit(5)
         .populate('sender', 'full_name username')
         .lean();
-      conversationContext = recent
-        .reverse()
-        .map((m: any) => `${(m.sender?.full_name || m.sender?.username || 'User')}: ${m.content}`)
-        .join('\n');
+      conversationContext = (await buildTranscriptLines(
+        recent.reverse(),
+        String(conversationId),
+        !!(conv as any)?.isGroupChat,
+        (m: any) => (m.sender?.full_name || m.sender?.username || 'User')
+      )).join('\n');
 
       const { resolveUserOrg } = await import('../utils/orgResolver');
       const typer = await User.findById(userId);
@@ -1600,10 +1654,14 @@ export const aidaDraft = async (req: Request, res: Response): Promise<void> => {
       .limit(20)
       .populate('sender', 'full_name username')
       .lean();
-    const conversationContext = recent
-      .reverse()
-      .map((m: any) => `${m.sender?.full_name || m.sender?.username || 'User'}: ${m.content || `[${m.message_type || 'media'}]`}`)
-      .join('\n');
+    const draftLines: string[] = [];
+    for (const m of recent.reverse() as any[]) {
+      const text = await resolveMessageText(m, String(conversationId), !!conv.isGroupChat);
+      if (text) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: ${text}`);
+      else if (!m.content) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: [${m.message_type || 'media'}]`);
+      // encrypted-but-unreadable (private DM) lines are dropped
+    }
+    const conversationContext = draftLines.join('\n');
 
     // 2. Meeting transcripts shared by this group in the last 14 days. Prefer a direct
     //    chatId link; otherwise fall back to meetings among these participants.

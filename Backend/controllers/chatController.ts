@@ -94,7 +94,10 @@ export const formatConversation = async (c: any, userId?: any) => {
 
   latestMessage: (c.latestMessage && (!userId || !c.latestMessage.deletedFor || !c.latestMessage.deletedFor.some((id: any) => String(id) === String(userId)))) ? {
     id: c.latestMessage._id,
-    content: c.latestMessage.content || null,
+    // E2EE messages are ciphertext server-side — list previews show a lock
+    // instead of envelope JSON. Clients that hold the key decrypt in-thread.
+    content: c.latestMessage.is_encrypted ? '🔒 Message' : (c.latestMessage.content || null),
+    is_encrypted: c.latestMessage.is_encrypted ?? false,
     mediaUrl: c.latestMessage.mediaUrl || null,
     mediaType: c.latestMessage.mediaType || null,
     message_type: c.latestMessage.message_type || 'text',

@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { User } from '../models/users';
 
 export interface GoogleProfileInput {
@@ -19,28 +18,11 @@ const generateUniqueTag = async (): Promise<string> => {
   }
 };
 
-// Kick off RSA keypair generation without blocking the auth response.
-const attachKeypairInBackground = (userId: any) => {
-  crypto.generateKeyPair(
-    'rsa',
-    {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    },
-    async (err: any, pub: string, priv: string) => {
-      if (err) {
-        console.warn('[googleAuth] RSA keypair generation failed (non-fatal):', err.message);
-        return;
-      }
-      try {
-        await User.findByIdAndUpdate(userId, { publicKey: pub, privateKey: priv });
-      } catch (e: any) {
-        console.warn('[googleAuth] Failed to persist RSA keypair (non-fatal):', e.message);
-      }
-    }
-  );
-};
+// E2EE keypairs are generated CLIENT-SIDE (tweetnacl) and only the public key is
+// uploaded via PUT /profile/me. The server must never hold a user's private key —
+// the previous server-generated RSA pair (private key stored in the User doc)
+// defeated the purpose of E2EE and has been removed. Legacy `privateKey` values
+// are cleaned up by scripts/migrate-drop-private-keys.ts.
 
 /**
  * Resolve (find, link, or create) the Bubble user behind a Google identity.
@@ -98,7 +80,6 @@ export const findOrCreateGoogleUser = async (input: GoogleProfileInput) => {
       role: 'employee',
     });
     console.log(`[googleAuth] Created new Google user ${user._id}`);
-    attachKeypairInBackground(user._id);
     return user;
   } catch (createErr: any) {
     // E11000: a row for this googleId/email/uniqueTag was created in parallel, or

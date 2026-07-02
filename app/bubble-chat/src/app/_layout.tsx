@@ -80,7 +80,14 @@ function GlobalCallOverlay() {
   const [myName, setMyName] = useState('You');
   useEffect(() => {
     authStorage.getUser().then((u) => {
-      if (u) setMyName(u.full_name || u.username || 'You');
+      if (u) {
+        setMyName(u.full_name || u.username || 'You');
+        // E2EE bootstrap: ensure a device keypair exists and the server holds
+        // our public key (replaces any legacy server-generated PEM key).
+        import('../lib/e2ee')
+          .then(({ bootstrapE2EE }) => bootstrapE2EE(u.publicKey))
+          .catch((err) => console.warn('[e2ee] bootstrap failed:', err));
+      }
     }).catch(() => {});
   }, []);
 
@@ -177,7 +184,17 @@ function GlobalCallOverlay() {
         setIsScreenSharing(false);
       }
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      // Root layout is going away (logout/teardown): drop the call socket
+      // listeners this module registered so nothing keeps firing into dead UI.
+      import('../lib/socket').then(({ getSocket }) => {
+        const sock = getSocket();
+        if (sock) {
+          import('../lib/callManager').then(m => m.teardownCallSocketListeners(sock));
+        }
+      }).catch(() => undefined);
+    };
   }, []);
 
   // Fetch a LiveKit token once the call is connected. The component renders only

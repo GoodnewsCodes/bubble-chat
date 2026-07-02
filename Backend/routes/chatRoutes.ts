@@ -17,6 +17,7 @@ import {
   updateGroupSettings,
   getChatById,
 } from '../controllers/chatController';
+import { getConversationKeys, postConversationKeys } from '../controllers/keyController';
 
 
 const router = express.Router();
@@ -246,6 +247,11 @@ router.patch('/toggle-archive/:chatId', toggleArchiveChat);
  *         description: Chat deleted from your view.
  */
 router.delete('/:chatId', deleteChat);
+
+// E2EE key exchange: member/brain public keys + wrapped group keys.
+// Registered before the catch-all /:chatId GET.
+router.get('/:chatId/keys', getConversationKeys);
+router.post('/:chatId/keys', postConversationKeys);
 
 /**
  * GET /api/v1/chat/:chatId — Fetch one conversation with fully-populated members.

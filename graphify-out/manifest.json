@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/chat-avatar.tsx": {
-    "mtime": 1782900976.6417124,
-    "ast_hash": "a3d621ff2a3a967b3df9070ede039c29",
+    "mtime": 1782937053.1526713,
+    "ast_hash": "1a331b154324d0247607452fd13f2f3e",
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/chat-list.tsx": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/chat-window.tsx": {
-    "mtime": 1782861497.1164737,
-    "ast_hash": "12cbb685698b301696c8b3e899ac06b1",
+    "mtime": 1782937027.6581106,
+    "ast_hash": "5666e6e11cf7b22e0a95ca2f036d7ee2",
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/create-group-modal.tsx": {
@@ -430,8 +430,8 @@
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/contexts/AppContext.tsx": {
-    "mtime": 1782901388.6711996,
-    "ast_hash": "c47aff6aed4a4fb534dc771976e1ae27",
+    "mtime": 1782936866.5092978,
+    "ast_hash": "cd4927f6421d06a7eaeb3aba86762f22",
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/contexts/DashboardContext.tsx": {
@@ -635,8 +635,8 @@
     "semantic_hash": ""
   },
   "Backend/controllers/authController.ts": {
-    "mtime": 1782899201.7907884,
-    "ast_hash": "1fc578b425477133d43fda4a3cc0a1dd",
+    "mtime": 1782937141.6121688,
+    "ast_hash": "34caad517f0fc03ff8478b57c077573e",
     "semantic_hash": ""
   },
   "Backend/controllers/chatController.ts": {
@@ -675,8 +675,8 @@
     "semantic_hash": ""
   },
   "Backend/controllers/messageController.ts": {
-    "mtime": 1782850231.5166712,
-    "ast_hash": "b2cdbd611b6c06776f1a5dc4351f533b",
+    "mtime": 1782936806.2233386,
+    "ast_hash": "c847907dd424645999e058942939180c",
     "semantic_hash": ""
   },
   "Backend/controllers/messageRequestController.ts": {
@@ -735,8 +735,8 @@
     "semantic_hash": ""
   },
   "Backend/index.ts": {
-    "mtime": 1782841676.3313823,
-    "ast_hash": "bde30845e5fb486304e34bcf39cb05f7",
+    "mtime": 1782937155.6022444,
+    "ast_hash": "c945962f0de94de68873c592a5772a9d",
     "semantic_hash": ""
   },
   "Backend/middleware/passport.ts": {
@@ -760,8 +760,8 @@
     "semantic_hash": ""
   },
   "Backend/models/conversations.ts": {
-    "mtime": 1782350000.4915905,
-    "ast_hash": "3147d02a1e86daf054e7f9ceca758d82",
+    "mtime": 1782936832.997218,
+    "ast_hash": "30154ada9861ba9a11a98d4e25955e8f",
     "semantic_hash": ""
   },
   "Backend/models/feed.ts": {
@@ -790,8 +790,8 @@
     "semantic_hash": ""
   },
   "Backend/models/messages.ts": {
-    "mtime": 1782755652.0059288,
-    "ast_hash": "f59c6c93681de57fcc8a0a53e5345734",
+    "mtime": 1782936817.2220452,
+    "ast_hash": "be349f166e00e77d1fe78e0efcafac9d",
     "semantic_hash": ""
   },
   "Backend/models/network.ts": {
@@ -1080,8 +1080,8 @@
     "semantic_hash": ""
   },
   "Backend/utils/socket.ts": {
-    "mtime": 1782901090.6937704,
-    "ast_hash": "3765e4daf9ca601d5f7b708484cbc5be",
+    "mtime": 1782937154.1881368,
+    "ast_hash": "8ded3cfbc04cb534ab8e837fe967bd2c",
     "semantic_hash": ""
   },
   "Backend/utils/whisperService.ts": {
@@ -1660,12 +1660,12 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/login.tsx": {
-    "mtime": 1782887751.9060056,
+    "mtime": 1782938465.424852,
     "ast_hash": "52452370a7a54181b5021338bc23f19d",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/signup.tsx": {
-    "mtime": 1782887780.8859906,
+    "mtime": 1782938469.2780998,
     "ast_hash": "6205fd63b122021f9dca73d7c4864e52",
     "semantic_hash": ""
   },
@@ -1740,8 +1740,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/authStorage.ts": {
-    "mtime": 1781294831.0731623,
-    "ast_hash": "3632898e3608ee7ea93cc961761d1764",
+    "mtime": 1782937214.7541378,
+    "ast_hash": "a6265087d76dd5588320d3102068ed88",
     "semantic_hash": ""
   },
   "app/bubble-chat/assets/images/file-building.png": {
@@ -1945,8 +1945,8 @@
     "semantic_hash": ""
   },
   "Backend/utils/envCheck.ts": {
-    "mtime": 1781866389.9491231,
-    "ast_hash": "264b9afc46be97d5da47d8cd52263f7e",
+    "mtime": 1782937173.7113273,
+    "ast_hash": "e180c409e744294c01b3e9022f9c1a8d",
     "semantic_hash": ""
   },
   "Backend/utils/livekitEgress.ts": {

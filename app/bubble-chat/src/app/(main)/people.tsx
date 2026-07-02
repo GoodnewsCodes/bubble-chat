@@ -1118,6 +1118,11 @@ export default function PeopleScreen() {
                     </Text>
                   </View>
 
+                  {/* Host identity — who started this room */}
+                  <Text style={{ fontSize: 10, fontFamily: 'Poppins_500Medium', color: colors.textSoft, marginBottom: 8 }} numberOfLines={1}>
+                    Hosted by {host?.full_name || host?.username || 'Someone'}
+                  </Text>
+
                   {/* Stacked participant avatars + overflow badge (matches web live-room card) */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>

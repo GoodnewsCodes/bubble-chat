@@ -96,7 +96,22 @@ export const ingestToBrain = async (params: IngestToBrainParams): Promise<Ingest
                 });
             }
         }
-        if (vectors.length > 0) await upsertVectors(vectors, namespace);
+        if (vectors.length > 0) {
+            // A transient Pinecone blip must not silently lose searchability —
+            // retry with backoff, and on final failure mark the doc for the
+            // scheduler's re-embed pass instead of dropping the vectors.
+            let upserted = false;
+            for (let attempt = 1; attempt <= 3 && !upserted; attempt++) {
+                try {
+                    await upsertVectors(vectors, namespace);
+                    upserted = true;
+                } catch (err) {
+                    console.error(`[BrainIngest] Pinecone upsert attempt ${attempt}/3 failed for "${title}":`, err);
+                    if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 2000));
+                }
+            }
+            if (!upserted) pineconeIds.length = 0;
+        }
     }
 
     const doc = await OrgDocument.create({
@@ -108,6 +123,12 @@ export const ingestToBrain = async (params: IngestToBrainParams): Promise<Ingest
         organizationId: orgId,
         pineconeIds,
         tags,
+        embedStatus:
+            !hasPinecone() || !embeddingsConfigured()
+                ? 'skipped' // vector store not configured — nothing to retry
+                : pineconeIds.length > 0 || totalChunks === 0
+                    ? 'embedded'
+                    : 'failed', // configured but nothing landed — re-embed job picks this up
     });
 
     // Back-fill the vector metadata with the real Mongo doc id (best-effort: we
@@ -125,4 +146,63 @@ export const ingestToBrain = async (params: IngestToBrainParams): Promise<Ingest
     }
 
     return { doc, pineconeIds, totalChunks, embeddingsSkipped };
+};
+
+/**
+ * Retry embedding for OrgDocuments whose vectors never landed (embedStatus:
+ * 'failed'). Called by the scheduler alongside the transcript catch-up job so a
+ * Pinecone/HF outage heals itself without manual intervention.
+ */
+export const reembedFailedDocs = async (limit = 10): Promise<number> => {
+    if (!hasPinecone() || !embeddingsConfigured()) return 0;
+
+    const { Organization } = await import('../models/organizations');
+    const failed = await OrgDocument.find({ embedStatus: 'failed' })
+        .sort({ updatedAt: 1 })
+        .limit(limit);
+
+    let healed = 0;
+    for (const doc of failed) {
+        try {
+            const org = await Organization.findById(doc.organizationId).select('pineconeNamespace');
+            if (!org) continue;
+            const namespace = (org as any).pineconeNamespace || `org-${org._id}`;
+            const chunks = chunkText(doc.content, 500, 100);
+            const createdAtTs = doc.createdAt.getTime();
+            const vectors = [];
+            const ids: string[] = [];
+            for (const chunk of chunks) {
+                const embedding = await generateEmbedding(chunk);
+                if (embedding.length > 0) {
+                    const id = `brain-${crypto.randomUUID()}`;
+                    ids.push(id);
+                    vectors.push({
+                        id,
+                        values: embedding,
+                        metadata: {
+                            title: doc.title,
+                            chunk,
+                            department: doc.department,
+                            accessLevel: doc.accessLevel,
+                            organizationId: String(doc.organizationId),
+                            sourceKind: 'document',
+                            sourceRef: String(doc._id),
+                            createdAtTs,
+                        },
+                    });
+                }
+            }
+            if (vectors.length > 0) {
+                await upsertVectors(vectors, namespace);
+                doc.pineconeIds = ids;
+                doc.embedStatus = 'embedded';
+                await doc.save();
+                healed++;
+                console.log(`[BrainIngest] re-embedded "${doc.title}" (${ids.length} chunks)`);
+            }
+        } catch (err) {
+            console.error(`[BrainIngest] re-embed failed for "${doc.title}":`, err);
+        }
+    }
+    return healed;
 };

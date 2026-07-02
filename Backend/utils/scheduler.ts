@@ -167,9 +167,16 @@ export const processTranscriptQueue = async () => {
 
 // 3. Initialize transcript background processor
 export const initTranscriptProcessor = () => {
-  // Run every 5 minutes
+  // Run every 5 minutes. The re-embed pass rides along so brain documents whose
+  // Pinecone upsert failed (embedStatus: 'failed') heal automatically.
   cron.schedule('*/5 * * * *', async () => {
     await processTranscriptQueue();
+    try {
+      const { reembedFailedDocs } = await import('./brainIngest');
+      await reembedFailedDocs();
+    } catch (err) {
+      console.error('❌ [BrainIngest] re-embed pass error:', err);
+    }
   });
 
   // Run once at startup
@@ -232,7 +239,8 @@ export const processTaskReminders = async () => {
         const user = await User.findById(assignedUserId);
 
         const emailMode: string = (user as any)?.actionItemEmailMode ?? 'each';
-        if (user && user.email && emailMode === 'each') {
+        const emailsAllowed = (user as any)?.privacy_settings?.email_notifications !== false;
+        if (user && user.email && emailMode === 'each' && emailsAllowed) {
           const daysText = newLevel === '5d' ? '5 days' : newLevel === '2d' ? '2 days' : '1 day';
           await sendTaskReminderEmail(
             user.email,
@@ -340,9 +348,10 @@ export const processActionItemFollowUps = async () => {
 
         // Best-effort email nudge — only when user has opted for per-item emails.
         try {
-          const user = await User.findById(assigneeId).select('email full_name username actionItemEmailMode');
+          const user = await User.findById(assigneeId).select('email full_name username actionItemEmailMode privacy_settings');
           const emailMode: string = (user as any)?.actionItemEmailMode ?? 'each';
-          if (user?.email && emailMode === 'each') {
+          const emailsAllowed = (user as any)?.privacy_settings?.email_notifications !== false;
+          if (user?.email && emailMode === 'each' && emailsAllowed) {
             const { sendTaskReminderEmail } = await import('./mailer');
             await sendTaskReminderEmail(
               user.email,
@@ -382,7 +391,7 @@ export const initActionItemFollowUpScheduler = () => {
  * Generates personalized morning briefs for all active users across all orgs.
  * Runs at 07:00 UTC daily. Each user's digest is cached in DailyDigest collection.
  */
-export const runDailyDigestJob = async () => {
+export const runDailyDigestJob = async (forHourUtc?: number) => {
   try {
     const { User } = await import('../models/users');
     const { generateDigestForUser } = await import('../controllers/digestController');
@@ -390,13 +399,23 @@ export const runDailyDigestJob = async () => {
     const { PushToken } = await import('../models/pushToken');
 
     // Find all users who belong to an org and have digest enabled (or default)
-    const users = await User.find({
+    const allUsers = await User.find({
       organization: { $exists: true, $ne: '' },
       $or: [
         { 'digestPreferences.enabled': true },
         { 'digestPreferences.enabled': { $exists: false } }, // default on
       ],
-    }).select('_id full_name username email digestPreferences actionItemEmailMode').limit(500);
+    }).select('_id full_name username email digestPreferences actionItemEmailMode privacy_settings').limit(500);
+
+    // Honor each user's preferred delivery hour (digestPreferences.notifyTime,
+    // "HH:MM"); users without a preference get the 07:00 default. When invoked
+    // without an hour (manual run), everyone matches.
+    const users = forHourUtc === undefined ? allUsers : allUsers.filter(u => {
+      const notifyTime: string = (u as any).digestPreferences?.notifyTime || '07:00';
+      const hour = parseInt(notifyTime.split(':')[0], 10);
+      return (Number.isFinite(hour) ? hour : 7) === forHourUtc;
+    });
+    if (users.length === 0) return;
 
     console.log(`📅 [DailyDigest] Generating briefs for ${users.length} users...`);
 
@@ -419,8 +438,9 @@ export const runDailyDigestJob = async () => {
           digest.pushSent = true;
           await digest.save();
 
-          // Also email the same brief (in addition to push). Best-effort.
-          if ((user as any).email) {
+          // Also email the same brief (in addition to push). Best-effort, and
+          // only if the user hasn't turned email notifications off.
+          if ((user as any).email && (user as any).privacy_settings?.email_notifications !== false) {
             try {
               const { sendDigestEmail } = await import('./mailer');
               let emailBody = digest.morningBrief;
@@ -466,13 +486,15 @@ export const runDailyDigestJob = async () => {
 };
 
 export const initDailyDigestScheduler = () => {
-  // Run every day at 07:00 UTC
-  cron.schedule('0 7 * * *', async () => {
-    console.log('📅 [DailyDigest] 07:00 UTC — Running daily digest job...');
-    await runDailyDigestJob();
+  // Run hourly; each pass delivers to users whose digestPreferences.notifyTime
+  // matches the current UTC hour (default 07:00). This makes notifyTime real
+  // instead of a stored-but-ignored preference.
+  cron.schedule('0 * * * *', async () => {
+    const hour = new Date().getUTCHours();
+    await runDailyDigestJob(hour);
   });
 
-  console.log('📅 [DailyDigest] Scheduler initialized (runs daily at 07:00 UTC).');
+  console.log('📅 [DailyDigest] Scheduler initialized (hourly, honoring digestPreferences.notifyTime).');
 };
 
 // ─── Weekly Digest Generator ────────────────────────────────────────────────────
