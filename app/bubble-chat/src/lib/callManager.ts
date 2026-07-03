@@ -411,8 +411,11 @@ export const setupCallSocketListeners = (socket: any) => {
 
   socket.on('incoming_call', (data: { fromUserId: string; roomId: string; callerName?: string; callerAvatar?: string; type?: 'voice' | 'video' }) => {
     if (currentCallState.status !== 'idle') {
-      // Busy, reject immediately
-      socket.emit('call_reject', { toUserId: data.fromUserId });
+      // Busy: reject the NEW call. Crucially, scope the reject to the incoming
+      // call's roomId so the server's echoed `call_ended` carries that room —
+      // otherwise a roomless `call_ended` bounces back to us and tears down the
+      // call we're ALREADY in ("someone ringing me killed my active call").
+      socket.emit('call_reject', { toUserId: data.fromUserId, roomId: data.roomId });
       return;
     }
 
@@ -478,7 +481,10 @@ export const setupCallSocketListeners = (socket: any) => {
   });
 
   socket.on('call_rejected', () => {
-    if (currentCallState.status === 'calling_out' || currentCallState.status === 'in_call') {
+    // Only a still-ringing OUTGOING call is cancelled by a rejection. If we're
+    // already in a call (e.g. we invited an extra participant who turned out to be
+    // busy), their decline must NOT end our ongoing call.
+    if (currentCallState.status === 'calling_out') {
       hangUpCall();
     }
   });
@@ -500,10 +506,16 @@ export const setupCallSocketListeners = (socket: any) => {
   socket.on('call_ended', (data: { roomId?: string; byUserId?: string }) => {
     const status = currentCallState.status;
     if (status === 'idle') return;
-    // Match by room when present; otherwise fall back to "any active call".
-    if (!data?.roomId || data.roomId === currentCallState.roomId) {
-      hangUpCall();
+    // A room-scoped end only tears down the call in THAT room — never a different,
+    // already-connected call. This is what stops another person's action (e.g. a
+    // busy-reject of a fresh incoming ring) from ending the call you're in.
+    if (data?.roomId) {
+      if (data.roomId === currentCallState.roomId) hangUpCall();
+      return;
     }
+    // Roomless end (legacy timeout / give-up): only cancel a call that is still
+    // RINGING, never one that's already connected.
+    if (status !== 'in_call') hangUpCall();
   });
 
   // Someone is knocking to join a live room we host / are in. Prompt to admit.

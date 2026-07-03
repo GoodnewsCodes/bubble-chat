@@ -455,10 +455,18 @@ export const initSocket = (server: HttpServer) => {
         if (gc) gc.joined.add(String(userId));
       }
 
-      // Reach BOTH parties by userId regardless of whether they joined a room.
-      io.to(data.toUserId).emit('call_rejected', { byUserId: userId });
-      io.to(data.toUserId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
-      io.to(userId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
+      // Always tell the caller that THIS invitee declined (informational).
+      io.to(data.toUserId).emit('call_rejected', { byUserId: userId, roomId: data.roomId });
+
+      // Only a plain 1:1 call (never registered as a group/invite room) is torn
+      // down by a decline. If the room is an active group/invite call, the caller
+      // is a host with an ONGOING call and one invitee declining must not end it —
+      // so we do NOT broadcast `call_ended` for those rooms.
+      const isGroupOrInvite = data.roomId ? activeGroupCalls.has(data.roomId) : false;
+      if (!isGroupOrInvite) {
+        io.to(data.toUserId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
+        io.to(userId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
+      }
 
       logActivity({
         actor: userId,

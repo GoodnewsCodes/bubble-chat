@@ -310,11 +310,22 @@ export default function ChatScreen() {
   // Deep Aida "Draft" (F5): a full context-aware reply fills the input.
   const [isDrafting, setIsDrafting] = useState(false);
 
+  // For E2EE chats the server can't read the ciphertext, so we hand Aida the
+  // locally-decrypted recent lines (transient — never stored server-side). For
+  // plaintext chats we send nothing and let the server read directly.
+  const buildAidaContext = (limit = 20): string[] | undefined => {
+    if (!cipherRef.current) return undefined;
+    return messages
+      .filter(m => m.sender !== 'system' && m.text)
+      .slice(-limit)
+      .map(m => `${m.sender === 'me' ? 'Me' : (m.senderName || chat?.name || 'Them')}: ${m.text}`);
+  };
+
   const handleDraftForMe = async () => {
     if (isDrafting) return;
     setIsDrafting(true);
     try {
-      const res = await aidaDraft(String(id), messageText.trim() || undefined);
+      const res = await aidaDraft(String(id), messageText.trim() || undefined, buildAidaContext());
       if (res?.draft) {
         setMessageText(res.draft);
         setAidaSuggestions([]);
@@ -362,7 +373,7 @@ export default function ChatScreen() {
 
     const fetchSuggestions = async () => {
       try {
-        const response = await getAidaWritingSuggestions(lastReceived.text, String(id));
+        const response = await getAidaWritingSuggestions(lastReceived.text, String(id), buildAidaContext());
         const suggestionsList = response?.suggestions || response?.data || [];
         setAidaSuggestions(suggestionsList);
       } catch (err: any) {

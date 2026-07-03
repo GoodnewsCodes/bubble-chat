@@ -842,22 +842,24 @@ export const toggleArchiveChat = async (chatId: string) => {
     return handleResponse(res);
 };
 
-export const getAidaWritingSuggestions = async (message: string, conversationId: string) => {
+// recentContext (decrypted "Name: text" lines) is passed for E2EE chats so Aida
+// keeps working without the server ever reading/storing the ciphertext.
+export const getAidaWritingSuggestions = async (message: string, conversationId: string, recentContext?: string[]) => {
     const res = await fetch(`${BASE_URL}/aida/writing-suggestions`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ message, conversationId }),
+        body: JSON.stringify({ message, conversationId, recentContext }),
     });
     return handleResponse(res);
 };
 
 // Context-Aware Draft on Behalf (Deep Aida): one full reply from the whole
 // conversation + related meeting transcripts + open action items (F5).
-export const aidaDraft = async (conversationId: string, currentMessage?: string) => {
+export const aidaDraft = async (conversationId: string, currentMessage?: string, recentContext?: string[]) => {
     const res = await fetch(`${BASE_URL}/aida/draft`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ conversationId, currentMessage }),
+        body: JSON.stringify({ conversationId, currentMessage, recentContext }),
     });
     return handleResponse(res);
 };
@@ -1326,7 +1328,16 @@ export const chatMessageAida = async (message: string, conversationId?: string) 
     return handleResponse(res);
 };
 
-export const fetchAidaConversationSummary = async (conversationId: string) => {
+export const fetchAidaConversationSummary = async (conversationId: string, recentContext?: string[]) => {
+    // For E2EE chats POST the decrypted lines; otherwise a plain GET.
+    if (recentContext && recentContext.length > 0) {
+        const res = await fetch(`${BASE_URL}/aida/conversation-summary/${conversationId}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ recentContext }),
+        });
+        return handleResponse(res);
+    }
     const res = await fetch(`${BASE_URL}/aida/conversation-summary/${conversationId}`, { headers: getAuthHeaders() });
     return handleResponse(res);
 };

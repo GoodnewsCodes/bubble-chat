@@ -27,6 +27,7 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, Share, Pan
 import { Image } from "expo-image";
 import { Phone, PhoneOff, Mic, MicOff, Volume2, Video, VideoOff, Minimize2, Maximize2, UserPlus, Link2, X, Monitor, MonitorOff } from "lucide-react-native";
 import { CameraView, Camera } from "expo-camera";
+import { BlurView } from "expo-blur";
 import { subscribeCallState, acceptIncomingCall, declineIncomingCall, hangUpCall, inviteToCall, getLinkJoinToken, CallState, getPersistedCall, clearPersistedCall, rejoinPersistedCall } from "../lib/callManager";
 import { authStorage } from "../lib/authStorage";
 import { fetchActiveMeetings } from "../lib/api";
@@ -319,6 +320,55 @@ function GlobalCallOverlay() {
       </View>
     )
   );
+
+  // ── Incoming ringer ─────────────────────────────────────────────────────────
+  // A dedicated "liquid glass" card (blurred, dimmed backdrop) shown ONLY while an
+  // incoming call is ringing — matches the design: rounded-square avatar, caller
+  // name, "INCOMING <TYPE> CALL…" label, and red-decline / green-accept circles.
+  if (isIncoming) {
+    return (
+      <View style={styles.ringerRoot}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.ringerDim} pointerEvents="none" />
+        <View style={styles.ringerCardWrap}>
+          <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={styles.ringerCardInner}>
+            {/* Pulsing halo behind the avatar */}
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute', top: 0, width: 180, height: 180, borderRadius: 44,
+                backgroundColor: 'rgba(108,92,231,0.18)',
+                opacity: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.6] }),
+                transform: [{ scale: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] }) }],
+              }}
+            />
+            <View style={styles.ringerAvatarFrame}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri || undefined }} style={styles.ringerAvatarImg} />
+              ) : (
+                <View style={[styles.ringerAvatarImg, styles.ringerAvatarFallback]}>
+                  <Text style={styles.ringerAvatarInitials}>{getGroupInitials(name)}</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.ringerName} numberOfLines={1}>{name}</Text>
+            <Text style={styles.ringerSub}>INCOMING {isVideo ? 'VIDEO' : 'VOICE'} CALL…</Text>
+
+            <View style={styles.ringerButtonsRow}>
+              <TouchableOpacity onPress={() => declineIncomingCall()} style={[styles.ringerBtn, styles.ringerDecline]} activeOpacity={0.85}>
+                <PhoneOff color="#ffffff" size={28} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => acceptIncomingCall()} style={[styles.ringerBtn, styles.ringerAccept]} activeOpacity={0.85}>
+                {isVideo ? <Video color="#ffffff" size={28} /> : <Phone color="#ffffff" size={28} />}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   // Single unified tree for both full-screen and minimized states. The media slot
   // holding <LiveKitCallRoom> always renders at the same JSX position regardless of
@@ -892,6 +942,41 @@ const styles = StyleSheet.create({
     paddingVertical: 72,
     paddingHorizontal: 24,
   },
+  // ── Incoming "liquid glass" ringer ──
+  ringerRoot: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 9999, elevation: 24,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  ringerDim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,18,30,0.35)' },
+  ringerCardWrap: {
+    width: '100%', maxWidth: 420,
+    borderRadius: 34, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 30, shadowOffset: { width: 0, height: 18 },
+    elevation: 18,
+  },
+  ringerCardInner: { alignItems: 'center', paddingTop: 34, paddingBottom: 30, paddingHorizontal: 24 },
+  ringerAvatarFrame: {
+    width: 150, height: 150, borderRadius: 40, overflow: 'hidden',
+    borderWidth: 3, borderColor: 'rgba(255,255,255,0.65)',
+    backgroundColor: PURPLE,
+    shadowColor: PURPLE, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
+  },
+  ringerAvatarImg: { width: '100%', height: '100%' },
+  ringerAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: PURPLE },
+  ringerAvatarInitials: { color: '#fff', fontSize: 48, fontFamily: 'SpaceGrotesk_700Bold' },
+  ringerName: { marginTop: 22, color: '#ffffff', fontSize: 26, fontFamily: 'SpaceGrotesk_700Bold', textAlign: 'center' },
+  ringerSub: { marginTop: 8, color: 'rgba(255,255,255,0.82)', fontSize: 13, letterSpacing: 2, fontFamily: 'Poppins_700Bold' },
+  ringerButtonsRow: { flexDirection: 'row', gap: 44, marginTop: 30 },
+  ringerBtn: {
+    width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  ringerDecline: { backgroundColor: RED },
+  ringerAccept: { backgroundColor: GREEN },
   minimizeButton: {
     position: 'absolute',
     top: 54,

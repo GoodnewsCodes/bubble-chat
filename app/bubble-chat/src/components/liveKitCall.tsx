@@ -9,7 +9,7 @@ import {
   isTrackReference,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { MessageSquare, Users, FileText, X, Send, Smile, Paperclip } from 'lucide-react-native';
+import { MessageSquare, Users, FileText, X, Send, Smile, Paperclip, Mic, MicOff } from 'lucide-react-native';
 import { getSocket } from '../lib/socket';
 import { uploadGroupOrOrgImage, getSecureMediaUrl } from '../lib/api';
 
@@ -93,6 +93,61 @@ const participantAvatar = (p: any): string | undefined => {
 };
 
 /**
+ * Voice-call "Audio Conference" stage. Renders a large active-speaker tile plus a
+ * row of participant tiles (avatar, name, live mic status, speaking highlight) so a
+ * voice call shows everyone on the call — mirroring the design's audio-conference
+ * layout instead of a single static avatar. Lives inside <LiveKitRoom>.
+ */
+function AudioConferenceArea() {
+  const participants = useParticipants();
+
+  // Active speaker wins the main stage; otherwise the first remote, otherwise self.
+  const speaking = participants.find((p) => p.isSpeaking);
+  const firstRemote = participants.find((p) => !p.isLocal);
+  const main = speaking || firstRemote || participants[0];
+  const others = participants.filter((p) => p !== main);
+
+  const Tile = ({ p, size }: { p: any; size: number }) => {
+    const micOn = p?.isMicrophoneEnabled;
+    return (
+      <View style={[styles.audioTile, p?.isSpeaking && styles.audioTileSpeaking]}>
+        <ParticipantAvatar name={p?.name} avatar={participantAvatar(p)} size={size} />
+        <Text numberOfLines={1} style={styles.audioTileName}>
+          {p?.name || 'Participant'}{p?.isLocal ? ' (You)' : ''}
+        </Text>
+        <View style={styles.audioMicBadge}>
+          {micOn ? <Mic size={12} color="#22c55e" /> : <MicOff size={12} color="#ef4444" />}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.audioStage}>
+      {/* Main active-speaker card */}
+      <View style={[styles.audioMainCard, main?.isSpeaking && styles.audioMainCardSpeaking]}>
+        <ParticipantAvatar name={main?.name} avatar={participantAvatar(main)} size={120} />
+        <Text numberOfLines={1} style={styles.audioMainName}>
+          {main?.name || 'Participant'}{main?.isLocal ? ' (You)' : ''}
+        </Text>
+        <View style={styles.audioMainMicRow}>
+          {main?.isMicrophoneEnabled
+            ? <><Mic size={13} color="#22c55e" /><Text style={styles.audioMainMicText}>Speaking</Text></>
+            : <><MicOff size={13} color="#ef4444" /><Text style={[styles.audioMainMicText, { color: '#ef4444' }]}>Muted</Text></>}
+        </View>
+      </View>
+
+      {/* Participant row */}
+      {others.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.audioRow}>
+          {others.map((p, i) => <Tile key={p?.sid || p?.identity || i} p={p} size={54} />)}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+/**
  * Renders the main video stage (screen-share, else the first remote, else local) with
  * the local camera as a picture-in-picture tile, plus a horizontally-scrolling row of
  * thumbnails for every other participant — matching the web meeting modal's main-stage
@@ -159,7 +214,10 @@ function VideoArea({ isVideo, fallback }: { isVideo: boolean; fallback: React.Re
   }
 
   if (!isVideo) {
-    return <>{fallback}</>;
+    // Voice call: show the multi-participant audio-conference stage. `fallback`
+    // (single avatar) is retained only for the brief pre-connect moment handled
+    // by the parent overlay, not here.
+    return <AudioConferenceArea />;
   }
 
   const mainIsLocal = main?.participant?.isLocal;
@@ -538,6 +596,24 @@ export default function LiveKitCallRoom({
 const styles = StyleSheet.create({
   fill: { flex: 1, width: '100%', height: '100%' },
   fillCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  // ── Voice "Audio Conference" stage ──
+  audioStage: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  audioMainCard: {
+    width: '86%', maxWidth: 360, borderRadius: 26, paddingVertical: 30, alignItems: 'center',
+    backgroundColor: 'rgba(108,92,231,0.10)', borderWidth: 1.5, borderColor: 'rgba(108,92,231,0.35)',
+  },
+  audioMainCardSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(108,92,231,0.18)' },
+  audioMainName: { marginTop: 16, color: '#fff', fontSize: 19, fontFamily: 'Poppins_700Bold' },
+  audioMainMicRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  audioMainMicText: { color: '#22c55e', fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
+  audioRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingTop: 20 },
+  audioTile: {
+    width: 92, borderRadius: 18, paddingVertical: 12, alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  audioTileSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(108,92,231,0.16)' },
+  audioTileName: { marginTop: 8, color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: 'Poppins_600SemiBold', maxWidth: 84 },
+  audioMicBadge: { marginTop: 5 },
   screenShareBadge: {
     position: 'absolute', top: 12, left: 12,
     backgroundColor: 'rgba(0,0,0,0.55)',

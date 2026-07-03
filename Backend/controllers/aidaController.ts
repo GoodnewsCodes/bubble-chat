@@ -582,33 +582,47 @@ export const summarizeConversation = async (req: Request, res: Response): Promis
     const conv = await Conversation.findOne({ _id: id, users: userId });
     if (!conv) { res.status(404).json({ error: 'Conversation not found' }); return; }
 
-    const messages = await Message.find({ chat: id })
-      .sort({ createdAt: -1 })
-      .limit(30)
-      .populate('sender', 'full_name username is_bot')
-      .lean();
+    // For an E2EE DM the caller (a participant) may POST decrypted lines so their
+    // own summary request still works. Used transiently, never stored/ingested.
+    const clientContext: string[] | undefined = Array.isArray(req.body?.recentContext)
+      ? req.body.recentContext.filter((l: any) => typeof l === 'string')
+      : undefined;
 
-    if (messages.length === 0) {
-      res.status(200).json({ summary: 'No messages in this conversation yet.' });
-      return;
-    }
+    let transcript: string;
+    let messageCount: number;
+    if (clientContext && clientContext.length > 0) {
+      transcript = clientContext.slice(-30).join('\n').slice(0, 6000);
+      messageCount = clientContext.length;
+    } else {
+      const messages = await Message.find({ chat: id })
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .populate('sender', 'full_name username is_bot')
+        .lean();
 
-    const transcriptLines = await buildTranscriptLines(
-      messages.reverse(),
-      String(id),
-      !!(conv as any).isGroupChat,
-      (m: any) => (m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || m.sender?.username || 'User'))
-    );
-    if (transcriptLines.length === 0) {
-      // Every message was E2EE and outside the Brain's reach (private DM).
-      res.status(200).json({
-        summary: 'This conversation is end-to-end encrypted and private — Aida cannot read or summarize it.',
-        messageCount: messages.length,
-        encrypted: true,
-      });
-      return;
+      if (messages.length === 0) {
+        res.status(200).json({ summary: 'No messages in this conversation yet.' });
+        return;
+      }
+
+      const transcriptLines = await buildTranscriptLines(
+        messages.reverse(),
+        String(id),
+        !!(conv as any).isGroupChat,
+        (m: any) => (m.sender?.is_bot ? 'Aida' : (m.sender?.full_name || m.sender?.username || 'User'))
+      );
+      if (transcriptLines.length === 0) {
+        // Every message was E2EE and the client sent no decrypted context.
+        res.status(200).json({
+          summary: 'This conversation is end-to-end encrypted and private — open it on a device with the keys to summarize.',
+          messageCount: messages.length,
+          encrypted: true,
+        });
+        return;
+      }
+      transcript = transcriptLines.join('\n');
+      messageCount = messages.length;
     }
-    const transcript = transcriptLines.join('\n');
 
     let summary = '';
     if (hasKey()) {
@@ -621,11 +635,12 @@ export const summarizeConversation = async (req: Request, res: Response): Promis
     }
 
     if (!summary) {
-      const lastLine = transcriptLines[transcriptLines.length - 1] || '';
-      summary = `Conversation with ${messages.length} message(s). Latest: "${lastLine.substring(0, 100)}..."`;
+      const lines = transcript.split('\n');
+      const lastLine = lines[lines.length - 1] || '';
+      summary = `Conversation with ${messageCount} message(s). Latest: "${lastLine.substring(0, 100)}..."`;
     }
 
-    res.status(200).json({ summary, messageCount: messages.length });
+    res.status(200).json({ summary, messageCount });
   } catch (error: any) {
     console.error('[Aida] Summarize error:', error);
     res.status(500).json({ error: 'Failed to summarize conversation.' });
@@ -1508,7 +1523,7 @@ export const getConversationContext = async (req: Request, res: Response): Promi
  */
 export const getAidaWritingSuggestions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, recentContext } = req.body;
     const userId = (req.user as any)?._id;
 
     if (!message || message.length < 3) {
@@ -1526,6 +1541,17 @@ export const getAidaWritingSuggestions = async (req: Request, res: Response): Pr
     let brainKnowledge = '';
     let contextRecall = ''; // a named recall hint when a missed meeting/announcement is relevant
     if (conversationId) {
+      // E2EE DMs are unreadable server-side. When the caller (a participant) sends
+      // the recent plaintext it already holds, use it transiently for THIS request
+      // only — never stored, never ingested — so the user's own writing help still
+      // works without the server ever persisting readable DM content.
+      if (Array.isArray(recentContext) && recentContext.length > 0) {
+        conversationContext = recentContext
+          .filter((l: any) => typeof l === 'string')
+          .slice(-5)
+          .join('\n')
+          .slice(0, 2000);
+      } else {
       const recent = await Message.find({ chat: conversationId })
         .sort({ createdAt: -1 })
         .limit(5)
@@ -1537,6 +1563,7 @@ export const getAidaWritingSuggestions = async (req: Request, res: Response): Pr
         !!(conv as any)?.isGroupChat,
         (m: any) => (m.sender?.full_name || m.sender?.username || 'User')
       )).join('\n');
+      }
 
       const { resolveUserOrg } = await import('../utils/orgResolver');
       const typer = await User.findById(userId);
@@ -1625,7 +1652,7 @@ export const getAidaWritingSuggestions = async (req: Request, res: Response): Pr
 // other party owes. That cross-channel context is what no single-channel AI can do.
 export const aidaDraft = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { conversationId, currentMessage } = req.body;
+    const { conversationId, currentMessage, recentContext } = req.body;
     const userId = (req.user as any)?._id;
 
     if (!conversationId) {
@@ -1648,18 +1675,26 @@ export const aidaDraft = async (req: Request, res: Response): Promise<void> => {
       ? (conv.chatName || 'the group')
       : (others[0]?.full_name || others[0]?.username || 'them');
 
-    // 1. Last ~20 messages of the thread (chronological).
-    const recent = await Message.find({ chat: conversationId })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .populate('sender', 'full_name username')
-      .lean();
+    // 1. Last ~20 messages of the thread (chronological). For E2EE DMs the caller
+    // supplies decrypted lines (used transiently, never stored) so "Draft for me"
+    // still works without the server ever persisting readable DM content.
     const draftLines: string[] = [];
-    for (const m of recent.reverse() as any[]) {
-      const text = await resolveMessageText(m, String(conversationId), !!conv.isGroupChat);
-      if (text) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: ${text}`);
-      else if (!m.content) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: [${m.message_type || 'media'}]`);
-      // encrypted-but-unreadable (private DM) lines are dropped
+    if (Array.isArray(recentContext) && recentContext.length > 0) {
+      for (const l of recentContext.slice(-20)) {
+        if (typeof l === 'string') draftLines.push(l.slice(0, 500));
+      }
+    } else {
+      const recent = await Message.find({ chat: conversationId })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .populate('sender', 'full_name username')
+        .lean();
+      for (const m of recent.reverse() as any[]) {
+        const text = await resolveMessageText(m, String(conversationId), !!conv.isGroupChat);
+        if (text) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: ${text}`);
+        else if (!m.content) draftLines.push(`${m.sender?.full_name || m.sender?.username || 'User'}: [${m.message_type || 'media'}]`);
+        // encrypted-but-unreadable (private DM) lines are dropped
+      }
     }
     const conversationContext = draftLines.join('\n');
 

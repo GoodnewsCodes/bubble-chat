@@ -32,6 +32,8 @@ const requireAuth = passport.authenticate('jwt', { session: false });
 router.get('/conversation', requireAuth, getAidaConversation);
 router.post('/chat-message', requireAuth, requireAidaKey, chatWithAidaInConversation);
 router.get('/conversation-summary/:id', requireAuth, requireAidaKey, summarizeConversation);
+// POST variant lets clients pass decrypted recentContext for E2EE DMs.
+router.post('/conversation-summary/:id', requireAuth, requireAidaKey, summarizeConversation);
 router.get('/conversation-context/:conversationId', requireAuth, requireAidaKey, getConversationContext);
 
 // ── Core conversational endpoints (AidaPage) ─────────────────────────────────
