@@ -802,7 +802,9 @@ export const proxyMedia = async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
   try {
-    await streamS3Object(url as string, res);
+    // Forward Range so mobile AV players (voice notes, video) can stream with
+    // 206 partial responses — required by iOS AVPlayer.
+    await streamS3Object(url as string, res, undefined, req.headers.range as string | undefined);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

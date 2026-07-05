@@ -189,8 +189,11 @@ export default function UpdatesScreen() {
 
   const handleUploadRecording = async (task: any) => {
     try {
+      // Audio AND video recordings — the backend Whisper service transcodes
+      // video containers (mp4/mov/webm/mkv…) to audio via ffmpeg before
+      // transcription, so a screen recording or camera video works too.
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'audio/*',
+        type: ['audio/*', 'video/*'],
         copyToCacheDirectory: true,
       });
 
@@ -199,10 +202,11 @@ export default function UpdatesScreen() {
       }
 
       const fileAsset = result.assets[0];
+      const isVideo = (fileAsset.mimeType || '').startsWith('video/');
       const fileToUpload = {
         uri: fileAsset.uri,
-        name: fileAsset.name || 'recording.mp3',
-        type: fileAsset.mimeType || 'audio/mpeg',
+        name: fileAsset.name || (isVideo ? 'recording.mp4' : 'recording.mp3'),
+        type: fileAsset.mimeType || (isVideo ? 'video/mp4' : 'audio/mpeg'),
       } as any;
 
       setIsUploading(true);
@@ -211,8 +215,8 @@ export default function UpdatesScreen() {
 
       if (res && res.message) {
         Alert.alert(
-          '✨ Audio Transcribed',
-          'Aida has successfully processed the audio recording. Check your updates for the summary and action items.',
+          '✨ Recording Transcribed',
+          'Aida has successfully processed the recording. Check your updates for the summary and action items.',
           [
             {
               text: 'View Transcript',

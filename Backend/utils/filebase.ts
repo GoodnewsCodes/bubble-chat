@@ -168,7 +168,7 @@ export const getSignedMediaUrlCached = async (keyOrUrl: string): Promise<string>
  * Streams a Filebase object directly to the client response with proper cross-origin headers.
  * Helps prevent ERR_BLOCKED_BY_RESPONSE.NotSameOrigin from browser security policies.
  */
-export const streamS3Object = async (keyOrUrl: string, res: Response, downloadName?: string): Promise<void> => {
+export const streamS3Object = async (keyOrUrl: string, res: Response, downloadName?: string, range?: string): Promise<void> => {
   if (keyOrUrl.startsWith('http') && !keyOrUrl.includes('filebase.com')) {
     res.redirect(keyOrUrl);
     return;
@@ -197,11 +197,20 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     const command = new GetObjectCommand({
       Bucket: BUCKET,
       Key: key,
+      // Forward the client's Range header. iOS AVPlayer (voice notes / video on
+      // the mobile app) probes with `Range: bytes=0-1` and REQUIRES a 206
+      // Partial Content response — ignoring Range made audio silently unplayable
+      // on iPhones even though the file stored and downloaded fine.
+      ...(range && { Range: range }),
       ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` })
     });
-    
+
     const response = await s3Client.send(command);
-    
+
+    if (range && response.ContentRange) {
+      res.status(206);
+    }
+
     if (response.ContentType) {
       res.setHeader('Content-Type', response.ContentType);
     }
@@ -211,9 +220,7 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     if (response.ContentRange) {
       res.setHeader('Content-Range', response.ContentRange);
     }
-    if (response.AcceptRanges) {
-      res.setHeader('Accept-Ranges', response.AcceptRanges);
-    }
+    res.setHeader('Accept-Ranges', 'bytes');
     
     // Explicitly allow cross-origin embedder policies to access this resource
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
