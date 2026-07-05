@@ -13,6 +13,15 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_ADDRESS = process.env.SMTP_FROM_EMAIL || 'noreply@yourdomain.com';
 const FROM_NAME = process.env.SMTP_FROM_NAME || 'Bubble Chat';
 
+/**
+ * Preference gate for NON-transactional email. Returns true when the user has an
+ * email address and hasn't opted out via privacy_settings.email_notifications.
+ * Never use this for OTP / password-reset / onboarding mail — those are
+ * transactional and must always send.
+ */
+export const emailAllowed = (user: any): boolean =>
+  !!user?.email && user?.privacy_settings?.email_notifications !== false;
+
 export const sendMail = async (to: string, subject: string, html: string, attachments?: any[]) => {
   if (!process.env.RESEND_API_KEY) {
     console.error(`❌ Mailer: RESEND_API_KEY is missing from environment variables.`);

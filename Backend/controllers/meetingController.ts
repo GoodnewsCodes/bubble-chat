@@ -170,7 +170,7 @@ export const createMeeting = async (
     const userId = (req as any).user?._id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { roomId, title, type, attendees, attendeeNames, chatId } = req.body;
+    const { roomId, title, type, attendees, attendeeNames, chatId, agenda } = req.body;
 
     // Every participant's client calls this when joining a call (caller AND callee).
     // Without this guard each of them would create their own Meeting document for the
@@ -200,6 +200,7 @@ export const createMeeting = async (
       title: title || 'Untitled Meeting',
       host: userId,
       type: type || 'video',
+      agenda: agenda || '',
       attendees: attendees || [],
       attendeeNames: attendeeNames || [],
       chatId: chatId || undefined,
@@ -442,7 +443,34 @@ export const getMeetingById = async (
       .lean();
 
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
-    res.status(200).json({ meeting });
+
+    // Carried-over action items: the still-pending items from the most recent
+    // prior meeting of the same chat/group, so recurring meetings open with
+    // last time's unfinished business front and center.
+    let carriedOverActionItems: any[] = [];
+    try {
+      if ((meeting as any).chatId) {
+        const prev = await Meeting.findOne({
+          chatId: (meeting as any).chatId,
+          status: 'ended',
+          _id: { $ne: meeting._id },
+          createdAt: { $lt: (meeting as any).createdAt },
+        })
+          .sort({ createdAt: -1 })
+          .select('title endedAt actionItems')
+          .populate('actionItems.assignedTo', 'full_name username')
+          .lean();
+        if (prev?.actionItems?.length) {
+          carriedOverActionItems = prev.actionItems
+            .filter((ai: any) => ai.status === 'pending')
+            .map((ai: any) => ({ ...ai, fromMeeting: { id: prev._id, title: prev.title, endedAt: prev.endedAt } }));
+        }
+      }
+    } catch (carryErr) {
+      console.error('[Meeting] carried-over action items lookup failed:', carryErr);
+    }
+
+    res.status(200).json({ meeting, carriedOverActionItems });
   } catch (err: any) {
     res
       .status(500)
@@ -795,8 +823,10 @@ export const endMeeting = async (
 
     // Broadcast meeting_ended via socket immediately to terminate the view for all participants
     try {
-      const { getIO } = await import('../utils/socket');
+      const { getIO, clearActiveCallsForRoom } = await import('../utils/socket');
       const io = getIO();
+      // Free every participant's busy-call slot so they can ring/be rung again.
+      clearActiveCallsForRoom(meeting.roomId);
       // Emit to both the roomId and each participant's personal room for cross-device delivery
       const endPayload = {
         roomId: meeting.roomId,
@@ -875,8 +905,9 @@ export const autoEndMeetingByRoomId = async (roomId: string): Promise<void> => {
     await meeting.save();
 
     try {
-      const { getIO } = await import('../utils/socket');
+      const { getIO, clearActiveCallsForRoom } = await import('../utils/socket');
       const io = getIO();
+      clearActiveCallsForRoom(meeting.roomId);
       const endPayload = {
         roomId: meeting.roomId,
         meetingId: String(meeting._id),

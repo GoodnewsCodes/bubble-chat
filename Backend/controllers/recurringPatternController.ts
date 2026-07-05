@@ -4,7 +4,7 @@ import { CalendarEvent } from '../models/calendarEvent';
 import { RecurringPattern } from '../models/recurringPattern';
 import { User } from '../models/users';
 import { sendPushNotification } from '../utils/push';
-import { sendRecurringPatternEmail } from '../utils/mailer';
+import { sendRecurringPatternEmail, emailAllowed } from '../utils/mailer';
 
 const THRESHOLD = 3;           // detections needed to trigger a notification
 const WINDOW_DAYS = 90;        // rolling window to look back in
@@ -98,8 +98,8 @@ export const detectAndNotifyPatterns = async (req: Request, res: Response) => {
         { patternId: String(pattern._id), type: 'recurring_pattern' }
       ).catch(err => console.error('[Pattern] Push failed:', err));
 
-      // Email notification (fire-and-forget)
-      if ((user as any).email) {
+      // Email notification (fire-and-forget) — skipped if the user opted out.
+      if (emailAllowed(user)) {
         const name = (user as any).full_name || (user as any).name || (user as any).username || 'there';
         sendRecurringPatternEmail(
           (user as any).email,

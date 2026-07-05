@@ -103,6 +103,14 @@ export const formatMessage = async (m: any) => ({
     const readerId = String(r._id || r.id || r);
     return readerId !== senderId;
   }),
+  // Delivery state (two gray ticks). A read message is implicitly delivered —
+  // covers legacy messages created before deliveredTo existed.
+  deliveredTo: Array.isArray(m.deliveredTo) ? m.deliveredTo.map((d: any) => String(d._id || d.id || d)) : [],
+  isDelivered: (() => {
+    const senderId = String(m.sender?._id || m.sender?.id || m.sender);
+    const nonSender = (arr: any[]) => (arr || []).some((r: any) => String(r._id || r.id || r) !== senderId);
+    return nonSender(m.deliveredTo) || nonSender(m.readBy);
+  })(),
 
   sender: m.sender ? await formatSender(m.sender) : null,
   chat: m.chat
@@ -128,7 +136,7 @@ export const formatMessage = async (m: any) => ({
  * the room, guaranteeing single delivery while still reaching offline-to-chat
  * recipients via their personal room.
  */
-const emitToConversation = async (
+export const emitToConversation = async (
   io: any,
   chatId: string,
   users: any[],
@@ -520,6 +528,37 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
 
     const formatted = await Promise.all(messages.map(formatMessage));
     res.status(200).json(formatted);
+
+    // Offline delivery catch-up: fetching history means every message in it has
+    // now REACHED this user's device. Mark them delivered and (privacy allowing)
+    // notify senders — this is how a push-launched or cold-started client flips
+    // the sender's ticks from 1 gray to 2 gray. Fire-and-forget after respond.
+    setImmediate(async () => {
+      try {
+        const userId = req.user._id;
+        const pending = messages
+          .filter((msg: any) =>
+            String(msg.sender?._id || msg.sender) !== String(userId) &&
+            !(msg.deliveredTo || []).some((d: any) => String(d) === String(userId)))
+          .map((msg: any) => String(msg._id));
+        if (pending.length === 0) return;
+
+        await Message.updateMany(
+          { _id: { $in: pending } },
+          { $addToSet: { deliveredTo: userId } }
+        );
+
+        if (req.user?.privacy_settings?.read_receipts === false) return;
+        const io = req.io || getIO();
+        await emitToConversation(io, String(req.params.chatId), convo.users as any[], 'message_delivery_receipt', {
+          chatId: String(req.params.chatId),
+          messageIds: pending,
+          deliveredBy: String(userId),
+        });
+      } catch (err) {
+        console.error('[Delivery] history catch-up failed:', err);
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -704,16 +743,22 @@ export const markAsRead = async (req: AuthRequest, res: Response): Promise<void>
   try {
     await Message.updateMany(
       { chat: chatId, sender: { $ne: userId } },
-      { $addToSet: { readBy: userId }, isRead: true }
+      // Reading implies delivery — keep both arrays consistent.
+      { $addToSet: { readBy: userId, deliveredTo: userId }, isRead: true }
     );
 
     try {
       const io = req.io || getIO();
-      io.to(chatId).emit('messages_read', { chatId, userId });
+      // Reach senders even when they don't have this chat open (room-only emission
+      // missed them). Respect the reader's read-receipt privacy: the DB is always
+      // updated (unread counts), but receipts are only surfaced when allowed.
+      const convoForCount = await Conversation.findById(chatId).select('isGroupChat users').lean();
+      if (req.user?.privacy_settings?.read_receipts !== false) {
+        await emitToConversation(io, String(chatId), (convoForCount?.users as any[]) || [], 'messages_read', { chatId, userId });
+      }
 
       // Keep the badge authoritative: recompute this user's unread count for the
       // chat (now zero) and push it to their personal room so every device syncs.
-      const convoForCount = await Conversation.findById(chatId).select('isGroupChat').lean();
       const unreadCount = await countUnreadForUser(chatId, userId, !!convoForCount?.isGroupChat);
       io.to(String(userId)).emit('unread_count_updated', { chatId, unreadCount });
     } catch (socketErr) {

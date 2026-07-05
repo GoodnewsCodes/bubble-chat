@@ -93,10 +93,27 @@ const participantAvatar = (p: any): string | undefined => {
 };
 
 /**
- * Voice-call "Audio Conference" stage. Renders a large active-speaker tile plus a
- * row of participant tiles (avatar, name, live mic status, speaking highlight) so a
- * voice call shows everyone on the call — mirroring the design's audio-conference
- * layout instead of a single static avatar. Lives inside <LiveKitRoom>.
+ * Headless bridge: reports the live participant roster (name/avatar/isLocal) up
+ * to the parent overlay so UI OUTSIDE <LiveKitRoom> (the call header's avatar
+ * cluster + participant count) can render it.
+ */
+function ParticipantsBridge({ onChanged }: { onChanged?: (list: { name?: string; avatar?: string; isLocal: boolean }[]) => void }) {
+  const participants = useParticipants();
+  useEffect(() => {
+    onChanged?.(participants.map((p) => ({
+      name: p?.name || p?.identity,
+      avatar: participantAvatar(p),
+      isLocal: !!p?.isLocal,
+    })));
+  }, [participants, onChanged]);
+  return null;
+}
+
+/**
+ * Voice-call "Audio Conference" stage — mirrors the WEB LiveKitMeetingModal's
+ * light design: a large lavender main-stage card for the active speaker (purple
+ * ring while speaking, "Camera Muted"/mic state line) and a row of light
+ * participant tiles below (avatar, name, mic badge). Lives inside <LiveKitRoom>.
  */
 function AudioConferenceArea() {
   const participants = useParticipants();
@@ -115,7 +132,7 @@ function AudioConferenceArea() {
         <Text numberOfLines={1} style={styles.audioTileName}>
           {p?.name || 'Participant'}{p?.isLocal ? ' (You)' : ''}
         </Text>
-        <View style={styles.audioMicBadge}>
+        <View style={[styles.audioMicBadge, { backgroundColor: micOn ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)' }]}>
           {micOn ? <Mic size={12} color="#22c55e" /> : <MicOff size={12} color="#ef4444" />}
         </View>
       </View>
@@ -124,20 +141,30 @@ function AudioConferenceArea() {
 
   return (
     <View style={styles.audioStage}>
-      {/* Main active-speaker card */}
+      {/* Main active-speaker card — the web's rounded lavender stage */}
       <View style={[styles.audioMainCard, main?.isSpeaking && styles.audioMainCardSpeaking]}>
-        <ParticipantAvatar name={main?.name} avatar={participantAvatar(main)} size={120} />
+        <View style={styles.audioMainAvatarFrame}>
+          <ParticipantAvatar name={main?.name} avatar={participantAvatar(main)} size={120} />
+        </View>
         <Text numberOfLines={1} style={styles.audioMainName}>
           {main?.name || 'Participant'}{main?.isLocal ? ' (You)' : ''}
         </Text>
         <View style={styles.audioMainMicRow}>
-          {main?.isMicrophoneEnabled
-            ? <><Mic size={13} color="#22c55e" /><Text style={styles.audioMainMicText}>Speaking</Text></>
-            : <><MicOff size={13} color="#ef4444" /><Text style={[styles.audioMainMicText, { color: '#ef4444' }]}>Muted</Text></>}
+          {main?.isCameraEnabled === false && (
+            <>
+              <MicOff size={13} color="#ef4444" />
+              <Text style={[styles.audioMainMicText, { color: '#9a9aab' }]}>Camera Muted</Text>
+            </>
+          )}
+          {main?.isCameraEnabled !== false && (
+            main?.isMicrophoneEnabled
+              ? <><Mic size={13} color="#22c55e" /><Text style={styles.audioMainMicText}>Speaking</Text></>
+              : <><MicOff size={13} color="#ef4444" /><Text style={[styles.audioMainMicText, { color: '#ef4444' }]}>Muted</Text></>
+          )}
         </View>
       </View>
 
-      {/* Participant row */}
+      {/* Participant tile row */}
       {others.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.audioRow}>
           {others.map((p, i) => <Tile key={p?.sid || p?.identity || i} p={p} size={54} />)}
@@ -305,7 +332,15 @@ type PanelTab = 'people' | 'chat' | 'transcript';
  * events the web meeting modal uses (`meeting_chat_message`,
  * `meeting_transcript_chunk`, `meeting_reaction`) so web↔mobile calls interoperate.
  */
-function CallPanel({ roomId, userName, onReact }: { roomId?: string; userName: string; onReact: (emoji: string) => void }) {
+function CallPanel({ roomId, userName, onReact, registerControls, hideFabs }: {
+  roomId?: string;
+  userName: string;
+  onReact: (emoji: string) => void;
+  /** Lets the parent overlay's control tray open the chat panel / emoji bar
+   *  (so the floating FABs can be hidden in favor of the web-style tray). */
+  registerControls?: (c: { openChat: () => void; toggleEmoji: () => void }) => void;
+  hideFabs?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<PanelTab>('chat');
   const [draft, setDraft] = useState('');
@@ -352,6 +387,15 @@ function CallPanel({ roomId, userName, onReact }: { roomId?: string; userName: s
 
   const openPanel = (t: PanelTab) => { setTab(t); setOpen(true); setUnread(0); };
 
+  // Expose panel/emoji controls to the parent overlay's control tray.
+  useEffect(() => {
+    registerControls?.({
+      openChat: () => openPanel('chat'),
+      toggleEmoji: () => setShowEmoji((s) => !s),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerControls]);
+
   const handleSend = () => {
     const text = draft.trim();
     if (!text) return;
@@ -390,7 +434,8 @@ function CallPanel({ roomId, userName, onReact }: { roomId?: string; userName: s
 
   return (
     <>
-      {/* Floating reaction picker toggle */}
+      {/* Reaction picker — the bar always renders (tray-driven too); the FABs
+          only when the parent overlay's control tray isn't driving us. */}
       <View style={styles.reactWrap} pointerEvents="box-none">
         {showEmoji && (
           <View style={styles.emojiBar}>
@@ -401,16 +446,20 @@ function CallPanel({ roomId, userName, onReact }: { roomId?: string; userName: s
             ))}
           </View>
         )}
-        <TouchableOpacity onPress={() => setShowEmoji(s => !s)} style={styles.reactFab} activeOpacity={0.85}>
-          <Smile color="#fff" size={20} />
-        </TouchableOpacity>
+        {!hideFabs && (
+          <TouchableOpacity onPress={() => setShowEmoji(s => !s)} style={styles.reactFab} activeOpacity={0.85}>
+            <Smile color="#fff" size={20} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Floating open button (chat-as-popup) */}
-      <TouchableOpacity onPress={() => openPanel('chat')} style={styles.panelFab} activeOpacity={0.85}>
-        <MessageSquare color="#fff" size={20} />
-        {unread > 0 && <View style={styles.panelFabDot} />}
-      </TouchableOpacity>
+      {!hideFabs && (
+        <TouchableOpacity onPress={() => openPanel('chat')} style={styles.panelFab} activeOpacity={0.85}>
+          <MessageSquare color="#fff" size={20} />
+          {unread > 0 && <View style={styles.panelFabDot} />}
+        </TouchableOpacity>
+      )}
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.panelBackdrop}>
@@ -518,6 +567,11 @@ export interface LiveKitCallRoomProps {
   userName?: string;
   /** Avatar/placeholder shown before remote video or on voice calls. */
   fallback: React.ReactNode;
+  /** Reports the live roster up to the overlay (header avatar cluster/count). */
+  onParticipantsChanged?: (list: { name?: string; avatar?: string; isLocal: boolean }[]) => void;
+  /** Receives { openChat, toggleEmoji } so the overlay's tray can drive the
+   *  in-call panel; when provided, the floating FABs are hidden. */
+  registerPanelControls?: (c: { openChat: () => void; toggleEmoji: () => void }) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (err: Error) => void;
@@ -539,6 +593,8 @@ export default function LiveKitCallRoom({
   roomId,
   userName,
   fallback,
+  onParticipantsChanged,
+  registerPanelControls,
   onConnected,
   onDisconnected,
   onError,
@@ -587,8 +643,15 @@ export default function LiveKitCallRoom({
         onScreenShareError={onScreenShareError}
       />
       <VideoArea isVideo={isVideo} fallback={fallback} />
+      <ParticipantsBridge onChanged={onParticipantsChanged} />
       <ReactionsLayer roomId={roomId} register={(fn) => { spawnReactionRef.current = fn; }} />
-      <CallPanel roomId={roomId} userName={userName || 'You'} onReact={handleReact} />
+      <CallPanel
+        roomId={roomId}
+        userName={userName || 'You'}
+        onReact={handleReact}
+        registerControls={registerPanelControls}
+        hideFabs={!!registerPanelControls}
+      />
     </LiveKitRoom>
   );
 }
@@ -596,24 +659,29 @@ export default function LiveKitCallRoom({
 const styles = StyleSheet.create({
   fill: { flex: 1, width: '100%', height: '100%' },
   fillCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  // ── Voice "Audio Conference" stage ──
+  // ── Voice "Audio Conference" stage (light — mirrors web LiveKitMeetingModal) ──
   audioStage: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   audioMainCard: {
-    width: '86%', maxWidth: 360, borderRadius: 26, paddingVertical: 30, alignItems: 'center',
-    backgroundColor: 'rgba(108,92,231,0.10)', borderWidth: 1.5, borderColor: 'rgba(108,92,231,0.35)',
+    width: '92%', flexGrow: 1, maxHeight: 420, borderRadius: 32, paddingVertical: 34, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(234,231,250,0.5)', borderWidth: 1.5, borderColor: 'rgba(108,92,231,0.3)',
   },
-  audioMainCardSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(108,92,231,0.18)' },
-  audioMainName: { marginTop: 16, color: '#fff', fontSize: 19, fontFamily: 'Poppins_700Bold' },
+  audioMainCardSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(234,231,250,0.75)' },
+  audioMainAvatarFrame: {
+    borderRadius: 30, overflow: 'hidden', borderWidth: 3, borderColor: '#ffffff',
+    shadowColor: '#6c5ce7', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+  },
+  audioMainName: { marginTop: 16, color: '#1f2030', fontSize: 20, fontFamily: 'Poppins_700Bold' },
   audioMainMicRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  audioMainMicText: { color: '#22c55e', fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
-  audioRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingTop: 20 },
+  audioMainMicText: { color: '#22c55e', fontSize: 12.5, fontFamily: 'Poppins_500Medium' },
+  audioRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingTop: 18 },
   audioTile: {
-    width: 92, borderRadius: 18, paddingVertical: 12, alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)',
+    width: 118, borderRadius: 24, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: '#ffffff', borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
   },
-  audioTileSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(108,92,231,0.16)' },
-  audioTileName: { marginTop: 8, color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: 'Poppins_600SemiBold', maxWidth: 84 },
-  audioMicBadge: { marginTop: 5 },
+  audioTileSpeaking: { borderColor: '#6c5ce7', backgroundColor: 'rgba(234,231,250,0.4)' },
+  audioTileName: { marginTop: 8, color: '#1f2030', fontSize: 11.5, fontFamily: 'Poppins_600SemiBold', maxWidth: 106 },
+  audioMicBadge: { marginTop: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   screenShareBadge: {
     position: 'absolute', top: 12, left: 12,
     backgroundColor: 'rgba(0,0,0,0.55)',

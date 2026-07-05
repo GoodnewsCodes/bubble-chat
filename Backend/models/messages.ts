@@ -5,6 +5,9 @@ export interface IMessage extends Document {
   content: string; // Used for text or captions
   chat: mongoose.Types.ObjectId;
   readBy: mongoose.Types.ObjectId[];
+  // Recipients whose device has RECEIVED the message (read or not). Drives the
+  // two-gray-ticks "delivered" state; readBy drives the blue "read" state.
+  deliveredTo: mongoose.Types.ObjectId[];
 
   // Rich Messaging Metadata
   message_type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'contact' | 'system';
@@ -87,6 +90,13 @@ const MessageSchema: Schema<IMessage> = new Schema(
       required: true,
     },
     readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    // Delivered-but-not-necessarily-read recipients (two gray ticks).
+    deliveredTo: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -204,5 +214,8 @@ MessageSchema.index({ chat: 1, createdAt: -1 });
 
 // Unread-count queries (readBy: { $ne: userId }) run on every send and mark-read.
 MessageSchema.index({ chat: 1, readBy: 1 });
+
+// Delivery catch-up queries (deliveredTo: { $ne: userId }) run on history fetch.
+MessageSchema.index({ chat: 1, deliveredTo: 1 });
 
 export const Message = mongoose.model<IMessage>('Message', MessageSchema);

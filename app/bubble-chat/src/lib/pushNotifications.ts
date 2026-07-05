@@ -84,6 +84,15 @@ const DAILY_BRIEF_KEY = 'daily_brief_notified_on';
 export async function notifyDailyBrief(brief: string): Promise<void> {
   try {
     if (!brief || Platform.OS === 'web') return;
+
+    // Respect "Pause all push notifications" and the daily-digest opt-out.
+    try {
+      const { authStorage } = await import('./authStorage');
+      const me: any = await authStorage.getUser();
+      if (me?.notification_settings?.muted === true) return;
+      if (me?.digestPreferences?.enabled === false) return;
+    } catch { /* prefs unavailable — default to showing */ }
+
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const last = await AsyncStorage.getItem(DAILY_BRIEF_KEY);
     if (last === today) return; // already shown today

@@ -114,7 +114,12 @@ export default function ChatScreen() {
   const INK = colors.text;
   const INK_SOFT = colors.textSoft;
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams();
+  // Optional context passed on navigation (name/avatar/otherUserId) lets a chat
+  // that isn't cached yet render its header + empty thread INSTANTLY instead of
+  // blocking on the network behind "Loading conversation…".
+  const { id, name: paramName, avatar: paramAvatar, otherUserId: paramOtherUserId } = useLocalSearchParams<{
+    id: string; name?: string; avatar?: string; otherUserId?: string;
+  }>();
   const router = useRouter();
   const [messageText, setMessageText] = useState('');
 
@@ -346,7 +351,8 @@ export default function ChatScreen() {
   const handleStartCall = (type: 'voice' | 'video') => {
     if (chat?.isGroupChat) {
       const members = [...(chat?.users || []), ...(chat?.members || [])];
-      startGroupCall(members, type, chat?.name);
+      // Pass the group's icon so the call overlay shows it instead of initials.
+      startGroupCall(members, type, chat?.name, chat?.avatar || undefined);
       return;
     }
     if (!chat?.otherUserId) return;
@@ -567,10 +573,39 @@ export default function ChatScreen() {
         if (prev.some((m: any) => String(m.id) === String(formatted.id))) return prev;
         return [...prev, formatted as any];
       });
+
+      // Delivery ack: this device has the message — flip the sender's tick to
+      // 2-gray. (Read/blue is emitted separately by the mark-as-read flow.)
+      if (!isMe && !isSystem && (data.id || data._id)) {
+        socket.emit('message_delivered', { chatId: String(id), messageIds: [String(data.id || data._id)] });
+      }
     };
 
     socket.on('new_message', onNewMessage);
     socket.on('receive_message', onNewMessage);
+
+    // Sender-side receipt updates: another participant's device received or read
+    // our messages — update tick state on our own bubbles.
+    const onDeliveryReceipt = (data: any) => {
+      if (!data || String(data.chatId) !== String(id)) return;
+      const currentUserId = currentUserIdRef.current;
+      if (currentUserId && String(data.deliveredBy) === String(currentUserId)) return;
+      const idSet = new Set((data.messageIds || []).map(String));
+      setMessages(prev => prev.map((m: any) =>
+        idSet.has(String(m.id)) && m.sender === 'me' ? { ...m, isDelivered: true } : m
+      ));
+    };
+    socket.on('message_delivery_receipt', onDeliveryReceipt);
+
+    const onMessagesRead = (data: any) => {
+      if (!data || String(data.chatId) !== String(id)) return;
+      const currentUserId = currentUserIdRef.current;
+      if (currentUserId && String(data.userId) === String(currentUserId)) return;
+      setMessages(prev => prev.map((m: any) =>
+        m.sender === 'me' ? { ...m, isRead: true, isDelivered: true } : m
+      ));
+    };
+    socket.on('messages_read', onMessagesRead);
 
     // Real-time removal when the other side deletes a message for everyone.
     const onMessageDeleted = (data: any) => {
@@ -650,6 +685,8 @@ export default function ChatScreen() {
       socket.off('connect', onConnect);
       socket.off('new_message', onNewMessage);
       socket.off('receive_message', onNewMessage);
+      socket.off('message_delivery_receipt', onDeliveryReceipt);
+      socket.off('messages_read', onMessagesRead);
       socket.off('message_deleted', onMessageDeleted);
       socket.off('chat_updated', onChatUpdated);
       socket.off('message_edited', onMessageEdited);
@@ -737,6 +774,43 @@ export default function ChatScreen() {
     setTimeout(() => setToastMessage(null), 2000);
   };
 
+  // Map a raw backend conversation (accessOrCreateChat response) into the same
+  // shape chatCache.syncChatsWithBackend produces, so the screen can render it
+  // immediately without waiting for a full chat-list re-sync.
+  const chatFromConversation = async (conversation: any) => {
+    if (!conversation) return null;
+    const me = await authStorage.getUser().catch(() => null);
+    const myId = String(me?.id || me?._id || '');
+    const isGroup = !!conversation.isGroupChat;
+    const users = Array.isArray(conversation.users) ? conversation.users : [];
+    const other = isGroup ? null : users.find((u: any) => String(u.id || u._id) !== myId);
+    return {
+      id: String(conversation.id || conversation._id),
+      name: isGroup
+        ? (conversation.chatName || 'Group Chat')
+        : (other?.full_name || other?.username || (paramName as string) || 'Chat'),
+      avatar: isGroup ? (conversation.groupIcon || null) : (other?.avatar || (paramAvatar as string) || null),
+      isGroupChat: isGroup,
+      otherUserId: other ? String(other.id || other._id) : ((paramOtherUserId as string) || null),
+      latestMessage: null,
+      unreadCount: 0,
+      isPinned: false,
+      isMuted: false,
+      isOnline: !isGroup && !!other?.isOnline,
+      username: other?.username || '',
+      bio: isGroup ? (conversation.groupDescription || 'Group Chat') : (other?.bio || ''),
+      email: other?.email || '',
+      messages: [],
+      users: isGroup ? conversation.users : undefined,
+      groupAdmin: isGroup ? conversation.groupAdmin : undefined,
+      status: 'read_own',
+    };
+  };
+
+  // True once no cache/params/network source could produce a chat — shows the
+  // retry state instead of an infinite spinner.
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const loadCachedChatAndMessages = async () => {
     const cachedChats = await chatCache.getCachedChats();
     let foundChat = cachedChats.find((c: any) => String(c.id) === String(id));
@@ -751,6 +825,19 @@ export default function ChatScreen() {
         router.replace(`/chat/${foundChat.id}`);
         return;
       }
+    } else if (paramName) {
+      // Not cached yet (brand-new DM) but the navigator told us who this is —
+      // render the header + empty thread NOW; the sync below fills in the rest.
+      setChat({
+        id: String(id),
+        name: String(paramName),
+        avatar: (paramAvatar as string) || null,
+        isGroupChat: false,
+        otherUserId: (paramOtherUserId as string) || String(id),
+        latestMessage: null, unreadCount: 0, isPinned: false, isMuted: false,
+        isOnline: false, username: '', bio: '', email: '', messages: [],
+        status: 'read_own',
+      });
     }
     const cachedMsgs = await chatCache.getCachedMessages(id as string);
     setMessages(cachedMsgs);
@@ -780,8 +867,15 @@ export default function ChatScreen() {
           const res = await accessOrCreateChat(id as string);
           const conversation = res?.conversation || res?.data?.conversation || res?.data || res;
           const actualChatId = conversation?.id || conversation?._id;
+          // Render from the response IMMEDIATELY — don't block on the full
+          // chat-list re-sync (that runs in the background).
+          const direct = await chatFromConversation(conversation);
+          if (direct) {
+            setChat((prev: any) => prev && String(prev.id) === String(direct.id) ? { ...prev, ...direct } : direct);
+            setLoadFailed(false);
+          }
+          chatCache.syncChatsWithBackend().catch(() => undefined);
           if (actualChatId && String(actualChatId) !== String(id)) {
-            await chatCache.syncChatsWithBackend();
             router.replace(`/chat/${actualChatId}`);
             return;
           }
@@ -796,6 +890,16 @@ export default function ChatScreen() {
       console.warn("Silent sync failed in ChatScreen:", err);
     }
   };
+
+  // Hard stop for the spinner: if nothing resolved the chat after 6s, offer a
+  // retry instead of spinning forever (e.g. offline with an uncached chat id).
+  useEffect(() => {
+    if (chat) { setLoadFailed(false); return; }
+    const t = setTimeout(() => {
+      if (!chat) setLoadFailed(true);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [chat, id]);
 
   useEffect(() => {
     loadCachedChatAndMessages();
@@ -842,8 +946,28 @@ export default function ChatScreen() {
 
   if (!chat) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }} edges={['top', 'bottom']}>
-        <Text style={{ color: INK, fontFamily: 'Poppins_600SemiBold', fontSize: 15 }}>Loading conversation...</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }} edges={['top', 'bottom']}>
+        {loadFailed ? (
+          <>
+            <Text style={{ color: INK, fontFamily: 'Poppins_600SemiBold', fontSize: 15, textAlign: 'center' }}>
+              Couldn’t load this conversation
+            </Text>
+            <Text style={{ color: INK_SOFT, fontFamily: 'Poppins_400Regular', fontSize: 12.5, textAlign: 'center', marginTop: 6 }}>
+              Check your connection and try again.
+            </Text>
+            <TouchableOpacity
+              onPress={() => { setLoadFailed(false); loadCachedChatAndMessages(); syncChatAndMessages(); }}
+              style={{ marginTop: 18, backgroundColor: PURPLE, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 28 }}
+            >
+              <Text style={{ color: '#fff', fontFamily: 'Poppins_700Bold', fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 10, padding: 8 }}>
+              <Text style={{ color: INK_SOFT, fontFamily: 'Poppins_600SemiBold', fontSize: 12.5 }}>Go back</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={{ color: INK, fontFamily: 'Poppins_600SemiBold', fontSize: 15 }}>Loading conversation...</Text>
+        )}
       </SafeAreaView>
     );
   }
@@ -1533,18 +1657,17 @@ export default function ChatScreen() {
                 {String(selectedMember.id || selectedMember._id) !== String(currentUserIdRef.current) && (
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                     <TouchableOpacity
-                      onPress={async () => {
-                        const memberId = String(selectedMember.id || selectedMember._id);
+                      onPress={() => {
+                        const m = selectedMember;
+                        const memberId = String(m.id || m._id);
                         setSelectedMember(null);
                         setIsInfoOpen(false);
-                        try {
-                          const res = await accessOrCreateChat(memberId);
-                          const newChatId = res?.data?._id || res?.data?.id || res?._id || res?.id;
-                          await chatCache.syncChatsWithBackend();
-                          router.push(`/chat/${newChatId || memberId}`);
-                        } catch {
-                          router.push(`/chat/${memberId}`);
-                        }
+                        // Navigate immediately with the member's context — the chat
+                        // screen resolves/creates the conversation itself.
+                        router.push({
+                          pathname: `/chat/${memberId}` as any,
+                          params: { name: getDisplayName(m), avatar: m.avatar || '', otherUserId: memberId },
+                        });
                       }}
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PURPLE, borderRadius: 16, paddingVertical: 14 }}
                     >
@@ -1562,6 +1685,18 @@ export default function ChatScreen() {
                     >
                       <Phone size={16} color={PURPLE} />
                       <Text style={{ color: PURPLE, fontFamily: 'Poppins_700Bold', fontSize: 13 }}>Call</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const m = selectedMember;
+                        const memberId = String(m.id || m._id);
+                        setSelectedMember(null);
+                        startOutgoingCall({ id: memberId, otherUserId: memberId, name: getDisplayName(m), avatar: m.avatar }, 'video');
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PURPLE_SOFT, borderWidth: 1, borderColor: 'rgba(108,92,231,0.2)', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 18 }}
+                    >
+                      <Video size={16} color={PURPLE} />
+                      <Text style={{ color: PURPLE, fontFamily: 'Poppins_700Bold', fontSize: 13 }}>Video</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -2381,6 +2516,8 @@ export default function ChatScreen() {
                           <Clock size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
                         ) : msg.isRead ? (
                           <CheckCheck size={11} color="#38bdf8" style={{ marginLeft: 4 }} />
+                        ) : (msg as any).isDelivered ? (
+                          <CheckCheck size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
                         ) : (
                           <Check size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
                         )
@@ -3297,18 +3434,17 @@ export default function ChatScreen() {
               {String(selectedMember.id || selectedMember._id) !== String(currentUserIdRef.current) && (
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                   <TouchableOpacity
-                    onPress={async () => {
-                      const memberId = String(selectedMember.id || selectedMember._id);
+                    onPress={() => {
+                      const m = selectedMember;
+                      const memberId = String(m.id || m._id);
                       setSelectedMember(null);
                       setIsInfoOpen(false);
-                      try {
-                        const res = await accessOrCreateChat(memberId);
-                        const newChatId = res?.data?._id || res?.data?.id || res?._id || res?.id;
-                        await chatCache.syncChatsWithBackend();
-                        router.push(`/chat/${newChatId || memberId}`);
-                      } catch {
-                        router.push(`/chat/${memberId}`);
-                      }
+                      // Navigate immediately with the member's context — the chat
+                      // screen resolves/creates the conversation itself.
+                      router.push({
+                        pathname: `/chat/${memberId}` as any,
+                        params: { name: getDisplayName(m), avatar: m.avatar || '', otherUserId: memberId },
+                      });
                     }}
                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PURPLE, borderRadius: 16, paddingVertical: 14 }}
                   >
@@ -3326,6 +3462,18 @@ export default function ChatScreen() {
                   >
                     <Phone size={16} color={PURPLE} />
                     <Text style={{ color: PURPLE, fontFamily: 'Poppins_700Bold', fontSize: 13 }}>Call</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const m = selectedMember;
+                      const memberId = String(m.id || m._id);
+                      setSelectedMember(null);
+                      startOutgoingCall({ id: memberId, otherUserId: memberId, name: getDisplayName(m), avatar: m.avatar }, 'video');
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PURPLE_SOFT, borderWidth: 1, borderColor: 'rgba(108,92,231,0.2)', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 18 }}
+                  >
+                    <Video size={16} color={PURPLE} />
+                    <Text style={{ color: PURPLE, fontFamily: 'Poppins_700Bold', fontSize: 13 }}>Video</Text>
                   </TouchableOpacity>
                 </View>
               )}

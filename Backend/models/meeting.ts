@@ -50,6 +50,11 @@ export interface IMeeting extends Document {
   chatId?: mongoose.Types.ObjectId;
 
   type: 'video' | 'voice' | 'group';
+
+  // Pre-set agenda (from the scheduling flow or creator) — surfaced in meeting
+  // detail and included in invite emails alongside carried-over action items.
+  agenda?: string;
+
   startedAt: Date;
   endedAt?: Date;
   duration?: number;
@@ -137,6 +142,7 @@ const MeetingSchema = new Schema<IMeeting>(
     chatId: { type: Schema.Types.ObjectId, ref: 'Conversation', index: true },
 
     type: { type: String, enum: ['video', 'voice', 'group'], default: 'video' },
+    agenda: { type: String, default: '' },
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date },
     duration: { type: Number },

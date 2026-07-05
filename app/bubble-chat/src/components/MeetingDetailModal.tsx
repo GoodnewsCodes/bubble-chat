@@ -130,9 +130,43 @@ export function MeetingDetailModal({ meeting, loading, onClose }: { meeting: any
 
           <ScrollView style={{ padding: 22 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             {tab === 'summary' && (
-              <Text style={{ fontSize: 13, color: '#1f2030', lineHeight: 20, fontFamily: 'Poppins_400Regular' }}>
-                {meeting.summary || 'AI summary is generating or unavailable for this meeting.'}
-              </Text>
+              <>
+                {meeting.agenda ? (
+                  <View style={{ marginBottom: 16, padding: 12, backgroundColor: 'rgba(108,92,231,0.06)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(108,92,231,0.15)' }}>
+                    <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: '#6c5ce7', letterSpacing: 1, marginBottom: 4 }}>AGENDA</Text>
+                    <Text style={{ fontSize: 12.5, color: '#1f2030', lineHeight: 19, fontFamily: 'Poppins_400Regular' }}>{meeting.agenda}</Text>
+                  </View>
+                ) : null}
+                <Text style={{ fontSize: 13, color: '#1f2030', lineHeight: 20, fontFamily: 'Poppins_400Regular' }}>
+                  {meeting.summary || 'AI summary is generating or unavailable for this meeting.'}
+                </Text>
+              </>
+            )}
+
+            {tab === 'actions' && Array.isArray(meeting.carriedOverActionItems) && meeting.carriedOverActionItems.length > 0 && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: '#f59e0b', letterSpacing: 1, marginBottom: 6 }}>
+                  CARRIED OVER FROM LAST MEETING
+                </Text>
+                {meeting.carriedOverActionItems.map((ai: any, i: number) => (
+                  <View key={`carry-${i}`} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, padding: 12, backgroundColor: 'rgba(245,158,11,0.06)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}>
+                    <Check size={14} color="#f59e0b" style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: '#1f2030' }}>{ai.text || String(ai)}</Text>
+                      {(ai.assignedToName || ai.assignedTo?.full_name) && (
+                        <Text style={{ fontSize: 10, color: '#f59e0b', fontFamily: 'Poppins_700Bold', marginTop: 2 }}>
+                          Assigned: {ai.assignedToName || ai.assignedTo?.full_name}
+                        </Text>
+                      )}
+                      {ai.fromMeeting?.title ? (
+                        <Text style={{ fontSize: 9.5, color: '#9a9aab', fontFamily: 'Poppins_400Regular', marginTop: 2 }}>
+                          From “{ai.fromMeeting.title}”
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
             )}
 
             {tab === 'actions' && (

@@ -39,7 +39,9 @@ export interface Chat {
   isMuted?: boolean;
   isOnline: boolean;
   typingUser: { name: string; username: string } | null;
-  status: 'read_own' | 'unread_other' | 'typing' | 'delivered' | 'read_other_all';
+  status: 'read_own' | 'unread_other' | 'typing' | 'sent' | 'delivered' | 'read_other_all';
+  /** True when the latest message in this chat was sent by the current user. */
+  latestFromMe?: boolean;
   updatedAt: Date;
   bio: string;
   email: string;

@@ -1299,6 +1299,7 @@ export default function ProfileScreen() {
               <Text className="text-[15px] font-bold ml-2 font-sans" style={{ color: colors.text }}>Notifications & Privacy</Text>
             </View>
             {([
+              { key: 'muted', label: 'Pause all push notifications', desc: 'Silence every push — messages, reminders and calls', get: (u: any) => u.notification_settings?.muted === true, build: (v: boolean, u: any) => ({ notification_settings: { ...(u.notification_settings || {}), muted: v } }) },
               { key: 'digest_enabled', label: 'Daily digest', desc: 'Morning brief push + email', get: (u: any) => u.digestPreferences?.enabled !== false, build: (v: boolean, u: any) => ({ digestPreferences: { ...(u.digestPreferences || {}), enabled: v } }) },
               { key: 'email_notifications', label: 'Email notifications', desc: 'Meeting recaps, reminders and digests by email', get: (u: any) => u.privacy_settings?.email_notifications !== false, build: (v: boolean, u: any) => ({ privacy_settings: { ...(u.privacy_settings || {}), email_notifications: v } }) },
               { key: 'read_receipts', label: 'Read receipts', desc: 'Let others see when you read messages', get: (u: any) => u.privacy_settings?.read_receipts !== false, build: (v: boolean, u: any) => ({ privacy_settings: { ...(u.privacy_settings || {}), read_receipts: v } }) },
@@ -1406,7 +1407,7 @@ export default function ProfileScreen() {
           </View>
           
           <ScrollView className="flex-1 px-6 pt-6">
-            <View className="bg-purple-soft/30 rounded-3xl border border-black/5 dark:border-white/10 p-6 mb-8">
+            <View className="bg-purple-soft/30 dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/10 p-6 mb-8">
               <View className="mb-4">
                 <Text className="text-xs font-bold text-ink dark:text-[#f4f5fb] uppercase mb-1">Full Name</Text>
                 <TextInput
@@ -1559,7 +1560,7 @@ export default function ProfileScreen() {
           </View>
           
           <ScrollView className="flex-1 px-6 pt-6">
-            <View className="bg-purple-soft/30 rounded-3xl border border-black/5 dark:border-white/10 p-6 mb-8">
+            <View className="bg-purple-soft/30 dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/10 p-6 mb-8">
               <View className="mb-4">
                 <Text className="text-xs font-bold text-ink dark:text-[#f4f5fb] uppercase mb-2">Organization Logo</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 5 }}>

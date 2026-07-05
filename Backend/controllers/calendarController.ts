@@ -385,6 +385,10 @@ export const startMeeting = async (req: Request, res: Response): Promise<any> =>
       message: 'Meeting started.',
       roomId: event.liveKitRoomId,
       eventId: event._id,
+      // Pre-set agenda travels with the room so the joining client can stamp it
+      // onto the Meeting record (createMeeting accepts `agenda`).
+      agenda: event.agenda || '',
+      title: event.title,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

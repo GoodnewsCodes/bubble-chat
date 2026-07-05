@@ -181,8 +181,9 @@ export const chatCache = {
       }
 
       // Check status — exclude system messages from unread count
-      let status: 'read_own' | 'unread_other' | 'typing' | 'delivered' | 'read_other_all' = 'read_own';
-      // unreadCount from backend may include system messages — we trust the backend's count 
+      let status: 'read_own' | 'unread_other' | 'typing' | 'sent' | 'delivered' | 'read_other_all' = 'read_own';
+      let latestFromMe = false;
+      // unreadCount from backend may include system messages — we trust the backend's count
       // but filter it: if there's no real latestText, treat unread as 0
       const effectiveUnreadCount = (c.latestMessage?.message_type === 'system' || c.latestMessage?.is_announcement)
         ? 0
@@ -190,7 +191,11 @@ export const chatCache = {
       if (c.latestMessage && !(c.latestMessage.message_type === 'system' || c.latestMessage.is_announcement)) {
         const senderId = String(c.latestMessage.sender?.id || c.latestMessage.sender?._id || c.latestMessage.sender);
         if (senderId === currentUserId) {
-          status = c.latestMessage.isRead ? 'read_other_all' : 'delivered';
+          latestFromMe = true;
+          // 3-state ticks: read (blue ✓✓) > delivered (gray ✓✓) > sent (gray ✓).
+          status = c.latestMessage.isRead
+            ? 'read_other_all'
+            : (c.latestMessage.isDelivered ? 'delivered' : 'sent');
         } else {
           status = 'unread_other';
         }
@@ -219,6 +224,7 @@ export const chatCache = {
         username: !isGroup ? (otherUser?.username || "") : "",
         typingUser: null,
         status: status,
+        latestFromMe,
         updatedAt: c.updatedAt,
         bio: isGroup ? (c.groupDescription || "Group Chat") : (otherUser?.bio || ""),
         email: otherUser?.email || "",
@@ -294,6 +300,7 @@ export const chatCache = {
         reactions: Array.isArray(m.reactions) ? m.reactions.map((r: any) => r.emoji) : [],
         isPinned: !!m.is_pinned,
         isRead: !!m.isRead,
+        isDelivered: !!m.isDelivered,
         mediaUrl: m.mediaUrl,
         message_type: m.message_type,
         media_metadata: m.media_metadata || null,

@@ -12,6 +12,9 @@ import { setInMeetingUsers } from "../../lib/presence";
 import { subscribeCallState, CallState } from "../../lib/callManager";
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  // The tab bar follows the app theme: light blur surface in light mode, dark
+  // blur surface in dark mode (confirmed on-device — a pinned-light bar looked
+  // broken against dark screens).
   const { colors, isDark } = useTheme();
   const currentRouteName = state.routes[state.index].name;
   const [activeRoomCount, setActiveRoomCount] = useState(0);
@@ -82,9 +85,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   return (
     <View style={styles.tabBarWrapper}>
-      {/* Full-width native blur panel behind the tabs */}
-      <BlurView intensity={75} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(15, 16, 24, 0.82)" : "rgba(248, 247, 255, 0.78)" }]} />
+      {/* Full-width native blur panel behind the tabs — adapts to the theme */}
+      <BlurView intensity={75} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(15, 16, 24, 0.82)' : 'rgba(248, 247, 255, 0.78)' }]} />
 
       {/* Row containing capsule tabs and FAB */}
       <View style={styles.container}>

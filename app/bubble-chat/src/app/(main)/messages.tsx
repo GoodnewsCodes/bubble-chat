@@ -260,34 +260,57 @@ export default function Messages() {
       const isMe = currentUserId && senderId === String(currentUserId);
       const isSystem = data.message_type === 'system' || data.is_announcement === true;
 
-      // Don't increment unread for system messages or own messages
-      if (isSystem || isMe) return;
+      if (isSystem) return;
 
       const previewText = data.message_type === 'text'
         ? (data.content || data.text || '')
         : `📎 [${data.message_type || 'Media'}]`;
+
+      // Own messages (sent from another device or echoed back) still update the
+      // preview + "You:" tick — they just never bump the unread badge or notify.
+      if (isMe) {
+        setChatsList(prev => prev.map(c => {
+          if (String(c.id) !== chatId) return c;
+          return {
+            ...c,
+            latestMessage: previewText,
+            latestFromMe: true,
+            status: data.isRead ? 'read_other_all' : (data.isDelivered ? 'delivered' : 'sent'),
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          } as any;
+        }));
+        return;
+      }
 
       setChatsList(prev => prev.map(c => {
         if (String(c.id) !== chatId) return c;
         return {
           ...c,
           latestMessage: previewText,
+          latestFromMe: false,
+          status: 'unread_other',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           unreadCount: (c.unreadCount || 0) + 1,
-        };
+        } as any;
       }));
 
       // In-app foreground banner: fire a local notification when the user is in the
-      // app but NOT inside this specific chat screen.
+      // app but NOT inside this specific chat screen. Honors the user's settings:
+      // muted = no banner at all; preview off = generic body; sounds off = silent.
       if (String(chatId) !== String(getActiveChatId())) {
         const senderName = data.sender?.full_name || data.sender?.username || 'Someone';
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: senderName,
-            body: previewText,
-            data: { chatId, type: 'new_message' },
-          },
-          trigger: null,
+        authStorage.getUser().then((me: any) => {
+          const prefs = me?.notification_settings || {};
+          if (prefs.muted === true) return;
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: senderName,
+              body: prefs.preview === false ? 'New message' : previewText,
+              sound: prefs.sounds === false ? undefined : 'default',
+              data: { chatId, type: 'new_message' },
+            },
+            trigger: null,
+          }).catch(() => {});
         }).catch(() => {});
       }
     };
@@ -301,7 +324,27 @@ export default function Messages() {
         setChatsList(prev => prev.map(c =>
           String(c.id) === String(data.chatId) ? { ...c, unreadCount: 0 } : c
         ));
+        return;
       }
+      // Someone ELSE read the chat — if our own message is the latest, flip its
+      // preview tick to blue.
+      setChatsList(prev => prev.map(c =>
+        String(c.id) === String(data.chatId) && (c as any).latestFromMe
+          ? ({ ...c, status: 'read_other_all' } as any)
+          : c
+      ));
+    };
+
+    // ── Delivery receipts ─ recipient's device got our latest message (2 gray) ─
+    const handleDeliveryReceipt = (data: { chatId: string; messageIds: string[]; deliveredBy: string }) => {
+      if (!data?.chatId) return;
+      const currentUserId = currentUserIdRef.current;
+      if (currentUserId && String(data.deliveredBy) === String(currentUserId)) return;
+      setChatsList(prev => prev.map(c =>
+        String(c.id) === String(data.chatId) && (c as any).latestFromMe && c.status === 'sent'
+          ? ({ ...c, status: 'delivered' } as any)
+          : c
+      ));
     };
 
     // ── Authoritative unread badge ─ backend pushes the exact server-side count
@@ -349,6 +392,7 @@ export default function Messages() {
     socket.on('new_message', handleNewMessage);
     socket.on('receive_message', handleNewMessage);
     socket.on('messages_read', handleMessagesRead);
+    socket.on('message_delivery_receipt', handleDeliveryReceipt);
     socket.on('unread_count_updated', handleUnreadCountUpdated);
     socket.on('chat_updated', handleChatUpdated);
     socket.on('connect', handleConnect);
@@ -363,6 +407,7 @@ export default function Messages() {
       socket.off('new_message', handleNewMessage);
       socket.off('receive_message', handleNewMessage);
       socket.off('messages_read', handleMessagesRead);
+      socket.off('message_delivery_receipt', handleDeliveryReceipt);
       socket.off('unread_count_updated', handleUnreadCountUpdated);
       socket.off('chat_updated', handleChatUpdated);
       socket.off('connect', handleConnect);
@@ -1292,8 +1337,9 @@ function ChatRow({
             </Text>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center", flex: 1, minWidth: 0, paddingRight: 8 }}>
-              {chat.status === "delivered" && <Check size={13} color="rgba(0,0,0,0.2)" style={{ marginRight: 3 }} />}
-              {chat.status === "read_other_all" && <CheckCheck size={13} color="#6c5ce7" style={{ marginRight: 3 }} />}
+              {chat.status === "sent" && <Check size={13} color="rgba(0,0,0,0.25)" style={{ marginRight: 3 }} />}
+              {chat.status === "delivered" && <CheckCheck size={13} color="rgba(0,0,0,0.25)" style={{ marginRight: 3 }} />}
+              {chat.status === "read_other_all" && <CheckCheck size={13} color="#34B7F1" style={{ marginRight: 3 }} />}
               {chat.isMuted && <BellOff size={12} color="rgba(0,0,0,0.2)" style={{ marginRight: 3 }} />}
               <Text
                 numberOfLines={1}
@@ -1304,6 +1350,9 @@ function ChatRow({
                   flex: 1,
                 }}
               >
+                {(chat as any).latestFromMe && chat.latestMessage ? (
+                  <Text style={{ fontFamily: "Poppins_600SemiBold" }}>You: </Text>
+                ) : null}
                 {chat.latestMessage || "Say hello! 👋"}
               </Text>
             </View>

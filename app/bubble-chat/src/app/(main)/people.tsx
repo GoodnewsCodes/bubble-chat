@@ -375,19 +375,19 @@ function ContactsTab({
                 {/* Action Buttons */}
                 <View className="flex-row items-center gap-2 ml-2">
                   <Link href={`/chat/${chatTarget}`} asChild>
-                    <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center">
+                    <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
                       <MessageSquare color="#6c5ce7" size={14} />
                     </TouchableOpacity>
                   </Link>
                   <TouchableOpacity
                     onPress={() => onStartCall(contact, 'voice')}
-                    className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+                    className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
                   >
                     <Phone color="#6c5ce7" size={14} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => onStartCall(contact, 'video')}
-                    className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+                    className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
                   >
                     <Video color="#6c5ce7" size={14} />
                   </TouchableOpacity>
@@ -439,7 +439,7 @@ function ContactsTab({
                   </TouchableOpacity>
                 </View>
 
-                <View className="bg-purple-soft/30 rounded-2xl border border-purple/10 px-4 py-3.5 mt-4 mb-4">
+                <View className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl border border-purple/10 px-4 py-3.5 mt-4 mb-4">
                   <TextInput
                     value={addIdentifier}
                     onChangeText={setAddIdentifier}
@@ -528,8 +528,15 @@ function WorkroomTab({
     return () => clearInterval(interval);
   }, []);
 
-  // FIX: Find existing 1-on-1 DM chat for a member, or create one via API
+  // FIX: Find existing 1-on-1 DM chat for a member, or create one via API.
+  // Always carry the member's name/avatar as route params so a chat that isn't
+  // cached yet renders instantly instead of stalling on "Loading conversation…".
   const handleOpenDm = async (member: any) => {
+    const dmParams = {
+      name: member.name || member.full_name || '',
+      avatar: member.avatar || '',
+      otherUserId: String(member.id),
+    };
     // First check local cache for existing non-group chat
     const existingChat = chats.find(c =>
       !c.isGroupChat &&
@@ -537,25 +544,16 @@ function WorkroomTab({
     );
 
     if (existingChat) {
-      router.push(`/chat/${existingChat.id}`);
+      router.push({ pathname: `/chat/${existingChat.id}` as any, params: dmParams });
       return;
     }
 
-    // Otherwise create/access DM via API
+    // Navigate IMMEDIATELY by member id — the chat screen resolves/creates the
+    // conversation itself (accessOrCreateChat) and renders the empty thread from
+    // the params meanwhile. No blocking spinner here.
+    setLoadingDm(member.id);
     try {
-      setLoadingDm(member.id);
-      const res = await accessOrCreateChat(member.id);
-      const chatId = res?.data?._id || res?.data?.id || res?._id || res?.id;
-      if (chatId) {
-        await chatCache.syncChatsWithBackend();
-        router.push(`/chat/${chatId}`);
-      } else {
-        // Fallback: navigate using member id (chat screen will resolve)
-        router.push(`/chat/${member.id}`);
-      }
-    } catch (err) {
-      console.warn("Failed to access/create DM, navigating by member id:", err);
-      router.push(`/chat/${member.id}`);
+      router.push({ pathname: `/chat/${member.id}` as any, params: dmParams });
     } finally {
       setLoadingDm(null);
     }
@@ -838,7 +836,7 @@ function HistoryTab({
         </View>
 
         {loading && filtered.length === 0 ? (
-          <Text className="text-center text-ink-soft text-sm mt-12 font-sans">Loading call history…</Text>
+          <Text className="text-center text-ink-soft dark:text-[#9a9bb6] text-sm mt-12 font-sans">Loading call history…</Text>
         ) : filtered.length === 0 ? (
           <View
             className="py-16 items-center justify-center border-2 border-dashed rounded-3xl mt-2"
@@ -870,7 +868,7 @@ function HistoryTab({
                 className="flex-row items-center rounded-2xl p-3.5 mb-2.5"
                 style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderStrong }}
               >
-                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${missed ? 'bg-red-500/10' : item.isMeeting ? 'bg-emerald-500/10' : 'bg-purple-soft/40'}`}>
+                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${missed ? 'bg-red-500/10' : item.isMeeting ? 'bg-emerald-500/10' : 'bg-purple-soft/40 dark:bg-purple/15'}`}>
                   <Icon color={missed ? '#ef4444' : item.isMeeting ? '#10b981' : '#6c5ce7'} size={18} />
                 </View>
                 <View className="flex-1">
@@ -1729,19 +1727,19 @@ export default function PeopleScreen() {
 //                 {/* Action Buttons */}
 //                 <View className="flex-row items-center gap-2 ml-2">
 //                   <Link href={`/chat/${contact.id}`} asChild>
-//                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center">
+//                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
 //                       <MessageSquare color="#6c5ce7" size={14} />
 //                     </TouchableOpacity>
 //                   </Link>
 //                   <TouchableOpacity
 //                     onPress={() => onStartCall(contact, 'voice')}
-//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
 //                   >
 //                     <Phone color="#6c5ce7" size={14} />
 //                   </TouchableOpacity>
 //                   <TouchableOpacity
 //                     onPress={() => onStartCall(contact, 'video')}
-//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
 //                   >
 //                     <Video color="#6c5ce7" size={14} />
 //                   </TouchableOpacity>
@@ -1783,7 +1781,7 @@ export default function PeopleScreen() {
 //                   </TouchableOpacity>
 //                 </View>
 
-//                 <View className="bg-purple-soft/30 rounded-2xl border border-purple/10 px-4 py-3.5 mt-4 mb-4">
+//                 <View className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl border border-purple/10 px-4 py-3.5 mt-4 mb-4">
 //                   <TextInput
 //                     value={addIdentifier}
 //                     onChangeText={setAddIdentifier}
@@ -1981,19 +1979,19 @@ export default function PeopleScreen() {
 //                 {/* Action Buttons */}
 //                 <View className="flex-row items-center gap-2 ml-2">
 //                   <Link href={`/chat/${member.id}`} asChild>
-//                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center">
+//                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
 //                       <MessageSquare color="#6c5ce7" size={14} />
 //                     </TouchableOpacity>
 //                   </Link>
 //                   <TouchableOpacity
 //                     onPress={() => onStartCall(member, 'voice')}
-//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
 //                   >
 //                     <Phone color="#6c5ce7" size={14} />
 //                   </TouchableOpacity>
 //                   <TouchableOpacity
 //                     onPress={() => onStartCall(member, 'video')}
-//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 items-center justify-center"
+//                     className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
 //                   >
 //                     <Video color="#6c5ce7" size={14} />
 //                   </TouchableOpacity>

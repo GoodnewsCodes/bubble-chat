@@ -24,6 +24,7 @@ export type ActivityAction =
   | 'call_invited'
   | 'call_accepted'
   | 'call_rejected'
+  | 'call_busy'
   | 'call_missed'
   | 'call_ended'
   | 'room_knock'

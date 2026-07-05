@@ -1392,7 +1392,7 @@ export default function UpdatesScreen() {
                   value={title}
                   onChangeText={setTitle}
                   placeholder="e.g. Design Sync Meeting"
-                  className="bg-purple-soft/30 rounded-2xl p-4 text-ink dark:text-[#f4f5fb] border border-black/5 dark:border-white/10"
+                  className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl p-4 text-ink dark:text-[#f4f5fb] border border-black/5 dark:border-white/10"
                 />
               </View>
 
@@ -1413,7 +1413,7 @@ export default function UpdatesScreen() {
                   value={description}
                   onChangeText={setDescription}
                   placeholder="Describe what you need, or tap Generate…"
-                  className="bg-purple-soft/30 rounded-2xl p-4 text-ink dark:text-[#f4f5fb] border border-black/5 dark:border-white/10"
+                  className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl p-4 text-ink dark:text-[#f4f5fb] border border-black/5 dark:border-white/10"
                   multiline
                   numberOfLines={2}
                 />
@@ -1425,7 +1425,7 @@ export default function UpdatesScreen() {
                   <Text className="text-xs font-bold text-ink dark:text-[#f4f5fb] uppercase mb-1">Start time</Text>
                   <TouchableOpacity
                     onPress={() => { setShowStartPicker(v => !v); setShowEndPicker(false); }}
-                    className="bg-purple-soft/30 rounded-2xl p-4 border border-black/5 dark:border-white/10 flex-row items-center justify-between"
+                    className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/10 flex-row items-center justify-between"
                   >
                     <Text className="text-ink dark:text-[#f4f5fb] font-sans">{startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                     <Clock size={15} color="#6c5ce7" />
@@ -1435,7 +1435,7 @@ export default function UpdatesScreen() {
                   <Text className="text-xs font-bold text-ink dark:text-[#f4f5fb] uppercase mb-1">End time</Text>
                   <TouchableOpacity
                     onPress={() => { setShowEndPicker(v => !v); setShowStartPicker(false); }}
-                    className="bg-purple-soft/30 rounded-2xl p-4 border border-black/5 dark:border-white/10 flex-row items-center justify-between"
+                    className="bg-purple-soft/30 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/10 flex-row items-center justify-between"
                   >
                     <Text className="text-ink dark:text-[#f4f5fb] font-sans">{endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
                     <Clock size={15} color="#6c5ce7" />

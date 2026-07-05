@@ -342,6 +342,18 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     const completeness = getProfileCompleteness(updated);
     await invalidateUserCaches(req.user._id);
 
+    // Presence privacy toggled? Update the live socket registry immediately so
+    // the user appears/disappears without needing to reconnect.
+    if (updateData.privacy_settings !== undefined) {
+      try {
+        const { setUserStatusHidden } = await import('../utils/socket');
+        await setUserStatusHidden(
+          String(req.user._id),
+          (updated as any).privacy_settings?.show_online_status === false
+        );
+      } catch { /* socket layer not initialized (tests/scripts) — ignore */ }
+    }
+
     res.status(200).json({
       message: 'Profile updated successfully.',
       data: {

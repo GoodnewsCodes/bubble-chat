@@ -25,7 +25,7 @@ import "../global.css";
 import { initApiFromStorage, getSecureMediaUrl } from "../lib/api";
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, Share, PanResponder, Dimensions, Alert, Animated } from "react-native";
 import { Image } from "expo-image";
-import { Phone, PhoneOff, Mic, MicOff, Volume2, Video, VideoOff, Minimize2, Maximize2, UserPlus, Link2, X, Monitor, MonitorOff } from "lucide-react-native";
+import { Phone, PhoneOff, Mic, MicOff, Volume2, Video, VideoOff, Minimize2, Maximize2, UserPlus, Link2, X, Monitor, MonitorUp, Smile, MessageSquare } from "lucide-react-native";
 import { CameraView, Camera } from "expo-camera";
 import { BlurView } from "expo-blur";
 import { subscribeCallState, acceptIncomingCall, declineIncomingCall, hangUpCall, inviteToCall, getLinkJoinToken, CallState, getPersistedCall, clearPersistedCall, rejoinPersistedCall } from "../lib/callManager";
@@ -79,10 +79,14 @@ function GlobalCallOverlay() {
   const [showEndSheet, setShowEndSheet] = useState(false);
   // Local user's display name — stamped on this client's in-call chat + reactions.
   const [myName, setMyName] = useState('You');
+  // Local avatar — shown beside the callee on the outgoing-call screen so BOTH
+  // parties appear while ringing.
+  const [myAvatar, setMyAvatar] = useState<string | null>(null);
   useEffect(() => {
     authStorage.getUser().then((u) => {
       if (u) {
         setMyName(u.full_name || u.username || 'You');
+        setMyAvatar(u.avatar || null);
         // E2EE bootstrap: ensure a device keypair exists and the server holds
         // our public key (replaces any legacy server-generated PEM key).
         import('../lib/e2ee')
@@ -97,6 +101,21 @@ function GlobalCallOverlay() {
     Alert.alert('Screen share unavailable', "This build doesn't support screen sharing yet. Try a video call instead.");
     console.warn('[LiveKit] screen share failed:', err);
   };
+
+  // Live participant roster reported up from inside <LiveKitRoom> — drives the
+  // header's "N participant(s)" count + avatar cluster (web parity).
+  const [roster, setRoster] = useState<{ name?: string; avatar?: string; isLocal: boolean }[]>([]);
+  const onParticipantsChanged = React.useCallback(
+    (list: { name?: string; avatar?: string; isLocal: boolean }[]) => setRoster(list),
+    []
+  );
+  // Bridge to the in-call panel (chat sheet + emoji bar) living inside
+  // LiveKitCallRoom, so the web-style control tray can open them.
+  const panelControlsRef = useRef<{ openChat: () => void; toggleEmoji: () => void } | null>(null);
+  const registerPanelControls = React.useCallback(
+    (c: { openChat: () => void; toggleEmoji: () => void }) => { panelControlsRef.current = c; },
+    []
+  );
 
   // Pulsing ring animation around the avatar during incoming and outgoing calls.
   const ringPulse = useRef(new Animated.Value(0)).current;
@@ -183,6 +202,8 @@ function GlobalCallOverlay() {
         setLkToken(null);
         setLkUrl(null);
         setIsScreenSharing(false);
+        setRoster([]);
+        panelControlsRef.current = null;
       }
     });
     return () => {
@@ -306,7 +327,7 @@ function GlobalCallOverlay() {
   const avatarUri = getAvatarUri();
 
   const statusLabel = isOutgoing
-    ? 'Calling…'
+    ? ((callState as any).busy ? 'On another call…' : 'Calling…')
     : isIncoming
       ? `Incoming ${isVideo ? 'video' : 'voice'} call`
       : `Connected · ${formatDuration((callState as any).duration)}`;
@@ -370,6 +391,82 @@ function GlobalCallOverlay() {
     );
   }
 
+  // ── Outgoing "calling" card ─────────────────────────────────────────────────
+  // Matches the WEB outgoing overlay: dark blurred backdrop + centered glass
+  // card with the pulsing avatar, "CALLING (VOICE)…" label, the both-parties
+  // row, and a single red end button.
+  if (isOutgoing && !isMinimized) {
+    return (
+      <View style={styles.ringerRoot}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.ringerDim} pointerEvents="none" />
+
+        <TouchableOpacity onPress={() => setIsMinimized(true)} style={styles.minimizeButton}>
+          <Minimize2 color="rgba(255,255,255,0.55)" size={18} />
+        </TouchableOpacity>
+
+        <View style={styles.ringerCardWrap}>
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.ringerCardInner}>
+            {/* Pulsing halo behind the avatar */}
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute', top: 24, width: 170, height: 170, borderRadius: 60,
+                backgroundColor: 'rgba(108,92,231,0.22)',
+                opacity: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.65] }),
+                transform: [{ scale: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.12] }) }],
+              }}
+            />
+            <View style={styles.ringerAvatarFrame}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri || undefined }} style={styles.ringerAvatarImg} />
+              ) : (
+                <View style={[styles.ringerAvatarImg, styles.ringerAvatarFallback]}>
+                  <Text style={styles.ringerAvatarInitials}>{getGroupInitials(name)}</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.ringerName} numberOfLines={1}>{name}</Text>
+            <Text style={[styles.ringerSub, { color: 'rgba(196,181,253,0.95)' }]}>
+              {(callState as any).busy ? 'ON ANOTHER CALL…' : `CALLING (${isVideo ? 'VIDEO' : 'VOICE'})…`}
+            </Text>
+
+            {/* Both parties appear while ringing */}
+            <View style={styles.partiesRow}>
+              <View style={styles.partyTile}>
+                {myAvatar ? (
+                  <Image source={{ uri: getSecureMediaUrl(myAvatar) || undefined }} style={styles.partyAvatar} />
+                ) : (
+                  <View style={[styles.partyAvatar, styles.partyAvatarFallback]}>
+                    <Text style={styles.partyInitials}>{getGroupInitials(myName)}</Text>
+                  </View>
+                )}
+                <Text style={styles.partyName} numberOfLines={1}>{myName} (You)</Text>
+              </View>
+              <View style={styles.partyDivider} />
+              <View style={styles.partyTile}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri || undefined }} style={styles.partyAvatar} />
+                ) : (
+                  <View style={[styles.partyAvatar, styles.partyAvatarFallback]}>
+                    <Text style={styles.partyInitials}>{getGroupInitials(name)}</Text>
+                  </View>
+                )}
+                <Text style={styles.partyName} numberOfLines={1}>{name}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity onPress={confirmHangUp} style={[styles.ringerBtn, styles.ringerDecline, { marginTop: 28 }]} activeOpacity={0.85}>
+              <PhoneOff color="#ffffff" size={26} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   // Single unified tree for both full-screen and minimized states. The media slot
   // holding <LiveKitCallRoom> always renders at the same JSX position regardless of
   // isMinimized — only its wrapping style changes — so React never unmounts the
@@ -379,34 +476,70 @@ function GlobalCallOverlay() {
   // existed inside the Modal branch.) A plain absolutely-positioned root (not a RN
   // Modal) is used so the minimized pill can float over the rest of the app while
   // still letting touches reach screens underneath it.
+  // Header roster: live LiveKit participants when connected; otherwise fall
+  // back to "you + them" so the cluster is never empty.
+  const headerRoster = roster.length > 0
+    ? roster
+    : [
+        { name: myName, avatar: myAvatar || undefined, isLocal: true },
+        { name, avatar: avatarUri || undefined, isLocal: false },
+      ];
+
   return (
     <View
-      style={[styles.callContainer, isMinimized && [styles.minimizedContainer, { left: pillPos.x, top: pillPos.y }]]}
+      style={[styles.callContainerLight, isMinimized && [styles.minimizedContainer, { left: pillPos.x, top: pillPos.y }]]}
       pointerEvents={isMinimized ? 'box-none' : 'auto'}
     >
-      {/* Minimize / Maximize toggle (not while an incoming call is ringing) */}
-      {!isIncoming && (
-        isMinimized ? (
-          <View style={styles.miniHeader}>
-            <TouchableOpacity onPress={() => setIsMinimized(false)} style={styles.miniOptionButton}>
-              <Maximize2 color={PURPLE} size={16} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => setIsMinimized(true)} style={styles.minimizeButton}>
-            <Minimize2 color="rgba(255,255,255,0.55)" size={18} />
+      {isMinimized && (
+        <View style={styles.miniHeader}>
+          <TouchableOpacity onPress={() => setIsMinimized(false)} style={styles.miniOptionButton}>
+            <Maximize2 color={PURPLE} size={16} />
           </TouchableOpacity>
-        )
+        </View>
       )}
 
-      {/* Full-mode header */}
+      {/* Full-mode header — mirrors the web meeting modal: minimize chevron,
+          title + "Live • mm:ss • N participant(s)", participant avatar cluster. */}
       {!isMinimized && (
-        <View style={styles.callHeader}>
-          <Text style={styles.callTypeTitle}>
-            BUBBLE {isVideo ? 'VIDEO CALL' : 'VOICE CALL'}
-          </Text>
-          <Text style={styles.callerNameText} numberOfLines={2}>{name}</Text>
-          <Text style={styles.statusText}>{statusLabel}</Text>
+        <View style={styles.lightHeaderRow}>
+          <TouchableOpacity onPress={() => setIsMinimized(true)} style={styles.lightHeaderChevron}>
+            <Minimize2 color={INK_SOFT} size={18} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lightHeaderTitle} numberOfLines={1}>
+              {callState.status === 'in_call' && (callState as any).user?.name && String((callState as any).user?.name) !== 'Meeting'
+                ? (isVideo ? name : 'Audio Conference')
+                : (isVideo ? 'Video Call' : 'Audio Conference')}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={styles.liveDot} />
+              <Text style={styles.lightHeaderSub} numberOfLines={1}>
+                {callState.status === 'in_call'
+                  ? `Live • ${formatDuration(callState.duration)} • ${headerRoster.length} participant(s)`
+                  : statusLabel}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.headerCluster}>
+            {headerRoster.slice(0, 3).map((p, i) => (
+              <View key={i} style={[styles.clusterAvatarWrap, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }]}>
+                {p.avatar ? (
+                  <Image source={{ uri: getSecureMediaUrl(p.avatar) || p.avatar }} style={styles.clusterAvatar} />
+                ) : (
+                  <View style={[styles.clusterAvatar, { backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ color: '#fff', fontSize: 12, fontFamily: 'Poppins_700Bold' }}>{getGroupInitials(p.name || '?')}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            {headerRoster.length > 3 && (
+              <View style={[styles.clusterAvatarWrap, { marginLeft: -10 }]}>
+                <View style={[styles.clusterAvatar, { backgroundColor: PURPLE_SOFT, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ color: PURPLE, fontSize: 10, fontFamily: 'Poppins_700Bold' }}>+{headerRoster.length - 3}</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -421,9 +554,9 @@ function GlobalCallOverlay() {
       )}
 
       {/* Media / Video Stream area — stable slot, see note above */}
-      <View style={isMinimized ? styles.miniMediaSlot : styles.mediaContainer}>
+      <View style={isMinimized ? styles.miniMediaSlot : styles.mediaContainerLight}>
         {callState.status === 'in_call' && LiveKitCallRoom && lkToken && lkUrl ? (
-          <View style={isVideo ? (isMinimized ? styles.miniVideoFrame : styles.videoPreviewFrame) : (isMinimized ? styles.miniAvatarRing : styles.avatarOuterRing)}>
+          <View style={isMinimized ? (isVideo ? styles.miniVideoFrame : styles.miniAvatarRing) : styles.stageFrame}>
             <LiveKitCallRoom
               serverUrl={lkUrl}
               token={lkToken}
@@ -436,6 +569,8 @@ function GlobalCallOverlay() {
               roomId={(callState as any).roomId}
               userName={myName}
               fallback={renderAvatar(isMinimized ? 46 : 156)}
+              onParticipantsChanged={onParticipantsChanged}
+              registerPanelControls={registerPanelControls}
               onError={(err) => console.warn('[LiveKit] room error:', err)}
               onDisconnected={() => {
                 // When the LiveKit room ends (peer left, network drop, or normal
@@ -447,7 +582,7 @@ function GlobalCallOverlay() {
             />
           </View>
         ) : callState.status === 'in_call' && isCameraActive && hasPermission && !isMinimized ? (
-          <View style={styles.videoPreviewFrame}>
+          <View style={styles.stageFrame}>
             <CameraView style={StyleSheet.absoluteFill} facing="front" />
             <View style={styles.remoteVideoPreviewOverlay}>
               {avatarUri ? (
@@ -463,27 +598,11 @@ function GlobalCallOverlay() {
         ) : isMinimized ? (
           renderAvatar(46)
         ) : (
-          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            {/* Pulsing outer glow ring — visible when ringing */}
-            {(isIncoming || isOutgoing) && (
-              <Animated.View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  width: 260, height: 260, borderRadius: 130,
-                  backgroundColor: isIncoming ? 'rgba(16,185,129,0.12)' : 'rgba(108,92,231,0.12)',
-                  opacity: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }),
-                  transform: [{ scale: ringPulse.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.1] }) }],
-                }}
-              />
-            )}
-            <View style={[styles.avatarOuterRing, isIncoming && styles.avatarOuterRingIncoming]}>
-              <View style={styles.avatarInnerRing}>
-                <View style={styles.avatarPlaceholderContainer}>
-                  {renderAvatar(156)}
-                </View>
-              </View>
-            </View>
+          /* Connecting / Expo Go fallback: light lavender stage with the peer avatar. */
+          <View style={styles.stagePlaceholder}>
+            <View style={styles.audioMainAvatarShadow}>{renderAvatar(120)}</View>
+            <Text style={styles.stagePlaceholderName} numberOfLines={1}>{name}</Text>
+            <Text style={styles.stagePlaceholderSub}>Connecting…</Text>
           </View>
         )}
       </View>
@@ -584,91 +703,67 @@ function GlobalCallOverlay() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.actionsContainer}>
-          {isIncoming ? (
-            <View style={styles.incomingButtonsRow}>
-              {/* Decline */}
-              <View style={styles.incomingActionGroup}>
-                <TouchableOpacity
-                  onPress={() => declineIncomingCall()}
-                  style={[styles.actionButton, styles.declineButton]}
-                >
-                  <PhoneOff color="#ffffff" size={26} />
-                </TouchableOpacity>
-                <Text style={styles.actionLabel}>Decline</Text>
-              </View>
+        /* White control tray — mirrors the web meeting modal: row 1 = mic /
+           camera / screenshare / END / speaker / emoji; row 2 = add people /
+           chat / expand. Red fills when a device is off, purple-soft otherwise. */
+        <View style={styles.trayWrap}>
+          <View style={styles.trayRow}>
+            <TouchableOpacity
+              onPress={() => setIsMuted(!isMuted)}
+              style={[styles.trayBtn, isMuted && styles.trayBtnDanger]}
+            >
+              {isMuted ? <MicOff color="#ffffff" size={20} /> : <Mic color={PURPLE} size={20} />}
+            </TouchableOpacity>
 
-              {/* Accept */}
-              <View style={styles.incomingActionGroup}>
-                <TouchableOpacity
-                  onPress={() => acceptIncomingCall()}
-                  style={[styles.actionButton, styles.acceptButton]}
-                >
-                  {isVideo ? <Video color="#ffffff" size={26} /> : <Phone color="#ffffff" size={26} />}
-                </TouchableOpacity>
-                <Text style={styles.actionLabel}>Accept</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.glassActionPanel}>
-              <View style={styles.buttonsRow}>
-                {/* Mute Toggle */}
-                <TouchableOpacity
-                  onPress={() => setIsMuted(!isMuted)}
-                  style={[styles.optionsButton, isMuted && styles.activeOptionsButton]}
-                >
-                  {isMuted ? <MicOff color="#ffffff" size={20} /> : <Mic color="rgba(255,255,255,0.8)" size={20} />}
-                </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setIsCameraActive(!isCameraActive)}
+              style={[styles.trayBtn, !isCameraActive && styles.trayBtnDanger]}
+            >
+              {isCameraActive ? <Video color={PURPLE} size={20} /> : <VideoOff color="#ffffff" size={20} />}
+            </TouchableOpacity>
 
-                {/* End Call */}
-                <TouchableOpacity
-                  onPress={confirmHangUp}
-                  style={[styles.actionButton, styles.declineButton]}
-                >
-                  <PhoneOff color="#ffffff" size={24} />
-                </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setIsScreenSharing(!isScreenSharing)}
+              style={[styles.trayBtn, isScreenSharing && styles.trayBtnActive]}
+            >
+              {isScreenSharing ? <Monitor color="#ffffff" size={20} /> : <MonitorUp color={PURPLE} size={20} />}
+            </TouchableOpacity>
 
-                {/* Speaker Toggle */}
-                <TouchableOpacity
-                  onPress={() => setIsSpeaker(!isSpeaker)}
-                  style={[styles.optionsButton, isSpeaker && styles.activeOptionsButton]}
-                >
-                  <Volume2 color="#ffffff" size={20} />
-                </TouchableOpacity>
+            <TouchableOpacity onPress={confirmHangUp} style={styles.trayEndBtn}>
+              <PhoneOff color="#ffffff" size={24} />
+            </TouchableOpacity>
 
-                {/* Video Toggle (only in active calls) */}
-                {callState.status === 'in_call' && (
-                  <TouchableOpacity
-                    onPress={() => setIsCameraActive(!isCameraActive)}
-                    style={[styles.optionsButton, isCameraActive && styles.activeOptionsButton]}
-                  >
-                    {isCameraActive ? <Video color="#ffffff" size={20} /> : <VideoOff color="rgba(255,255,255,0.8)" size={20} />}
-                  </TouchableOpacity>
-                )}
+            <TouchableOpacity
+              onPress={() => setIsSpeaker(!isSpeaker)}
+              style={[styles.trayBtn, isSpeaker && styles.trayBtnActive]}
+            >
+              <Volume2 color={isSpeaker ? '#ffffff' : PURPLE} size={20} />
+            </TouchableOpacity>
 
-                {/* Screen share (only in active calls; gracefully no-ops if the
-                    build lacks native screen-capture support — see handleScreenShareError) */}
-                {callState.status === 'in_call' && (
-                  <TouchableOpacity
-                    onPress={() => setIsScreenSharing(!isScreenSharing)}
-                    style={[styles.optionsButton, isScreenSharing && styles.activeOptionsButton]}
-                  >
-                    {isScreenSharing ? <Monitor color="#ffffff" size={20} /> : <MonitorOff color="rgba(255,255,255,0.8)" size={20} />}
-                  </TouchableOpacity>
-                )}
+            <TouchableOpacity
+              onPress={() => panelControlsRef.current?.toggleEmoji()}
+              disabled={!panelControlsRef.current}
+              style={[styles.trayBtn, !panelControlsRef.current && { opacity: 0.4 }]}
+            >
+              <Smile color={PURPLE} size={20} />
+            </TouchableOpacity>
+          </View>
 
-                {/* Add people (only in active calls) */}
-                {callState.status === 'in_call' && (
-                  <TouchableOpacity
-                    onPress={openAddPeople}
-                    style={styles.optionsButton}
-                  >
-                    <UserPlus color="rgba(255,255,255,0.8)" size={20} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          )}
+          <View style={[styles.trayRow, { marginTop: 10, justifyContent: 'center', gap: 14 }]}>
+            <TouchableOpacity onPress={openAddPeople} style={styles.trayBtn}>
+              <UserPlus color={PURPLE} size={20} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => panelControlsRef.current?.openChat()}
+              disabled={!panelControlsRef.current}
+              style={[styles.trayBtn, !panelControlsRef.current && { opacity: 0.4 }]}
+            >
+              <MessageSquare color={PURPLE} size={20} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsMinimized(true)} style={styles.trayBtn}>
+              <Minimize2 color={PURPLE} size={20} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -855,9 +950,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: BORDER,
-    // paddingVertical/paddingHorizontal (not `padding`) so this wins over
-    // callContainer's paddingVertical:72/paddingHorizontal:24 at matching specificity
-    // when both styles are merged for the minimized pill.
+    // Explicit per-edge paddings so this wins over callContainerLight's
+    // paddingTop:54/paddingBottom:30 (specific props beat paddingVertical when
+    // styles merge, so the shorthand alone left a 54px top pad in the pill).
+    paddingTop: 10,
+    paddingBottom: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
     shadowColor: '#6c5ce7',
@@ -977,6 +1074,77 @@ const styles = StyleSheet.create({
   },
   ringerDecline: { backgroundColor: RED },
   ringerAccept: { backgroundColor: GREEN },
+  // ── Outgoing-call "both parties" row ──
+  partiesRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 26,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 22, paddingVertical: 12, paddingHorizontal: 18,
+  },
+  partyTile: { alignItems: 'center', width: 96 },
+  partyAvatar: { width: 46, height: 46, borderRadius: 15 },
+  partyAvatarFallback: { backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  partyInitials: { color: '#fff', fontSize: 16, fontFamily: 'SpaceGrotesk_700Bold' },
+  partyName: { marginTop: 6, color: 'rgba(255,255,255,0.85)', fontSize: 10.5, fontFamily: 'Poppins_600SemiBold', maxWidth: 92 },
+  partyDivider: { width: 1, height: 44, backgroundColor: 'rgba(255,255,255,0.18)' },
+  // ── Light in-call layout (web meeting-modal parity) ──
+  callContainerLight: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 9999, elevation: 24,
+    backgroundColor: '#f8f7ff',
+    paddingTop: 54, paddingBottom: 30, paddingHorizontal: 14,
+  },
+  lightHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 6, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  lightHeaderChevron: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  lightHeaderTitle: { color: '#1f2030', fontSize: 18, fontFamily: 'Poppins_700Bold' },
+  lightHeaderSub: { color: '#9a9aab', fontSize: 12, fontFamily: 'Poppins_500Medium' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e' },
+  headerCluster: { flexDirection: 'row', alignItems: 'center' },
+  clusterAvatarWrap: {
+    borderRadius: 18, borderWidth: 2, borderColor: '#ffffff', overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+  },
+  clusterAvatar: { width: 32, height: 32, borderRadius: 16 },
+  mediaContainerLight: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  stageFrame: {
+    flex: 1, width: '100%', borderRadius: 32, overflow: 'hidden',
+    backgroundColor: 'rgba(234,231,250,0.35)',
+    borderWidth: 1.5, borderColor: 'rgba(108,92,231,0.25)',
+  },
+  stagePlaceholder: {
+    flex: 1, width: '100%', borderRadius: 32, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(234,231,250,0.5)', borderWidth: 1.5, borderColor: 'rgba(108,92,231,0.3)',
+  },
+  audioMainAvatarShadow: {
+    borderRadius: 999, shadowColor: '#6c5ce7', shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 },
+  },
+  stagePlaceholderName: { marginTop: 16, color: '#1f2030', fontSize: 20, fontFamily: 'Poppins_700Bold' },
+  stagePlaceholderSub: { marginTop: 4, color: '#9a9aab', fontSize: 12.5, fontFamily: 'Poppins_500Medium' },
+  // ── White control tray ──
+  trayWrap: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 40, paddingVertical: 16, paddingHorizontal: 14, marginTop: 10,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+  },
+  trayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly' },
+  trayBtn: {
+    width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(108,92,231,0.1)',
+  },
+  trayBtnDanger: { backgroundColor: '#ef4444' },
+  trayBtnActive: { backgroundColor: '#6c5ce7' },
+  trayEndBtn: {
+    width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#ef4444',
+    shadowColor: '#ef4444', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   minimizeButton: {
     position: 'absolute',
     top: 54,

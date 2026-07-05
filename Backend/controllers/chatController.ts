@@ -115,7 +115,15 @@ export const formatConversation = async (c: any, userId?: any) => {
       const senderId = String(c.latestMessage.sender?._id || c.latestMessage.sender?.id || c.latestMessage.sender);
       const readerId = String(r._id || r.id || r);
       return readerId !== senderId;
-    })
+    }),
+    // Delivery state for the list-preview tick (read implies delivered, which
+    // also covers legacy messages that predate deliveredTo).
+    deliveredTo: c.latestMessage.deliveredTo || [],
+    isDelivered: (() => {
+      const senderId = String(c.latestMessage.sender?._id || c.latestMessage.sender?.id || c.latestMessage.sender);
+      const nonSender = (arr: any[]) => (arr || []).some((r: any) => String(r._id || r.id || r) !== senderId);
+      return nonSender(c.latestMessage.deliveredTo) || nonSender(c.latestMessage.readBy);
+    })()
   } : null,
   unreadCount: c.unreadCount || 0,
   updatedAt: c.updatedAt

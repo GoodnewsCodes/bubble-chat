@@ -17,7 +17,36 @@ let io: Server;
 // genuine last disconnect.
 const onlineSockets = new Map<string, Set<string>>();
 
-export const getOnlineUserIds = (): string[] => Array.from(onlineSockets.keys());
+// Users who opted out of presence (privacy_settings.show_online_status=false).
+// They still connect and receive everything — they just never appear online to
+// others: no user_status_change broadcast, excluded from presence_snapshot, and
+// User.isOnline stays false so REST-formatted user objects agree.
+const hiddenStatusUsers = new Set<string>();
+
+export const getOnlineUserIds = (): string[] =>
+  Array.from(onlineSockets.keys()).filter((id) => !hiddenStatusUsers.has(id));
+
+/**
+ * Live-update presence privacy when the user flips "Online status" in Settings
+ * (called from updateProfile). Broadcasts the resulting appear/disappear so
+ * other clients update immediately instead of waiting for a reconnect.
+ */
+export const setUserStatusHidden = async (userId: string, hidden: boolean): Promise<void> => {
+  const uid = String(userId);
+  const wasHidden = hiddenStatusUsers.has(uid);
+  if (hidden) hiddenStatusUsers.add(uid);
+  else hiddenStatusUsers.delete(uid);
+  if (wasHidden === hidden || !io) return;
+
+  const isConnected = (onlineSockets.get(uid)?.size || 0) > 0;
+  if (!isConnected) return;
+  try {
+    await User.findByIdAndUpdate(uid, { isOnline: !hidden, lastSeen: new Date() });
+    io.emit('user_status_change', { userId: uid, isOnline: !hidden });
+  } catch (err) {
+    console.error('Presence privacy update failed:', err);
+  }
+};
 
 // Active group/multi-party calls, keyed by roomId. Lets us re-remind members who
 // were invited but haven't joined yet, every few minutes, while the call is live.
@@ -31,6 +60,44 @@ interface ActiveGroupCall {
   lastReminder: number;
 }
 const activeGroupCalls = new Map<string, ActiveGroupCall>();
+
+// ─── Busy-call registry ─────────────────────────────────────────────────────
+// userId -> the call they're currently in (ringing out or connected). Lets the
+// server suppress a second incoming ring entirely: the busy target never hears
+// it, and the caller gets an immediate `call_busy` instead of 30s of ringback.
+// In-memory (resets on restart) — clients keep their own auto-reject fallback.
+interface ActiveUserCall {
+  roomId: string;
+  type: 'voice' | 'video';
+  since: number;
+}
+const activeCallByUser = new Map<string, ActiveUserCall>();
+
+// Anything older than this is presumed to be a leaked entry (missed hangup).
+const ACTIVE_CALL_STALE_MS = 4 * 60 * 60 * 1000;
+
+const getActiveCall = (userId: string): ActiveUserCall | undefined => {
+  const entry = activeCallByUser.get(String(userId));
+  if (!entry) return undefined;
+  if (Date.now() - entry.since > ACTIVE_CALL_STALE_MS) {
+    activeCallByUser.delete(String(userId));
+    return undefined;
+  }
+  return entry;
+};
+
+const setActiveCall = (userId: string, roomId: string, type: 'voice' | 'video') => {
+  activeCallByUser.set(String(userId), { roomId, type, since: Date.now() });
+};
+
+// Clear every user whose active call is the given room (used when a room ends).
+// Exported so the HTTP endMeeting path can free participants' busy slots too.
+export const clearActiveCallsForRoom = (roomId?: string) => {
+  if (!roomId) return;
+  for (const [uid, entry] of activeCallByUser) {
+    if (entry.roomId === roomId) activeCallByUser.delete(uid);
+  }
+};
 
 const GROUP_REMINDER_INTERVAL_MS = 5 * 60 * 1000;  // re-ring inactive members every 5 min
 const GROUP_CALL_MAX_AGE_MS = 30 * 60 * 1000;      // stop reminding after 30 min
@@ -96,7 +163,8 @@ export const initSocket = (server: HttpServer) => {
         pending,
         `Ongoing ${typeStr}`,
         `${call.callerName}'s group ${typeStr} is still going — tap to join`,
-        { roomId, type: 'incoming_call', callType: call.type, callerName: call.callerName }
+        { roomId, type: 'incoming_call', callType: call.type, callerName: call.callerName },
+        'call'
       ).catch((err) => console.error('[GroupCall] reminder push failed:', err));
     }
   }, 60 * 1000);
@@ -122,10 +190,17 @@ export const initSocket = (server: HttpServer) => {
       // a room (without it, every in-room user gets a duplicate delivery).
       socket.data.userId = decoded.id;
       try {
-        const user = await User.findById(decoded.id).select('username full_name');
+        const user = await User.findById(decoded.id).select('username full_name privacy_settings');
         if (user) {
           (socket as any).username = user.username;
           (socket as any).fullName = user.full_name;
+          // Presence privacy: remember opted-out users so connection handling
+          // below can keep them invisible to everyone else.
+          if ((user as any).privacy_settings?.show_online_status === false) {
+            hiddenStatusUsers.add(String(decoded.id));
+          } else {
+            hiddenStatusUsers.delete(String(decoded.id));
+          }
         }
       } catch (dbErr) {
         console.error('Socket auth DB lookup error:', dbErr);
@@ -147,10 +222,15 @@ export const initSocket = (server: HttpServer) => {
     existing.add(socket.id);
     onlineSockets.set(userId, existing);
 
+    const statusHidden = hiddenStatusUsers.has(String(userId));
     if (wasOffline) {
-      User.findByIdAndUpdate(userId, { socketId: socket.id, isOnline: true, lastSeen: new Date() })
+      // Hidden users never flip isOnline in the DB and never broadcast — they
+      // stay "offline" to everyone while still fully connected themselves.
+      User.findByIdAndUpdate(userId, { socketId: socket.id, isOnline: !statusHidden, lastSeen: new Date() })
         .then(() => {
-          socket.broadcast.emit('user_status_change', { userId, isOnline: true });
+          if (!statusHidden) {
+            socket.broadcast.emit('user_status_change', { userId, isOnline: true });
+          }
         })
         .catch((err) => console.error('Presence online update failed:', err));
     } else {
@@ -247,6 +327,38 @@ export const initSocket = (server: HttpServer) => {
       socket.to(data.chatId).emit('recording_stop', { fromUserId: userId, chatId: data.chatId });
     });
 
+    // ─── Delivery Receipts ────────────────────────────────────────────────────
+    // A recipient's device acks messages it just received (live) so senders can
+    // flip 1-gray-tick → 2-gray-ticks. Offline catch-up happens in allMessages.
+    socket.on('message_delivered', async (data: { chatId: string; messageIds: string[] }) => {
+      try {
+        if (!data?.chatId || !Array.isArray(data.messageIds) || data.messageIds.length === 0) return;
+        const { Message } = await import('../models/messages');
+        const { Conversation } = await import('../models/conversations');
+        const convo = await Conversation.findById(data.chatId).select('users');
+        if (!convo || !convo.users.some((u: any) => String(u) === String(userId))) return;
+
+        await Message.updateMany(
+          { _id: { $in: data.messageIds }, chat: data.chatId, sender: { $ne: userId } },
+          { $addToSet: { deliveredTo: userId } }
+        );
+
+        // Respect the acker's read-receipt privacy: still record delivery in the
+        // DB, but don't surface the receipt to senders.
+        const acker = await User.findById(userId).select('privacy_settings').lean();
+        if ((acker as any)?.privacy_settings?.read_receipts === false) return;
+
+        const { emitToConversation } = await import('../controllers/messageController');
+        await emitToConversation(io, String(data.chatId), convo.users as any[], 'message_delivery_receipt', {
+          chatId: String(data.chatId),
+          messageIds: data.messageIds,
+          deliveredBy: String(userId),
+        });
+      } catch (err) {
+        console.error('[Delivery] message_delivered failed:', err);
+      }
+    });
+
     // ─── Read Receipts & Burn Protocol ───────────────────────────────────────
     socket.on('message_read', async (data: { messageId: string, toUserId: string, isBurnAfterReading: boolean }) => {
       io.to(data.toUserId).emit('message_read_receipt', { messageId: data.messageId, readBy: userId });
@@ -303,6 +415,7 @@ export const initSocket = (server: HttpServer) => {
       console.log(`[Meeting] Relaying meeting_ended for room: ${data.roomId}`);
       io.to(data.roomId).emit('meeting_ended', data);
       endGroupCallTracking(data.roomId);
+      clearActiveCallsForRoom(data.roomId);
     });
 
     // ─── E2EE Public Key Exchange ─────────────────────────────────────────────
@@ -318,8 +431,26 @@ export const initSocket = (server: HttpServer) => {
       // Use authenticated socket identity as the authoritative caller name
       const callerName = (socket as any).fullName || (socket as any).username || data.callerName || 'Colleague';
 
+      // Busy gate: if the target is already in a different call, don't ring or
+      // push them at all — tell the caller immediately instead.
+      const targetBusy = getActiveCall(data.toUserId);
+      if (targetBusy && targetBusy.roomId !== data.roomId) {
+        socket.emit('call_busy', { toUserId: data.toUserId, roomId: data.roomId, type: data.type || 'voice' });
+        logActivity({
+          actor: userId,
+          action: 'call_busy',
+          entityId: data.toUserId,
+          entityType: 'Call',
+          entityLabel: callerName,
+          metadata: { roomId: data.roomId, callType: data.type || 'voice', to: data.toUserId },
+        });
+        return;
+      }
+
       // Caller joins the room immediately so hangup events later reach this socket
       socket.join(data.roomId);
+      // Ringing out counts as busy — a cross-ring while dialing must not double-book.
+      setActiveCall(userId, data.roomId, data.type || 'voice');
 
       io.to(data.toUserId).emit('incoming_call', {
         ...data,
@@ -348,7 +479,8 @@ export const initSocket = (server: HttpServer) => {
           type: 'incoming_call',
           callType: data.type || 'voice',
           callerName,
-        }
+        },
+        'call'
       ).catch(err => console.error('[Push] Incoming call push failed:', err));
     });
 
@@ -359,8 +491,19 @@ export const initSocket = (server: HttpServer) => {
     socket.on('call_invite', async (data: { toUserId: string; roomId: string; callerName?: string; callerAvatar?: string; type?: 'voice' | 'video' }) => {
       const callerName = (socket as any).fullName || (socket as any).username || data.callerName || 'Colleague';
 
+      // Busy gate: an invitee already in a DIFFERENT call gets no ring/push;
+      // the inviter is told immediately. (Re-ringing someone into the SAME room
+      // stays allowed — that's the group-reminder path.)
+      const inviteeBusy = getActiveCall(data.toUserId);
+      if (inviteeBusy && inviteeBusy.roomId !== data.roomId) {
+        socket.emit('call_busy', { toUserId: data.toUserId, roomId: data.roomId, type: data.type || 'voice' });
+        return;
+      }
+
       // Inviter is already in the room, but join defensively in case this socket isn't.
       socket.join(data.roomId);
+      // The inviter is mid-call in this room — make sure the registry knows.
+      setActiveCall(userId, data.roomId, data.type || 'voice');
 
       io.to(data.toUserId).emit('incoming_call', {
         ...data,
@@ -387,7 +530,8 @@ export const initSocket = (server: HttpServer) => {
           type: 'incoming_call',
           callType: data.type || 'voice',
           callerName,
-        }
+        },
+        'call'
       ).catch(err => console.error('[Push] Call invite push failed:', err));
 
       // Track this as an active group call so we can re-remind no-shows. The inviter
@@ -415,6 +559,9 @@ export const initSocket = (server: HttpServer) => {
 
       // Callee joins the room so subsequent meeting_ended / call_ended events reach them.
       socket.join(data.roomId);
+      // Answering marks BOTH parties as in-call in the busy registry.
+      setActiveCall(userId, data.roomId, groupCall?.type || 'voice');
+      setActiveCall(data.toUserId, data.roomId, groupCall?.type || 'voice');
 
       // Pull the caller's open sockets into the same room so they can hear the callee's hangup.
       try {
@@ -453,6 +600,21 @@ export const initSocket = (server: HttpServer) => {
       if (data.roomId) {
         const gc = activeGroupCalls.get(data.roomId);
         if (gc) gc.joined.add(String(userId));
+      }
+
+      // Busy registry: a reject only frees the rejecter if it's for the call the
+      // registry has them in. A busy auto-reject of a SECOND ring (different room)
+      // must not clear their real active call.
+      const rejecterEntry = activeCallByUser.get(String(userId));
+      if (rejecterEntry && data.roomId && rejecterEntry.roomId === data.roomId) {
+        activeCallByUser.delete(String(userId));
+      }
+      // If the caller was only ringing out on this room (not connected to anyone
+      // else), a decline frees them too.
+      const callerEntry = activeCallByUser.get(String(data.toUserId));
+      if (callerEntry && data.roomId && callerEntry.roomId === data.roomId) {
+        const stillLive = activeGroupCalls.has(data.roomId);
+        if (!stillLive) activeCallByUser.delete(String(data.toUserId));
       }
 
       // Always tell the caller that THIS invitee declined (informational).
@@ -495,6 +657,11 @@ export const initSocket = (server: HttpServer) => {
           console.error('[Call] Failed to verify host on call_end:', err);
         }
       }
+
+      // Busy registry: the hanger-up is always freed; when the end is broadcast
+      // (1:1 or host hangup) the whole room's participants are freed too.
+      activeCallByUser.delete(String(userId));
+      if (data.roomId && broadcastToRoom) clearActiveCallsForRoom(data.roomId);
 
       if (data.toUserId) io.to(data.toUserId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
       io.to(userId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
@@ -549,7 +716,8 @@ export const initSocket = (server: HttpServer) => {
           [String(data.hostId)],
           `${requesterName} wants to join`,
           `${requesterName} is asking to join your live room`,
-          { roomId: data.roomId, type: 'room_knock', requesterId: String(userId) }
+          { roomId: data.roomId, type: 'room_knock', requesterId: String(userId) },
+          'call'
         ).catch(err => console.error('[Push] Knock push failed:', err));
       }
     });
@@ -604,13 +772,20 @@ export const initSocket = (server: HttpServer) => {
           onlineSockets.delete(userId);
         }
 
-        // Genuine last disconnect → mark offline and broadcast once.
+        // Last socket gone → they can't be in a call anymore; free the busy slot
+        // so they can be rung the moment they reconnect.
+        activeCallByUser.delete(String(userId));
+
+        // Genuine last disconnect → mark offline and broadcast once. Hidden
+        // users never appeared online, so no offline broadcast for them either.
         await User.findByIdAndUpdate(userId, {
           socketId: '',
           isOnline: false,
           lastSeen: new Date(),
         });
-        socket.broadcast.emit('user_status_change', { userId, isOnline: false });
+        if (!hiddenStatusUsers.has(String(userId))) {
+          socket.broadcast.emit('user_status_change', { userId, isOnline: false });
+        }
       } catch (err) {
         console.error('Error on disconnect:', err);
       }

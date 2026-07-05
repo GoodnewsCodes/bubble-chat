@@ -57,8 +57,13 @@ export const createTask = async (req: Request, res: Response): Promise<any> => {
     const {
       title, description, start_time, end_time, status, type, priority,
       assignedTo, color, source, meetingRef, isRecurring, recurrence, recipients,
-      externalEmails, meetingType
+      externalEmails, meetingType, agenda
     } = req.body;
+
+    // Invitation emails show the agenda under the description when provided.
+    const emailDescription = [description, agenda ? `Agenda:\n${agenda}` : '']
+      .filter(Boolean)
+      .join('\n\n');
 
     // Normalise external (non-org) participant emails.
     const externalList: string[] = Array.isArray(externalEmails)
@@ -135,27 +140,31 @@ export const createTask = async (req: Request, res: Response): Promise<any> => {
 
       const emailList: { email: string; name: string }[] = [];
 
+      // Members who opted out of email notifications are skipped (emailAllowed);
+      // external invitees (below) aren't users, so they always get the invite.
+      const { emailAllowed } = await import('../utils/mailer');
+
       if (hasRecipients) {
         // Send email to specific selected recipients (never email the creator about their own event)
         for (const recId of recipients) {
           if (String(recId) === String(userId)) continue;
-          const recUser = await User.findById(recId).select('email full_name username');
-          if (recUser && recUser.email) {
+          const recUser = await User.findById(recId).select('email full_name username privacy_settings');
+          if (recUser && recUser.email && emailAllowed(recUser)) {
             emailList.push({ email: recUser.email, name: recUser.full_name || recUser.username || 'Attendee' });
           }
         }
       } else if ((type === 'meeting' || type === 'event') && creator && creator.organization) {
         // Broadcast: Send email to everyone in the organization
-        const orgUsers = await User.find({ organization: creator.organization }).select('email full_name username');
+        const orgUsers = await User.find({ organization: creator.organization }).select('email full_name username privacy_settings');
         for (const recUser of orgUsers) {
-          if (recUser.email) {
+          if (recUser.email && emailAllowed(recUser)) {
             emailList.push({ email: recUser.email, name: recUser.full_name || recUser.username || 'Attendee' });
           }
         }
       } else if (assignedTo) {
         // Single task assignment
-        const recUser = await User.findById(assignedTo).select('email full_name username');
-        if (recUser && recUser.email) {
+        const recUser = await User.findById(assignedTo).select('email full_name username privacy_settings');
+        if (recUser && recUser.email && emailAllowed(recUser)) {
           emailList.push({ email: recUser.email, name: recUser.full_name || recUser.username || 'Assignee' });
         }
       }
@@ -241,7 +250,7 @@ export const createTask = async (req: Request, res: Response): Promise<any> => {
             type || 'task',
             start_time || new Date(),
             end_time || new Date(),
-            description,
+            emailDescription || description,
             creatorName
           ).catch((err) => console.error(`[Calendar Email] Failed to send email to ${recipientInfo.email}:`, err));
         }

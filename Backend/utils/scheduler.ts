@@ -599,17 +599,20 @@ export const processHolidayReminders = async () => {
     for (const h of holidays as any[]) {
       const org = await Organization.findById(h.organizationId).lean();
       if (!org) continue;
-      const members = await User.find({ organization: (org as any).name }).select('_id full_name email').lean();
+      const members = await User.find({ organization: (org as any).name }).select('_id full_name email privacy_settings').lean();
       if (!members.length) continue;
 
       const ids = members.map((m: any) => String(m._id));
       await sendPushNotification(ids, `🎉 ${h.title}`, `Tomorrow is ${h.title} — a public holiday.`, {
         type: 'holiday',
         eventId: String(h._id),
-      });
+      }, 'reminder');
 
+      const { emailAllowed } = await import('./mailer');
       for (const m of members as any[]) {
-        if (!m.email) continue;
+        // Respect the member's email-notifications opt-out (reminder mail is
+        // informational, not transactional).
+        if (!emailAllowed(m)) continue;
         try {
           await sendCalendarEventEmail(
             m.email,

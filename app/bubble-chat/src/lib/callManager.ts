@@ -26,7 +26,7 @@ const persistCall = (roomId: string, type: 'voice' | 'video') => {
 
 export type CallState =
   | { status: 'idle' }
-  | { status: 'calling_out'; user: any; type: 'voice' | 'video'; roomId: string }
+  | { status: 'calling_out'; user: any; type: 'voice' | 'video'; roomId: string; busy?: boolean }
   | { status: 'calling_in'; callerId: string; callerName: string; callerAvatar?: string; type: 'voice' | 'video'; roomId: string }
   | { status: 'in_call'; user: any; type: 'voice' | 'video'; roomId: string; duration: number; meetingDbId: string | null; hostId?: string | null; isHost?: boolean };
 
@@ -333,7 +333,8 @@ export const rejoinPersistedCall = async ({ roomId, type }: { roomId: string; ty
 
 // Start a group call: ring every other member into one room (call_invite) and enter
 // the room as host. LiveKit hosts the N-way media; the overlay renders the call.
-export const startGroupCall = async (members: any[], type: 'voice' | 'video', groupName?: string) => {
+// `groupAvatar` (the group's icon) shows on the host overlay instead of initials.
+export const startGroupCall = async (members: any[], type: 'voice' | 'video', groupName?: string, groupAvatar?: string) => {
   const roomId = `bubble-group-${Math.random().toString(36).slice(2, 11)}`;
   const socket = getSocket();
   const currentUser = await authStorage.getUser();
@@ -368,7 +369,7 @@ export const startGroupCall = async (members: any[], type: 'voice' | 'video', gr
 
   setCallState({
     status: 'in_call',
-    user: { name: groupName || 'Group call', id: roomId },
+    user: { name: groupName || 'Group call', id: roomId, avatar: groupAvatar || null },
     type,
     roomId,
     duration: 0,
@@ -403,6 +404,7 @@ export const setupCallSocketListeners = (socket: any) => {
   // Remove duplicate listeners if any
   socket.off('incoming_call');
   socket.off('call_accepted');
+  socket.off('call_busy');
   socket.off('call_rejected');
   socket.off('call_ended');
   socket.off('meeting_ended');
@@ -478,6 +480,25 @@ export const setupCallSocketListeners = (socket: any) => {
     });
 
     startDurationTimer();
+  });
+
+  // Server busy gate: the person we rang is already on another call — their end
+  // never rang. Show a brief "on another call" state, then reset to idle.
+  socket.on('call_busy', (data: { toUserId: string; roomId: string; type?: 'voice' | 'video' }) => {
+    const state = currentCallState;
+    if (state.status === 'calling_out' && state.roomId === data.roomId) {
+      if (callTimeout) clearTimeout(callTimeout);
+      stopRingtone();
+      setCallState({ ...state, busy: true });
+      setTimeout(() => {
+        if (getCallState().status === 'calling_out') setCallState({ status: 'idle' });
+      }, 2500);
+      return;
+    }
+    // Mid-call invite to a busy colleague — the call continues; just inform.
+    if (state.status === 'in_call') {
+      Alert.alert('On another call', 'That colleague is currently on another call.');
+    }
   });
 
   socket.on('call_rejected', () => {
@@ -559,6 +580,7 @@ export const teardownCallSocketListeners = (socket: any) => {
   if (!socket) return;
   socket.off('incoming_call');
   socket.off('call_accepted');
+  socket.off('call_busy');
   socket.off('call_rejected');
   socket.off('call_ended');
   socket.off('meeting_ended');
