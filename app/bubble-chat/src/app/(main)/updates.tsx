@@ -492,6 +492,11 @@ export default function UpdatesScreen() {
     return () => clearInterval(interval);
   }, [isFocused]);
 
+  // Meetings we've already shown the "Meeting Ended" alert for this session —
+  // the backend fires the event several times per meeting (room + personal
+  // rooms + the post-AI enriched re-emit).
+  const alertedMeetingsRef = useRef<Set<string>>(new Set());
+
   // Listen for meeting_ended socket event to show transcript notification
   useEffect(() => {
     const socket = getSocket();
@@ -505,6 +510,14 @@ export default function UpdatesScreen() {
       actionItems?: { text: string; assignedToName?: string }[];
       rawTranscript?: string;
     }) => {
+      // The backend emits meeting_ended MULTIPLE times per meeting (to the room
+      // + each participant's personal room, and again enriched after the AI
+      // pass) — alert exactly ONCE per meeting or the popup keeps reappearing
+      // after the user already dismissed it.
+      const meetingKey = String(data.meetingId || data.roomId || '');
+      if (meetingKey && alertedMeetingsRef.current.has(meetingKey)) return;
+      if (meetingKey) alertedMeetingsRef.current.add(meetingKey);
+
       // Fetch full meeting details if we have meetingId
       let summary = data.summary || '';
       let actionItems = data.actionItems || [];

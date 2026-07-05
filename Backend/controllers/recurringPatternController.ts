@@ -42,12 +42,16 @@ export const detectAndNotifyPatterns = async (req: Request, res: Response) => {
 
     const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-    // Fetch all events this user attended (or created) within the window
+    // Fetch all events this user attended (or created) within the window.
+    // Holidays are excluded: they're seeded system events that recur BY NATURE
+    // (Christmas Day ×4 etc.), so suggesting them as "recurring patterns"
+    // spammed the Updates tab with junk cards after every scan.
     const events = await CalendarEvent.find({
       organizationId: orgId,
       $or: [{ createdBy: userId }, { attendees: userId }],
       startTime: { $gte: since },
       status: { $ne: 'cancelled' },
+      eventType: { $ne: 'holiday' },
     })
       .select('title eventType isRecurring recurrenceRule parentEventId')
       .lean();
@@ -112,6 +116,26 @@ export const detectAndNotifyPatterns = async (req: Request, res: Response) => {
       }
 
       newlyDetected.push(example.title);
+    }
+
+    // One-time cleanup: drop previously-detected patterns that were generated
+    // from holiday events (before holidays were excluded above) so the junk
+    // "Christmas Day ×4" cards stop resurfacing.
+    try {
+      const holidayTitles = await CalendarEvent.distinct('title', {
+        organizationId: orgId,
+        eventType: 'holiday',
+      });
+      if (holidayTitles.length) {
+        const normalizedHolidays = holidayTitles.map((t: string) => normalise(t)).filter(Boolean);
+        await RecurringPattern.deleteMany({
+          userId,
+          status: 'detected',
+          normalisedTitle: { $in: normalizedHolidays },
+        });
+      }
+    } catch (cleanupErr) {
+      console.error('[Pattern] holiday-pattern cleanup failed:', cleanupErr);
     }
 
     // Also return any existing detected patterns for this user so the client

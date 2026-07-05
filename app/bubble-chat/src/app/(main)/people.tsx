@@ -1066,20 +1066,38 @@ export default function PeopleScreen() {
         </View>
       </View>
 
-      {/* Live Rooms — visible only when at least one meeting is active */}
-      {liveRooms.length > 0 && (
-        <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-            <Animated.View style={{
-              width: 7, height: 7, borderRadius: 4,
-              backgroundColor: '#10b981',
-              opacity: liveDotPulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
-              transform: [{ scale: liveDotPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) }],
-            }} />
-            <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: '#10b981', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-              Live Rooms
+      {/* Live — persistent card (divider on top) showing calls happening RIGHT
+          NOW, always rendered above contacts/org members like the web's Live
+          Rooms strip. Empty state when nothing is live. */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+        {/* Divider line on top of the Live card */}
+        <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 12 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+          <Animated.View style={{
+            width: 7, height: 7, borderRadius: 4,
+            backgroundColor: liveRooms.length > 0 ? '#10b981' : colors.textSoft,
+            opacity: liveRooms.length > 0
+              ? liveDotPulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] })
+              : 0.5,
+            transform: [{ scale: liveRooms.length > 0 ? liveDotPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }) : 1 }],
+          }} />
+          <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: liveRooms.length > 0 ? '#10b981' : colors.textSoft, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            Live
+          </Text>
+          {liveRooms.length > 0 && (
+            <Text style={{ fontSize: 10, fontFamily: 'Poppins_600SemiBold', color: colors.textSoft }}>
+              · {liveRooms.length} {liveRooms.length === 1 ? 'call' : 'calls'} happening now
+            </Text>
+          )}
+        </View>
+        {liveRooms.length === 0 && (
+          <View style={{ backgroundColor: colors.card, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ fontSize: 11.5, fontFamily: 'Poppins_400Regular', color: colors.textSoft }}>
+              No live calls right now — start one from a chat or a colleague below.
             </Text>
           </View>
+        )}
+        {liveRooms.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {liveRooms.map((room: any) => {
               const host = room.host;
@@ -1169,8 +1187,8 @@ export default function PeopleScreen() {
               );
             })}
           </ScrollView>
-        </View>
-      )}
+        )}
+      </View>
 
       {/* Tab Switcher */}
       <View className="flex-row px-6 pb-1 border-b border-black/5 dark:border-white/10">

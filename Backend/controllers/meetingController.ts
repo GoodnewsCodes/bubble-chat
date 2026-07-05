@@ -35,7 +35,10 @@ export const extractMeetingIntelligence = async (
   // the AI *summary + action items* depend on Aida (DeepSeek). When that's unavailable
   // we still return a usable record — never leak provider/config wording to end users,
   // which previously made a working transcript look broken ("DeepSeek key not configured").
-  if (!transcript) {
+  // A missing OR trivially short transcript produces NO AI output — sending a
+  // few stray words to the LLM made it hallucinate summaries and fake action
+  // items (which then became real Tasks) after every tiny/silent call.
+  if (!transcript || transcript.trim().length < 40) {
     return {
       summary: 'No transcript was captured for this meeting, so no summary is available.',
       actionItems: [],
