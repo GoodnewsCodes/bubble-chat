@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "Backend/controllers/messageController.ts": {
-    "mtime": 1783124077.9337928,
-    "ast_hash": "6f71be0f3605b8dce04052bf432aa798",
+    "mtime": 1783286979.3185737,
+    "ast_hash": "e623736b97ff727c1e775a372f52a613",
     "semantic_hash": ""
   },
   "Backend/controllers/messageRequestController.ts": {
@@ -1035,8 +1035,8 @@
     "semantic_hash": ""
   },
   "Backend/utils/filebase.ts": {
-    "mtime": 1782315406.940349,
-    "ast_hash": "9d6bf8880d7c5d085ff0047fc202a887",
+    "mtime": 1783286962.303752,
+    "ast_hash": "f59b0a0c6f8cd79e6906a9d823ead01d",
     "semantic_hash": ""
   },
   "Backend/utils/livekitService.ts": {
@@ -1695,8 +1695,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/updates.tsx": {
-    "mtime": 1783284003.0797963,
-    "ast_hash": "94654689c8c875b58c3bb402829377c5",
+    "mtime": 1783287091.2026548,
+    "ast_hash": "9a242f605ee914cb44cb6dd27a5af0a1",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/api.ts": {

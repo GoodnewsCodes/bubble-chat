@@ -62,10 +62,13 @@ const PURPLE_SOFT = 'rgba(108,92,231,0.10)';
 // truncated for display (the full URL still opens) so they never widen the bubble.
 // Mirrors the web's renderMentionText linkify behavior (chat-window.tsx).
 const URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
-function renderMessageText(text: string, isMe: boolean) {
+const MENTION_REGEX = /(@[a-zA-Z0-9_.\-]+)/g;
+
+function renderMessageText(text: string, isMe: boolean, mentionNames?: Record<string, string>) {
   if (!text) return text;
   const baseColor = isMe ? '#ffffff' : INK;
   const linkColor = isMe ? '#ffffff' : PURPLE;
+  const mentionColor = isMe ? '#ffe8a3' : PURPLE;
   const parts = text.split(URL_REGEX);
   return parts.map((segment, i) => {
     URL_REGEX.lastIndex = 0;
@@ -81,11 +84,29 @@ function renderMessageText(text: string, isMe: boolean) {
         </Text>
       );
     }
-    return (
-      <Text key={`t-${i}`} style={{ color: baseColor }}>
-        {segment}
-      </Text>
-    );
+    // Highlight @mentions and show the person's NAME right beside the handle
+    // (e.g. "@dara (Dara Mobile)") so an @ is never just a bare username.
+    return segment.split(MENTION_REGEX).map((piece, j) => {
+      if (piece.startsWith('@') && piece.length > 1) {
+        const uname = piece.slice(1).toLowerCase();
+        const fullName = uname === 'all' ? null : mentionNames?.[uname];
+        return (
+          <Text key={`m-${i}-${j}`} style={{ color: mentionColor, fontFamily: 'Poppins_700Bold' }}>
+            {piece}
+            {fullName ? (
+              <Text style={{ color: isMe ? 'rgba(255,255,255,0.8)' : INK_SOFT, fontFamily: 'Poppins_400Regular' }}>
+                {` (${fullName})`}
+              </Text>
+            ) : null}
+          </Text>
+        );
+      }
+      return (
+        <Text key={`t-${i}-${j}`} style={{ color: baseColor }}>
+          {piece}
+        </Text>
+      );
+    });
   });
 }
 
@@ -145,6 +166,18 @@ export default function ChatScreen() {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chat, setChat] = useState<any>(null);
+
+  // username (lowercase) → full name for everyone in this chat, so rendered
+  // @mentions can show the person's name right beside the handle.
+  const mentionNames = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    const members = [...(chat?.users || []), ...(chat?.members || [])];
+    for (const u of members) {
+      const uname = u?.username ? String(u.username).toLowerCase() : null;
+      if (uname && !map[uname]) map[uname] = u.full_name || u.name || '';
+    }
+    return map;
+  }, [chat?.users, chat?.members]);
   const [isAttachmentOpen, setIsAttachmentOpen] = useState(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: string; type: string; url?: string } | null>(null);
@@ -2439,7 +2472,7 @@ export default function ChatScreen() {
                           />
                           {msg.text && msg.text !== (msg.mediaUrl || msg.media_url) && (
                             <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : colors.text, marginTop: 6 }}>
-                              {renderMessageText(msg.text, isMe)}
+                              {renderMessageText(msg.text, isMe, mentionNames)}
                             </Text>
                           )}
                         </View>
@@ -2457,7 +2490,7 @@ export default function ChatScreen() {
                           </View>
                           {msg.text && msg.text !== (msg.mediaUrl || msg.media_url) && (
                             <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : colors.text, marginTop: 6 }}>
-                              {renderMessageText(msg.text, isMe)}
+                              {renderMessageText(msg.text, isMe, mentionNames)}
                             </Text>
                           )}
                         </View>
@@ -2472,7 +2505,7 @@ export default function ChatScreen() {
                         </View>
                       ) : (
                         <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : INK }}>
-                          {renderMessageText(msg.text, isMe)}
+                          {renderMessageText(msg.text, isMe, mentionNames)}
                         </Text>
                       )}
 

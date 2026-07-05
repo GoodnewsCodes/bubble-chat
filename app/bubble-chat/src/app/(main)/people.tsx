@@ -116,6 +116,10 @@ function Avatar({
     <View style={{ width: size, height: size }} className="relative shrink-0">
       <SharedAvatar
         url={avatar}
+        // userId unlocks the offline base64 avatar cache (keyed by user id) —
+        // without it, cards fell back to initials whenever the URL was
+        // unsigned/expired even though the avatar was already cached locally.
+        userId={userId}
         name={name}
         size={size}
         isGroup={isFallbackBlack}
@@ -652,7 +656,7 @@ function WorkroomTab({
                   className="flex-1 flex-row items-center"
                   disabled={loadingDm === member.id}
                 >
-                  <Avatar name={member.name} avatar={member.avatar} size={50} isOnline={member.isOnline} organization={member.organization} />
+                  <Avatar name={member.name} avatar={member.avatar} size={50} isOnline={member.isOnline} userId={member.id} organization={member.organization} />
                   <View className="flex-1 min-w-0 ml-3">
                     <View className="flex-row items-center gap-1.5 flex-wrap">
                       <Text className="text-[15px] font-bold text-ink dark:text-[#f4f5fb] leading-tight font-sans" numberOfLines={1}>
@@ -1973,7 +1977,7 @@ export default function PeopleScreen() {
 //                     activeOpacity={0.75}
 //                     className="flex-1 flex-row items-center"
 //                   >
-//                     <Avatar name={member.name} avatar={member.avatar} size={50} isOnline={member.isOnline} organization={member.organization} />
+//                     <Avatar name={member.name} avatar={member.avatar} size={50} isOnline={member.isOnline} userId={member.id} organization={member.organization} />
 //                     <View className="flex-1 min-w-0 ml-3">
 //                       <View className="flex-row items-center gap-1.5 flex-wrap">
 //                         <Text className="text-[15px] font-bold text-ink dark:text-[#f4f5fb] leading-tight font-sans" numberOfLines={1}>
