@@ -8,8 +8,9 @@ import { useTheme } from "../../lib/theme";
 import { NicknameProvider } from "../../lib/nicknames";
 import { fetchActiveMeetings } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
-import { setInMeetingUsers } from "../../lib/presence";
+import { setInMeetingUsers, setViewerVisibility } from "../../lib/presence";
 import { subscribeCallState, CallState } from "../../lib/callManager";
+import { authStorage } from "../../lib/authStorage";
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   // The tab bar follows the app theme: light blur surface in light mode, dark
@@ -204,6 +205,18 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  // Seed viewer reciprocity flags from the stored user so presence/read-receipt
+  // gating reflects my own privacy settings from the first render.
+  useEffect(() => {
+    authStorage.getUser().then((u: any) => {
+      if (!u) return;
+      setViewerVisibility({
+        showOnline: u.privacy_settings?.show_online_status !== false,
+        readReceipts: u.privacy_settings?.read_receipts !== false,
+      });
+    }).catch(() => {});
+  }, []);
+
   return (
     <NicknameProvider>
       <Tabs

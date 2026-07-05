@@ -35,6 +35,7 @@ import { authStorage } from "../../lib/authStorage";
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from "react-native-svg";
 import { useTheme } from "../../lib/theme";
 import { getCachedNickname } from "../../lib/nicknames";
+import { useViewerVisibility } from "../../lib/presence";
 import * as Notifications from 'expo-notifications';
 import { getActiveChatId } from "../../lib/activeChatRef";
 
@@ -1271,6 +1272,8 @@ function ChatRow({
   onLongPress: () => void;
 }) {
   const { colors } = useTheme();
+  // Reciprocity: hide others' presence / read state if I've hidden my own.
+  const { presenceVisible, readReceipts } = useViewerVisibility();
 
   return (
     <TouchableOpacity
@@ -1306,7 +1309,7 @@ function ChatRow({
           style={{ borderRadius: 14 }}
           imageStyle={{ borderRadius: 14 }}
         />
-        {chat.isOnline && !chat.isGroupChat && (
+        {chat.isOnline && presenceVisible && !chat.isGroupChat && (
           <View style={{ position: "absolute", bottom: -1, right: -1, width: 13, height: 13, borderRadius: 99, backgroundColor: "#22c55e", borderWidth: 2, borderColor: "#f8f7ff" }} />
         )}
       </View>
@@ -1339,7 +1342,11 @@ function ChatRow({
             <View style={{ flexDirection: "row", alignItems: "center", flex: 1, minWidth: 0, paddingRight: 8 }}>
               {chat.status === "sent" && <Check size={13} color="rgba(0,0,0,0.25)" style={{ marginRight: 3 }} />}
               {chat.status === "delivered" && <CheckCheck size={13} color="rgba(0,0,0,0.25)" style={{ marginRight: 3 }} />}
-              {chat.status === "read_other_all" && <CheckCheck size={13} color="#34B7F1" style={{ marginRight: 3 }} />}
+              {chat.status === "read_other_all" && (
+                readReceipts
+                  ? <CheckCheck size={13} color="#34B7F1" style={{ marginRight: 3 }} />
+                  : <CheckCheck size={13} color="rgba(0,0,0,0.25)" style={{ marginRight: 3 }} />
+              )}
               {chat.isMuted && <BellOff size={12} color="rgba(0,0,0,0.2)" style={{ marginRight: 3 }} />}
               <Text
                 numberOfLines={1}
@@ -1391,6 +1398,8 @@ function ContactRow({
 }) {
   const { colors } = useTheme();
   const unreadCount = matchingChat?.unreadCount || 0;
+  // Reciprocity: hide others' presence if I've hidden my own.
+  const { presenceVisible } = useViewerVisibility();
 
   return (
     <TouchableOpacity
@@ -1425,7 +1434,7 @@ function ContactRow({
           style={{ borderRadius: 14 }}
           imageStyle={{ borderRadius: 14 }}
         />
-        {contact.isOnline && (
+        {contact.isOnline && presenceVisible && (
           <View style={{ position: "absolute", bottom: -1, right: -1, width: 13, height: 13, borderRadius: 99, backgroundColor: "#22c55e", borderWidth: 2, borderColor: colors.bg }} />
         )}
       </View>

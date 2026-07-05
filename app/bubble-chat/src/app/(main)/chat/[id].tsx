@@ -46,7 +46,7 @@ import {
 import { startOutgoingCall, startGroupCall } from '../../../lib/callManager';
 import { prepareChat, encryptForChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from '../../../lib/e2ee';
 import { useTheme } from '../../../lib/theme';
-import { useIsOnline } from '../../../lib/presence';
+import { useIsOnline, useViewerVisibility } from '../../../lib/presence';
 import { authStorage } from '../../../lib/authStorage';
 import { useNicknames } from '../../../lib/nicknames';
 import { setActiveChatId } from '../../../lib/activeChatRef';
@@ -161,6 +161,8 @@ export default function ChatScreen() {
   const [isPulsing, setIsPulsing] = useState(true);
   const [ownUser, setOwnUser] = useState<any>(null);
   const isPeerOnline = useIsOnline(chat?.otherUserId, !!chat?.isOnline);
+  // Reciprocity: if I turned off my own read receipts, I don't see others' "seen" state.
+  const { readReceipts: viewerReadReceipts } = useViewerVisibility();
   const { getDisplayName, saveNickname } = useNicknames();
 
   // New States for Lightbox, Forwarding, and Emoji selector
@@ -1099,7 +1101,7 @@ export default function ChatScreen() {
   const memberCount = uniqueMemberIds.length
   const statusLine = chat.status === 'typing'
     ? 'typing…'
-    : chat.isOnline
+    : (isPeerOnline && !chat.isGroupChat)
       ? 'Online'
       : chat.isGroupChat
         ? `${memberCount > 0 ? memberCount : ''} member${memberCount !== 1 ? 's' : ''}`.trim()
@@ -2514,9 +2516,9 @@ export default function ChatScreen() {
                       {isMe && (
                         msg.status === 'queued' ? (
                           <Clock size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
-                        ) : msg.isRead ? (
+                        ) : (msg.isRead && viewerReadReceipts) ? (
                           <CheckCheck size={11} color="#38bdf8" style={{ marginLeft: 4 }} />
-                        ) : (msg as any).isDelivered ? (
+                        ) : ((msg as any).isDelivered || msg.isRead) ? (
                           <CheckCheck size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
                         ) : (
                           <Check size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />

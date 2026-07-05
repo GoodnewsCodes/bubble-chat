@@ -22,18 +22,56 @@ export const setupPresenceListeners = (socket: any) => {
   });
 };
 
-export const getPresence = (userId?: string | null): boolean | undefined =>
-  userId != null ? onlineMap.get(String(userId)) : undefined;
+export const getPresence = (userId?: string | null): boolean | undefined => {
+  // Reciprocity: if I've hidden my own online status, I see no one as online.
+  if (!viewerPresenceVisible) return false;
+  return userId != null ? onlineMap.get(String(userId)) : undefined;
+};
 
 export const subscribePresence = (l: () => void) => {
   listeners.push(l);
   return () => { listeners = listeners.filter((x) => x !== l); };
 };
 
+// ── Viewer reciprocity (WhatsApp-style) ──────────────────────────────────────
+// If the signed-in user hides their OWN online status, they also stop seeing
+// everyone else's presence; likewise, turning off their own read receipts hides
+// others' "seen" state from them. Outbound suppression (not broadcasting my
+// presence / not sending my acks) is enforced server-side; these flags gate what
+// the viewer is allowed to SEE. Seeded at app bootstrap and updated on save.
+let viewerPresenceVisible = true;
+let viewerReadReceipts = true;
+
+/** Update the viewer's own privacy visibility. Call on bootstrap and after saving settings. */
+export const setViewerVisibility = (opts: { showOnline?: boolean; readReceipts?: boolean }) => {
+  let changed = false;
+  if (typeof opts.showOnline === 'boolean' && opts.showOnline !== viewerPresenceVisible) {
+    viewerPresenceVisible = opts.showOnline;
+    changed = true;
+  }
+  if (typeof opts.readReceipts === 'boolean' && opts.readReceipts !== viewerReadReceipts) {
+    viewerReadReceipts = opts.readReceipts;
+    changed = true;
+  }
+  if (changed) notify();
+};
+
+export const getViewerPresenceVisible = (): boolean => viewerPresenceVisible;
+export const getViewerReadReceipts = (): boolean => viewerReadReceipts;
+
+/** Hook: viewer's own privacy visibility flags. Re-renders when they change. */
+export const useViewerVisibility = (): { presenceVisible: boolean; readReceipts: boolean } => {
+  const [, force] = useReducer((x) => x + 1, 0);
+  useEffect(() => subscribePresence(force), []);
+  return { presenceVisible: viewerPresenceVisible, readReceipts: viewerReadReceipts };
+};
+
 /** Resolves the displayed online state: realtime value if known, else the API fallback. */
 export const useIsOnline = (userId?: string | null, fallback: boolean = false): boolean => {
   const [, force] = useReducer((x) => x + 1, 0);
   useEffect(() => subscribePresence(force), []);
+  // Reciprocity: if I hide my own online status, I see no one as online.
+  if (!viewerPresenceVisible) return false;
   const known = getPresence(userId);
   return known === undefined ? fallback : known;
 };

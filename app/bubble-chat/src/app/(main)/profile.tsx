@@ -12,6 +12,7 @@ import { useNavigation, useRouter } from 'expo-router';
 import { subscribeToPlusButton } from '../../lib/mockData';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { authStorage } from '../../lib/authStorage';
+import { setViewerVisibility } from '../../lib/presence';
 
 import { getMyProfile, updateProfile, getSecureMediaUrl } from '../../lib/api';
 
@@ -1324,6 +1325,15 @@ export default function ProfileScreen() {
                       try {
                         const res = await updateProfile(patch);
                         if (res?.data) await authStorage.updateUser(res.data);
+                        // Keep reciprocity flags in sync so presence/read-receipt
+                        // gating updates live when privacy toggles change.
+                        const nextPrivacy = (res?.data?.privacy_settings) || (patch as any).privacy_settings;
+                        if (nextPrivacy) {
+                          setViewerVisibility({
+                            showOnline: nextPrivacy.show_online_status !== false,
+                            readReceipts: nextPrivacy.read_receipts !== false,
+                          });
+                        }
                       } catch (err: any) {
                         setUser(prevUser);
                         Alert.alert('Error', err?.message || 'Could not save that setting.');
