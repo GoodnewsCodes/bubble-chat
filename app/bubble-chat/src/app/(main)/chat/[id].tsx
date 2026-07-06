@@ -64,9 +64,18 @@ const PURPLE_SOFT = 'rgba(108,92,231,0.10)';
 const URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
 const MENTION_REGEX = /(@[a-zA-Z0-9_.\-]+)/g;
 
-function renderMessageText(text: string, isMe: boolean, mentionNames?: Record<string, string>) {
+function renderMessageText(
+  text: string,
+  isMe: boolean,
+  mentionNames?: Record<string, string>,
+  // Received bubbles sit on `colors.surface`, so their text must follow the theme
+  // (dark ink in light mode, near-white in dark mode). Sent bubbles are always on
+  // purple, so their text stays white regardless of scheme.
+  textColors?: { text: string; textSoft: string }
+) {
   if (!text) return text;
-  const baseColor = isMe ? '#ffffff' : INK;
+  const baseColor = isMe ? '#ffffff' : (textColors?.text ?? INK);
+  const softColor = isMe ? 'rgba(255,255,255,0.8)' : (textColors?.textSoft ?? INK_SOFT);
   const linkColor = isMe ? '#ffffff' : PURPLE;
   const mentionColor = isMe ? '#ffe8a3' : PURPLE;
   const parts = text.split(URL_REGEX);
@@ -94,7 +103,7 @@ function renderMessageText(text: string, isMe: boolean, mentionNames?: Record<st
           <Text key={`m-${i}-${j}`} style={{ color: mentionColor, fontFamily: 'Poppins_700Bold' }}>
             {piece}
             {fullName ? (
-              <Text style={{ color: isMe ? 'rgba(255,255,255,0.8)' : INK_SOFT, fontFamily: 'Poppins_400Regular' }}>
+              <Text style={{ color: softColor, fontFamily: 'Poppins_400Regular' }}>
                 {` (${fullName})`}
               </Text>
             ) : null}
@@ -981,7 +990,7 @@ export default function ChatScreen() {
 
   if (!chat) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }} edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }} edges={['top', 'bottom']}>
         {loadFailed ? (
           <>
             <Text style={{ color: INK, fontFamily: 'Poppins_600SemiBold', fontSize: 15, textAlign: 'center' }}>
@@ -2472,7 +2481,7 @@ export default function ChatScreen() {
                           />
                           {msg.text && msg.text !== (msg.mediaUrl || msg.media_url) && (
                             <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : colors.text, marginTop: 6 }}>
-                              {renderMessageText(msg.text, isMe, mentionNames)}
+                              {renderMessageText(msg.text, isMe, mentionNames, colors)}
                             </Text>
                           )}
                         </View>
@@ -2490,7 +2499,7 @@ export default function ChatScreen() {
                           </View>
                           {msg.text && msg.text !== (msg.mediaUrl || msg.media_url) && (
                             <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : colors.text, marginTop: 6 }}>
-                              {renderMessageText(msg.text, isMe, mentionNames)}
+                              {renderMessageText(msg.text, isMe, mentionNames, colors)}
                             </Text>
                           )}
                         </View>
@@ -2505,7 +2514,7 @@ export default function ChatScreen() {
                         </View>
                       ) : (
                         <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular', color: isMe ? '#ffffff' : INK }}>
-                          {renderMessageText(msg.text, isMe, mentionNames)}
+                          {renderMessageText(msg.text, isMe, mentionNames, colors)}
                         </Text>
                       )}
 

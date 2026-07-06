@@ -538,11 +538,11 @@ export default function Messages() {
         )}
         {isEmpty ? (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
-            <MessageSquarePlus size={36} color="rgba(31,32,48,0.12)" />
-            <Text style={{ marginTop: 12, fontSize: 14, fontFamily: "Poppins_500Medium", color: "rgba(31,32,48,0.3)" }}>
+            <MessageSquarePlus size={36} color={colors.textSoft} />
+            <Text style={{ marginTop: 12, fontSize: 14, fontFamily: "Poppins_500Medium", color: colors.textSoft }}>
               No conversations yet
             </Text>
-            <Text style={{ fontSize: 12, fontFamily: "Poppins_400Regular", color: "rgba(31,32,48,0.2)", marginTop: 4 }}>
+            <Text style={{ fontSize: 12, fontFamily: "Poppins_400Regular", color: colors.textSoft, marginTop: 4 }}>
               Message a contact to get started
             </Text>
           </View>
@@ -552,10 +552,10 @@ export default function Messages() {
             {filteredChats.length > 0 && (
               <View style={{ marginBottom: 20 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, marginBottom: 8 }}>
-                  <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: "rgba(31,32,48,0.3)", letterSpacing: 1.5, fontStyle: "italic", textTransform: "uppercase" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: colors.textSoft, letterSpacing: 1.5, fontStyle: "italic", textTransform: "uppercase" }}>
                     RECENT MESSAGES
                   </Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: "rgba(0,0,0,0.05)", marginLeft: 10 }} />
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border, marginLeft: 10 }} />
                 </View>
 
                 {filteredChats.map((chat, index) => {
@@ -573,7 +573,7 @@ export default function Messages() {
                         onLongPress={() => handleLongPressItem('chat', chat.id, chat.name, chat.isPinned, !!chat.isMuted)}
                       />
                       {index < filteredChats.length - 1 && (
-                        <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.04)", marginHorizontal: 12, marginVertical: 3 }} />
+                        <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 12, marginVertical: 3 }} />
                       )}
                     </React.Fragment>
                   );
@@ -585,10 +585,10 @@ export default function Messages() {
             {filteredContacts.length > 0 && (
               <View style={{ marginBottom: 32 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, marginBottom: 8 }}>
-                  <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: "rgba(31,32,48,0.3)", letterSpacing: 1.5, fontStyle: "italic", textTransform: "uppercase" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: colors.textSoft, letterSpacing: 1.5, fontStyle: "italic", textTransform: "uppercase" }}>
                     CONTACTS
                   </Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: "rgba(0,0,0,0.05)", marginLeft: 10 }} />
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border, marginLeft: 10 }} />
                 </View>
 
                 {filteredContacts.map((contact, index) => {
@@ -610,7 +610,7 @@ export default function Messages() {
                         onLongPress={() => handleLongPressItem('contact', contact.id, contact.name, false, false)}
                       />
                       {index < filteredContacts.length - 1 && (
-                        <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.04)", marginHorizontal: 12, marginVertical: 3 }} />
+                        <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 12, marginVertical: 3 }} />
                       )}
                     </React.Fragment>
                   );
@@ -705,7 +705,7 @@ export default function Messages() {
                       style={{
                         fontSize: 13,
                         fontFamily: isActive ? "Poppins_700Bold" : "Poppins_500Medium",
-                        color: isActive ? "#ffffff" : "#9a9aab",
+                        color: isActive ? "#ffffff" : colors.textSoft,
                       }}
                     >
                       {filter}
@@ -1032,7 +1032,7 @@ export default function Messages() {
           bottom: 100,
           left: 16,
           right: 16,
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.card,
           borderRadius: 20,
           paddingVertical: 14,
           paddingHorizontal: 20,
@@ -1052,7 +1052,7 @@ export default function Messages() {
             setIsSelectionMode(false);
             setSelectedItemIds([]);
           }}>
-            <Text style={{ fontSize: 13.5, fontFamily: "Poppins_600SemiBold", color: "#9a9aab" }}>Cancel</Text>
+            <Text style={{ fontSize: 13.5, fontFamily: "Poppins_600SemiBold", color: colors.textSoft }}>Cancel</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => {
@@ -1087,8 +1087,8 @@ export default function Messages() {
                 borderRadius: 10,
               }}
             >
-              <Archive size={14} color={selectedItemIds.length > 0 ? "#6c5ce7" : "#9a9aab"} style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 12.5, fontFamily: "Poppins_700Bold", color: selectedItemIds.length > 0 ? "#6c5ce7" : "#9a9aab" }}>Archive</Text>
+              <Archive size={14} color={selectedItemIds.length > 0 ? "#6c5ce7" : colors.textSoft} style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 12.5, fontFamily: "Poppins_700Bold", color: selectedItemIds.length > 0 ? "#6c5ce7" : colors.textSoft }}>Archive</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1118,8 +1118,8 @@ export default function Messages() {
                 borderRadius: 10,
               }}
             >
-              <Trash2 size={14} color={selectedItemIds.length > 0 ? "red" : "#9a9aab"} style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 12.5, fontFamily: "Poppins_700Bold", color: selectedItemIds.length > 0 ? "red" : "#9a9aab" }}>Delete</Text>
+              <Trash2 size={14} color={selectedItemIds.length > 0 ? "red" : colors.textSoft} style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 12.5, fontFamily: "Poppins_700Bold", color: selectedItemIds.length > 0 ? "red" : colors.textSoft }}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1166,7 +1166,7 @@ export default function Messages() {
               style={{
                 width: "100%",
                 maxWidth: 290,
-                backgroundColor: "#ffffff",
+                backgroundColor: colors.card,
                 borderRadius: 24,
                 padding: 18,
                 shadowColor: "#000",
@@ -1175,18 +1175,18 @@ export default function Messages() {
                 elevation: 10,
               }}
             >
-              <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: "#9a9aab", textTransform: "uppercase", marginBottom: 4, letterSpacing: 0.5 }}>
+              <Text style={{ fontSize: 10, fontFamily: "Poppins_700Bold", color: colors.textSoft, textTransform: "uppercase", marginBottom: 4, letterSpacing: 0.5 }}>
                 {activeContextItem.type === 'chat' ? 'Conversation Options' : 'Contact Options'}
               </Text>
-              <Text style={{ fontSize: 15.5, fontFamily: "Poppins_700Bold", color: "#1f2030", marginBottom: 12 }}>
+              <Text style={{ fontSize: 15.5, fontFamily: "Poppins_700Bold", color: colors.text, marginBottom: 12 }}>
                 {activeContextItem.name}
               </Text>
 
-              <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.05)", marginBottom: 8 }} />
+              <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 8 }} />
 
               {activeContextItem.type === 'chat' && (
                 <ContextMenuItem
-                  icon={<Pin size={16} color="#9a9aab" />}
+                  icon={<Pin size={16} color={colors.textSoft} />}
                   label={activeContextItem.isPinned ? "Unpin Chat" : "Pin Chat"}
                   onPress={() => handleTogglePin(activeContextItem.id)}
                 />
@@ -1194,7 +1194,7 @@ export default function Messages() {
 
               {activeContextItem.type === 'chat' && (
                 <ContextMenuItem
-                  icon={<Archive size={16} color="#9a9aab" />}
+                  icon={<Archive size={16} color={colors.textSoft} />}
                   label={activeContextItem.isMuted ? "Unarchive Chat" : "Archive Chat"}
                   onPress={() => handleToggleArchive(activeContextItem.id)}
                 />
@@ -1202,7 +1202,7 @@ export default function Messages() {
 
               {activeContextItem.type === 'chat' && (
                 <ContextMenuItem
-                  icon={<FolderPlus size={16} color="#9a9aab" />}
+                  icon={<FolderPlus size={16} color={colors.textSoft} />}
                   label="Move to Folder"
                   onPress={() => {
                     setFolderSelectChatId(activeContextItem.id);
@@ -1213,18 +1213,18 @@ export default function Messages() {
               )}
 
               <ContextMenuItem
-                icon={<Ban size={16} color="#9a9aab" />}
+                icon={<Ban size={16} color={colors.textSoft} />}
                 label="Block Contact"
                 onPress={() => handleBlockContact(activeContextItem.name)}
               />
 
               <ContextMenuItem
-                icon={<Check size={16} color="#9a9aab" />}
+                icon={<Check size={16} color={colors.textSoft} />}
                 label="Select"
                 onPress={() => handleToggleSelectMode(activeContextItem.id)}
               />
 
-              <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.05)", marginVertical: 8 }} />
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
 
               <ContextMenuItem
                 icon={<Trash2 size={16} color="red" />}
@@ -1288,7 +1288,7 @@ function ChatRow({
           height: 20,
           borderRadius: 10,
           borderWidth: 2,
-          borderColor: isSelected ? "#6c5ce7" : "#9a9aab",
+          borderColor: isSelected ? "#6c5ce7" : colors.textSoft,
           backgroundColor: isSelected ? "#6c5ce7" : "transparent",
           alignItems: "center",
           justifyContent: "center",
@@ -1594,6 +1594,7 @@ function ContextMenuItem({
   onPress: () => void;
   labelStyle?: any;
 }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -1605,7 +1606,7 @@ function ContextMenuItem({
       }}
     >
       {icon}
-      <Text style={[{ fontSize: 13.5, color: '#1f2030', fontFamily: 'Poppins_500Medium', marginLeft: 10 }, labelStyle]}>
+      <Text style={[{ fontSize: 13.5, color: colors.text, fontFamily: 'Poppins_500Medium', marginLeft: 10 }, labelStyle]}>
         {label}
       </Text>
     </TouchableOpacity>
