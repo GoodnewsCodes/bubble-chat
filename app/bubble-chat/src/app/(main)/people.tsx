@@ -30,6 +30,8 @@ import {
   History as HistoryIcon,
   PhoneMissed,
   FileText,
+  Info,
+  Mail,
 } from 'lucide-react-native';
 import { Link, useNavigation, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -162,6 +164,8 @@ function ContactsTab({
   // FIX: use chats to resolve real unread counts per contact
   const [chats, setChats] = useState<any[]>([]);
   const [typingChats, setTypingChats] = useState<Record<string, { fromUserId: string; fromUsername?: string; fromName?: string } | false>>({});
+  // Contact detail sheet — bio/email/phone/organization, opened via the info button.
+  const [detailContact, setDetailContact] = useState<Contact | null>(null);
 
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -378,6 +382,12 @@ function ContactsTab({
 
                 {/* Action Buttons */}
                 <View className="flex-row items-center gap-2 ml-2">
+                  <TouchableOpacity
+                    onPress={() => setDetailContact(contact)}
+                    className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center"
+                  >
+                    <Info color="#6c5ce7" size={14} />
+                  </TouchableOpacity>
                   <Link href={`/chat/${chatTarget}`} asChild>
                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
                       <MessageSquare color="#6c5ce7" size={14} />
@@ -401,6 +411,81 @@ function ContactsTab({
           })
         )}
       </ScrollView>
+
+      {/* Contact Detail Sheet — bio, email, phone, organization */}
+      <Modal visible={!!detailContact} transparent animationType="fade" onRequestClose={() => setDetailContact(null)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
+          activeOpacity={1}
+          onPress={() => setDetailContact(null)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ width: '100%', maxWidth: 380 }}>
+            <View style={{ backgroundColor: colors.card, borderRadius: 28, padding: 22, borderWidth: 1, borderColor: colors.border }}>
+              {detailContact && (
+                <>
+                  <View className="items-center mb-4">
+                    <Avatar name={detailContact.name} avatar={detailContact.avatar} size={72} userId={detailContact.id} isOnline={detailContact.isOnline} />
+                    <Text className="text-[17px] font-bold text-ink dark:text-[#f4f5fb] mt-3 font-sans">{detailContact.name}</Text>
+                    <Text className="text-[12px] text-ink-soft dark:text-[#9a9bb6] font-sans">@{detailContact.username}</Text>
+                  </View>
+
+                  {!!detailContact.bio && (
+                    <Text className="text-[13px] text-ink dark:text-[#f4f5fb] font-sans mb-4 text-center leading-5">
+                      {detailContact.bio}
+                    </Text>
+                  )}
+
+                  <View style={{ gap: 10 }}>
+                    {!!detailContact.email && (
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-9 h-9 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
+                          <Mail color="#6c5ce7" size={16} />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[10px] text-ink-soft dark:text-[#9a9bb6] font-sans uppercase tracking-wide">Email</Text>
+                          <Text className="text-[13px] text-ink dark:text-[#f4f5fb] font-sans" numberOfLines={1}>{detailContact.email}</Text>
+                        </View>
+                      </View>
+                    )}
+                    {!!detailContact.phone && (
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-9 h-9 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
+                          <Phone color="#6c5ce7" size={16} />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[10px] text-ink-soft dark:text-[#9a9bb6] font-sans uppercase tracking-wide">Phone</Text>
+                          <Text className="text-[13px] text-ink dark:text-[#f4f5fb] font-sans" numberOfLines={1}>{detailContact.phone}</Text>
+                        </View>
+                      </View>
+                    )}
+                    {(!!detailContact.organization || !!detailContact.org_role) && (
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-9 h-9 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
+                          <Briefcase color="#6c5ce7" size={16} />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[10px] text-ink-soft dark:text-[#9a9bb6] font-sans uppercase tracking-wide">Organization & Role</Text>
+                          <Text className="text-[13px] text-ink dark:text-[#f4f5fb] font-sans" numberOfLines={1}>
+                            {[detailContact.organization, detailContact.org_role].filter(Boolean).join(' · ')}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setDetailContact(null)}
+                    className="mt-5 rounded-2xl py-3 items-center"
+                    style={{ backgroundColor: colors.purpleSoft }}
+                  >
+                    <Text className="text-[13px] font-bold text-purple font-sans">Close</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Soft bottom fade — list gently blurs out as it scrolls past the edge */}
       {filtered.length > 4 && (

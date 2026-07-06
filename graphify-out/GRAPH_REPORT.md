@@ -1,7 +1,7 @@
 # Graph Report - bubble-chat  (2026-07-05)
 
 ## Corpus Check
-- 389 files · ~2,065,493 words
+- 389 files · ~2,065,783 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c4bdd005`
+- Built from commit: `61e7acb7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -942,7 +942,7 @@ Cohesion: 0.50
 Nodes (3): IUserImage, UserImage, UserImageSchema
 
 ## Knowledge Gaps
-- **1030 isolated node(s):** `uploadsDir`, `BUCKET`, `TEMPLATES`, `updateMessage`, `markMessagesRead` (+1025 more)
+- **1030 isolated node(s):** `AVATARS`, `EMOJI_CATEGORIES`, `TABS`, `TabType`, `uploadsDir` (+1025 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **40 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -957,7 +957,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.115) - this node is a cross-community bridge._
 - **Are the 247 inferred relationships involving `cn()` (e.g. with `ChatAvatar()` and `ChatList()`) actually correct?**
   _`cn()` has 247 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `uploadsDir`, `BUCKET`, `TEMPLATES` to the rest of the system?**
+- **What connects `AVATARS`, `EMOJI_CATEGORIES`, `TABS` to the rest of the system?**
   _1034 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.04706504494976203 - nodes in this community are weakly interconnected._

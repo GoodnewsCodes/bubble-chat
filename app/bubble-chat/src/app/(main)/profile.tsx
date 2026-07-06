@@ -1675,14 +1675,14 @@ export default function ProfileScreen() {
           <TouchableOpacity
             activeOpacity={1}
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: colors.card,
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               padding: 24,
             }}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 18, fontFamily: 'SpaceGrotesk_700Bold', color: '#1f2030' }}>
+              <Text style={{ fontSize: 18, fontFamily: 'SpaceGrotesk_700Bold', color: colors.text }}>
                 Select Profile Image
               </Text>
               <TouchableOpacity onPress={() => setIsAvatarModalOpen(false)} style={{ padding: 4 }}>
@@ -1749,7 +1749,7 @@ export default function ProfileScreen() {
             style={{
               width: '100%',
               maxWidth: 320,
-              backgroundColor: '#ffffff',
+              backgroundColor: colors.card,
               borderRadius: 28,
               padding: 24,
               alignItems: 'center',
@@ -1760,7 +1760,7 @@ export default function ProfileScreen() {
             }}
           >
             <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontFamily: 'SpaceGrotesk_700Bold', color: '#1f2030' }}>
+              <Text style={{ fontSize: 18, fontFamily: 'SpaceGrotesk_700Bold', color: colors.text }}>
                 Share Contact Info
               </Text>
               <TouchableOpacity onPress={() => setIsQrModalOpen(false)} style={{ padding: 4 }}>
@@ -1768,23 +1768,23 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 12, color: '#9a9aab', fontFamily: 'Poppins_500Medium', textAlign: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 12, color: colors.textSoft, fontFamily: 'Poppins_500Medium', textAlign: 'center', marginBottom: 16 }}>
               Let others scan this QR to instantly add you on Bubble Chat.
             </Text>
 
-            <View style={{ width: 220, height: 220, borderRadius: 20, backgroundColor: '#f8f7ff', borderWidth: 1, borderColor: 'rgba(108,92,231,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 20, overflow: 'hidden' }}>
-              <Image 
-                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=6c5ce7&data=${encodeURIComponent(user.uniqueTag || user.email || user.username || 'unknown')}` }} 
-                style={{ width: 200, height: 200 }} 
+            <View style={{ width: 220, height: 220, borderRadius: 20, backgroundColor: colors.purpleSoft, borderWidth: 1, borderColor: 'rgba(108,92,231,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 20, overflow: 'hidden' }}>
+              <Image
+                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=6c5ce7&data=${encodeURIComponent(user.uniqueTag || user.email || user.username || 'unknown')}` }}
+                style={{ width: 200, height: 200 }}
               />
             </View>
 
-            <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: '#9a9aab', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            <Text style={{ fontSize: 11, fontFamily: 'Poppins_700Bold', color: colors.textSoft, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
               Your Bubble ID
             </Text>
-            
-            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(108,92,231,0.05)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 20 }}>
-              <Text style={{ flex: 1, fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: '#1f2030' }} numberOfLines={1}>
+
+            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: colors.purpleSoft, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 20 }}>
+              <Text style={{ flex: 1, fontSize: 13, fontFamily: 'Poppins_600SemiBold', color: colors.text }} numberOfLines={1}>
                 {user.uniqueTag || user.email || user.username || 'N/A'}
               </Text>
               <TouchableOpacity 

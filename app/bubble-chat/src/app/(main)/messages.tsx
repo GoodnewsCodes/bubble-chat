@@ -780,21 +780,21 @@ export default function Messages() {
           onPress={() => setIsAddContactOpen(false)}
           style={styles.modalOverlay}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Contact</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Contact</Text>
               <TouchableOpacity onPress={() => setIsAddContactOpen(false)}>
                 <X size={20} color="#6c5ce7" />
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.inputLabel}>Email or BubbleID</Text>
+            <Text style={[styles.inputLabel, { color: colors.textSoft }]}>Email or BubbleID</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { color: colors.text, backgroundColor: colors.purpleSoft }]}
               placeholder="e.g. user@example.com or bubble-ID"
               value={newContactName}
               onChangeText={setNewContactName}
-              placeholderTextColor="#9a9aab"
+              placeholderTextColor={colors.textSoft}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -828,21 +828,21 @@ export default function Messages() {
           onPress={() => setIsJoinOrgOpen(false)}
           style={styles.modalOverlay}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Join Group / Org</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Join Group / Org</Text>
               <TouchableOpacity onPress={() => setIsJoinOrgOpen(false)}>
                 <X size={20} color="#6c5ce7" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Organization / Group Code</Text>
+            <Text style={[styles.inputLabel, { color: colors.textSoft }]}>Organization / Group Code</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { color: colors.text, backgroundColor: colors.purpleSoft }]}
               placeholder="Paste your invite code"
               value={joinOrgCode}
               onChangeText={setJoinOrgCode}
-              placeholderTextColor="#9a9aab"
+              placeholderTextColor={colors.textSoft}
               autoCapitalize="characters"
               autoCorrect={false}
             />
@@ -880,21 +880,21 @@ export default function Messages() {
           onPress={() => setIsCreateTabOpen(false)}
           style={styles.modalOverlay}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Folder Tab</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>New Folder Tab</Text>
               <TouchableOpacity onPress={() => setIsCreateTabOpen(false)}>
                 <X size={20} color="#6c5ce7" />
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.inputLabel}>Folder Name</Text>
+            <Text style={[styles.inputLabel, { color: colors.textSoft }]}>Folder Name</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { color: colors.text, backgroundColor: colors.purpleSoft }]}
               placeholder="e.g. VIP or Personal"
               value={newTabName}
               onChangeText={setNewTabName}
-              placeholderTextColor="#9a9aab"
+              placeholderTextColor={colors.textSoft}
               autoFocus
             />
 
@@ -927,15 +927,15 @@ export default function Messages() {
           }}
           style={styles.modalOverlay}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Move to Folder</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Move to Folder</Text>
               <TouchableOpacity onPress={() => { setIsFolderSelectOpen(false); setFolderSelectChatId(null); }}>
                 <X size={20} color="#6c5ce7" />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, fontFamily: "Poppins_500Medium", color: "#1f2030", marginBottom: 12 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Poppins_500Medium", color: colors.text, marginBottom: 12 }}>
               Choose which folders/tabs this conversation should appear in:
             </Text>
 
@@ -958,12 +958,12 @@ export default function Messages() {
                       paddingVertical: 12,
                       paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: isMapped ? "rgba(108,92,231,0.08)" : "rgba(0,0,0,0.02)",
+                      backgroundColor: isMapped ? colors.purpleSoft : colors.border,
                       borderWidth: 1,
                       borderColor: isMapped ? "#6c5ce7" : "transparent",
                     }}
                   >
-                    <Text style={{ fontSize: 14, fontFamily: "Poppins_600SemiBold", color: isMapped ? "#6c5ce7" : "#1f2030" }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Poppins_600SemiBold", color: isMapped ? "#6c5ce7" : colors.text }}>
                       {folder}
                     </Text>
                     {isMapped && <Check size={16} color="#6c5ce7" />}
@@ -973,17 +973,17 @@ export default function Messages() {
             </ScrollView>
 
             {/* Create inline folder tab section */}
-            <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 12, marginTop: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: '#9a9aab', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 8, marginBottom: 8 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: colors.textSoft, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 }}>
                 Create & Move to New Tab
               </Text>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <TextInput
-                  style={[styles.textInput, { flex: 1, marginBottom: 0, height: 42, paddingVertical: 0 }]}
+                  style={[styles.textInput, { flex: 1, marginBottom: 0, height: 42, paddingVertical: 0, color: colors.text, backgroundColor: colors.purpleSoft }]}
                   placeholder="New tab name..."
                   value={newFolderNameInMove}
                   onChangeText={setNewFolderNameInMove}
-                  placeholderTextColor="#9a9aab"
+                  placeholderTextColor={colors.textSoft}
                 />
                 <TouchableOpacity
                   onPress={async () => {

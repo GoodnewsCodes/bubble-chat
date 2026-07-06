@@ -776,9 +776,13 @@ export default function CallsScreen() {
                       <View className="relative">
                         <Avatar
                           url={worker.avatar}
-                          name={worker.organization || displayName}
+                          // userId unlocks the offline base64 avatar cache. Also fixed a
+                          // bug where the fallback used the ORG name (so almost every
+                          // person with an org showed a black group-tile with the
+                          // company's initials instead of their own colored avatar).
+                          userId={worker.id}
+                          name={displayName}
                           size={80}
-                          isGroup={!!worker.organization}
                           style={{ borderRadius: 24 }}
                           imageStyle={{ borderRadius: 24 }}
                         />

@@ -2163,7 +2163,7 @@ export default function ChatScreen() {
           top: 60,
           right: 14,
           width: 195,
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.card,
           borderRadius: 20,
           paddingVertical: 6,
           borderWidth: 1,
@@ -2517,7 +2517,7 @@ export default function ChatScreen() {
                           right: isMe ? undefined : 12,
                           left: isMe ? 12 : undefined,
                           flexDirection: 'row',
-                          backgroundColor: '#ffffff',
+                          backgroundColor: colors.card,
                           borderRadius: 12,
                           paddingHorizontal: 6,
                           paddingVertical: 2,
@@ -2613,7 +2613,7 @@ export default function ChatScreen() {
             paddingVertical: 14,
             borderTopWidth: 1,
             borderTopColor: 'rgba(0,0,0,0.06)',
-            backgroundColor: '#ffffff',
+            backgroundColor: colors.card,
           }}>
             <TouchableOpacity onPress={() => {
               setIsSelectionMode(false);
@@ -2721,7 +2721,7 @@ export default function ChatScreen() {
                   bottom: 70,
                   left: 16,
                   width: 190,
-                  backgroundColor: '#ffffff',
+                  backgroundColor: colors.card,
                   borderRadius: 18,
                   padding: 8,
                   borderWidth: 1,
@@ -3120,7 +3120,7 @@ export default function ChatScreen() {
             {isEmojiOpen && (
               <View style={{
                 height: 250,
-                backgroundColor: '#ffffff',
+                backgroundColor: colors.card,
                 borderTopWidth: 1,
                 borderTopColor: colors.border,
                 paddingTop: 8,
@@ -3225,7 +3225,7 @@ export default function ChatScreen() {
               style={{
                 width: '100%',
                 maxWidth: 290,
-                backgroundColor: '#ffffff',
+                backgroundColor: colors.card,
                 borderRadius: 24,
                 padding: 16,
                 shadowColor: '#000',
@@ -3329,7 +3329,7 @@ export default function ChatScreen() {
       <Modal visible={isAiSummaryOpen} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(31,32,48,0.5)', justifyContent: 'flex-end' }}>
           <View style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: colors.card,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             padding: 24,
@@ -3630,7 +3630,7 @@ export default function ChatScreen() {
       <Modal visible={forwardingMessage !== null} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(31,32,48,0.5)', justifyContent: 'flex-end' }}>
           <View style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: colors.card,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             padding: 24,

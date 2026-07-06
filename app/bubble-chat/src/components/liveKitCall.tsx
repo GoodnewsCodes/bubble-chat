@@ -73,7 +73,20 @@ const initialsOf = (n?: string) => {
 /** Small avatar/initials placeholder for a participant in a video tile. */
 function ParticipantAvatar({ name, avatar, size }: { name?: string; avatar?: string; size: number }) {
   const uri = getSecureMediaUrl(avatar);
-  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  // A stale/expired signed URL was rendering a broken image with no fallback —
+  // track load failure and drop back to initials, same as the shared Avatar.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [uri]);
+
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#6c5ce7', alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#fff', fontSize: size * 0.36, fontFamily: 'Poppins_700Bold' }}>{initialsOf(name)}</Text>
