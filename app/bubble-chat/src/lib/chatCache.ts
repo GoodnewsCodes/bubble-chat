@@ -141,11 +141,15 @@ export const chatCache = {
     const response = await fetchAllUserChats();
     const list = response?.conversations || [];
     
-    // Map to UI Chat objects
-    const mapped = await Promise.all(list.map(async (c: any) => {
+    // Map to UI Chat objects. Each row is mapped defensively: a single malformed
+    // conversation (e.g. missing `users`) must never reject the whole sync, or the
+    // list screen would throw away good data and fall back to the error banner.
+    const mapped = (await Promise.all(list.map(async (c: any) => {
+     try {
       const isGroup = !!c.isGroupChat;
-      const otherUser = !isGroup 
-        ? c.users.find((u: any) => String(u.id || u._id) !== currentUserId) 
+      const participants = Array.isArray(c.users) ? c.users : [];
+      const otherUser = !isGroup
+        ? participants.find((u: any) => String(u.id || u._id) !== currentUserId)
         : null;
 
       // Pin check
@@ -241,7 +245,11 @@ export const chatCache = {
         transcriptPolicy: isGroup ? (c.transcriptPolicy || 'save') : undefined,
         resources: isGroup ? (c.resources || []) : undefined,
       };
-    }));
+     } catch (err) {
+      console.warn('Skipping malformed conversation during chat sync:', c?.id || c?._id, err);
+      return null;
+     }
+    }))).filter(Boolean) as any[];
 
     // Collapse any duplicate conversations (parallel DM docs / repeated rows)
     // before caching so each chat renders exactly once.

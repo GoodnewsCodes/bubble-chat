@@ -202,21 +202,31 @@ export default function Messages() {
   };
 
   const syncWithBackend = async () => {
-    try {
-      const freshChats = await chatCache.syncChatsWithBackend();
-      const freshContacts = await chatCache.syncContactsWithBackend();
-      const freshFolders = await chatCache.getFolders();
-      const freshMappings = await chatCache.getFolderMappings();
-      setChatsList(freshChats);
-      setContactsList(freshContacts);
-      setFoldersList(freshFolders);
-      setFolderMappings(freshMappings);
-      setSyncFailed(false);
-    } catch (err) {
-      // Surface the failure instead of silently showing stale data.
-      console.warn("Sync failed in messages.tsx:", err);
-      setSyncFailed(true);
+    // Offline-first: chats and contacts are refreshed independently so a failure
+    // in one never discards a successful refresh of the other. Whatever we can't
+    // reach the network for simply keeps its cached value — the list only ever
+    // changes when genuinely fresh data arrives.
+    const [chatsResult, contactsResult] = await Promise.allSettled([
+      chatCache.syncChatsWithBackend(),
+      chatCache.syncContactsWithBackend(),
+    ]);
+
+    if (chatsResult.status === "fulfilled") setChatsList(chatsResult.value);
+    if (contactsResult.status === "fulfilled") setContactsList(contactsResult.value);
+
+    // Folders/mappings are local-only, so these never hit the network.
+    setFoldersList(await chatCache.getFolders());
+    setFolderMappings(await chatCache.getFolderMappings());
+
+    if (chatsResult.status === "rejected") {
+      console.warn("Chat sync failed in messages.tsx:", chatsResult.reason);
     }
+    if (contactsResult.status === "rejected") {
+      console.warn("Contact sync failed in messages.tsx:", contactsResult.reason);
+    }
+    // We only "failed" if the refresh couldn't complete at all. If either source
+    // came back, the screen has current data and shouldn't show a warning.
+    setSyncFailed(chatsResult.status === "rejected" && contactsResult.status === "rejected");
   };
 
   const currentUserIdRef = useRef<string | null>(null);
@@ -511,6 +521,12 @@ export default function Messages() {
 
   const isEmpty = filteredChats.length === 0 && filteredContacts.length === 0;
 
+  // Offline-first: only surface the "couldn't refresh" affordance when there is
+  // nothing cached to show. If we have any cached chats/contacts we serve them
+  // silently — a transient refresh failure shouldn't nag over good local data.
+  const hasCachedData = chatsList.length > 0 || contactsList.length > 0;
+  const showSyncBanner = syncFailed && !hasCachedData;
+
   const insets = useSafeAreaInsets();
   const headerHeight = 170 + insets.top;
 
@@ -526,13 +542,13 @@ export default function Messages() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {syncFailed && (
+        {showSyncBanner && (
           <TouchableOpacity
             onPress={() => { setSyncFailed(false); syncWithBackend(); }}
             style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(244,102,59,0.1)", borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 10 }}
           >
             <Text style={{ fontSize: 12, fontFamily: "Poppins_500Medium", color: "#f4663b" }}>
-              Couldn't refresh — showing cached chats. Tap to retry.
+              You're offline and nothing's cached yet. Tap to retry.
             </Text>
           </TouchableOpacity>
         )}
