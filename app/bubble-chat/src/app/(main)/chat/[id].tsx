@@ -22,7 +22,8 @@ import {
 } from 'expo-audio';
 import { Message } from '../../../lib/mockData';
 import { chatCache } from '../../../lib/chatCache';
-import { getSocket } from '../../../lib/socket';
+import { getSocket, onSocketReady } from '../../../lib/socket';
+import { runThrottled, resetThrottle } from '../../../lib/syncScheduler';
 import {
   sendTextMessage,
   sendMediaMessage,
@@ -57,6 +58,11 @@ const INK = '#1f2030';
 const INK_SOFT = '#9a9aab';
 const BG = '#f8f7ff';
 const PURPLE_SOFT = 'rgba(108,92,231,0.10)';
+
+// [DEBUG-INSTRUMENTATION] module-scoped so they survive remounts — lets us tell
+// "effect re-ran N times for id X" (mount/param churn) from a real connect storm.
+let __chatEffectRuns = 0;
+let __chatOnConnectCalls = 0;
 
 // Render message body text, turning URLs into tappable links. Long URLs are
 // truncated for display (the full URL still opens) so they never widen the bubble.
@@ -219,6 +225,32 @@ export default function ChatScreen() {
   // User details for own-typing socket filters
   const currentUserIdRef = useRef<string | null>(null);
   const chatRef = useRef<any>(null);
+
+  // Set once we've turned a bare userId route into a real conversation id via
+  // accessOrCreateChat — stops that resolve call from re-firing on every sync/
+  // reconnect (which was hammering the API into 429s). Reset when `id` changes.
+  const resolvedChatIdRef = useRef<string | null>(null);
+  // The route id we last attempted to resolve, so accessOrCreateChat runs at most
+  // once per id (cleared on failure so a later retry — post-backoff — can happen).
+  const resolveAttemptedRef = useRef<string | null>(null);
+
+  // Every chat id this screen instance has already navigated to. Canonicalizing a
+  // bare userId → conversationId via router.replace must happen AT MOST ONCE per
+  // target — otherwise loadCached and syncChat can ping-pong the route id, which
+  // re-runs the whole socket effect in a tight loop (the "Flushing…" log storm).
+  const visitedChatIdsRef = useRef<Set<string>>(new Set());
+  const redirectToChat = (targetId: string): boolean => {
+    const target = String(targetId);
+    if (!target || target === String(id)) return false;
+    if (visitedChatIdsRef.current.has(target)) {
+      // We've already been here — a redirect back to it means a loop. Stop.
+      return false;
+    }
+    visitedChatIdsRef.current.add(String(id));
+    visitedChatIdsRef.current.add(target);
+    router.replace(`/chat/${target}`);
+    return true;
+  };
 
   // E2EE cipher state for this chat (null = plaintext / keys unavailable).
   const cipherRef = useRef<Awaited<ReturnType<typeof prepareChat>>>(null);
@@ -546,10 +578,18 @@ export default function ChatScreen() {
     mentionStartIndexRef.current = -1;
   };
 
+  // Cold-start race fix: mounting before the socket exists must not leave this
+  // screen permanently without real-time handlers (see messages.tsx).
+  const [socketEpoch, setSocketEpoch] = useState(0);
+  useEffect(() => onSocketReady(() => setSocketEpoch((e) => e + 1)), []);
+
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
     if (!id) return;
+
+    __chatEffectRuns += 1;
+    console.log(`[DEBUG] chat socket-effect run #${__chatEffectRuns} id=${id} socket.connected=${socket.connected}`);
 
     const onTypingStart = (data: { fromUserId: string; chatId: string; fromName?: string; fromUsername?: string }) => {
       if (currentUserIdRef.current && String(data.fromUserId) === String(currentUserIdRef.current)) return;
@@ -568,11 +608,13 @@ export default function ChatScreen() {
     };
 
     const onConnect = () => {
-      console.log("Socket connected/reconnected in Chat detail screen. Flushing and syncing...");
+      __chatOnConnectCalls += 1;
+      console.log(`[DEBUG] chat onConnect #${__chatOnConnectCalls} id=${id} (effectRuns=${__chatEffectRuns})`);
       // A reconnect gets a new socket on the server, which loses prior room
       // membership — re-join so room-scoped events (e.g. group typing) keep flowing.
       socket.emit('join_room', id);
-      syncChatAndMessages();
+      // Throttled: rapid connect churn must not re-fire a full sync each time.
+      runThrottled(`chat:${id}`, syncChatAndMessages, 2500);
     };
 
     socket.emit('join_room', id);
@@ -741,7 +783,7 @@ export default function ChatScreen() {
         socket.emit('typing_stop', { toUserId: chatRef.current.otherUserId, chatId: chatRef.current.id });
       }
     };
-  }, [id]);
+  }, [id, socketEpoch]);
 
   // Header Dropdown Actions states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -832,7 +874,7 @@ export default function ChatScreen() {
       id: String(conversation.id || conversation._id),
       name: isGroup
         ? (conversation.chatName || 'Group Chat')
-        : (other?.full_name || other?.username || (paramName as string) || 'Chat'),
+        : (other?.full_name || other?.username || other?.email?.split('@')[0] || (paramName as string) || 'Chat'),
       avatar: isGroup ? (conversation.groupIcon || null) : (other?.avatar || (paramAvatar as string) || null),
       isGroupChat: isGroup,
       otherUserId: other ? String(other.id || other._id) : ((paramOtherUserId as string) || null),
@@ -865,10 +907,7 @@ export default function ChatScreen() {
       setChat(foundChat);
       setIsMuted(!!foundChat.isMuted);
       setIsChatPinned(!!foundChat.isPinned);
-      if (String(foundChat.id) !== String(id)) {
-        router.replace(`/chat/${foundChat.id}`);
-        return;
-      }
+      if (redirectToChat(String(foundChat.id))) return;
     } else if (paramName) {
       // Not cached yet (brand-new DM) but the navigator told us who this is —
       // render the header + empty thread NOW; the sync below fills in the rest.
@@ -887,6 +926,38 @@ export default function ChatScreen() {
     setMessages(cachedMsgs);
   };
 
+  // Turn a bare userId route into a real conversation id (creating the DM if
+  // needed), rendering the resolved chat immediately. Guarded so accessOrCreateChat
+  // runs at most once per route id — repeated calls were what stampeded the API
+  // into 429s. Returns the conversation id, or null if it couldn't resolve.
+  const resolveConversationId = async (): Promise<string | null> => {
+    if (resolvedChatIdRef.current) return resolvedChatIdRef.current;
+    if (resolveAttemptedRef.current === String(id)) return null;
+    resolveAttemptedRef.current = String(id);
+    try {
+      const res = await accessOrCreateChat(id as string);
+      const conversation = res?.conversation || res?.data?.conversation || res?.data || res;
+      const actualChatId = conversation?.id || conversation?._id;
+      // Render from the response IMMEDIATELY — don't block on the full chat-list
+      // re-sync (that runs in the background and warms the cache).
+      const direct = await chatFromConversation(conversation);
+      if (direct) {
+        setChat((prev: any) => prev && String(prev.id) === String(direct.id) ? { ...prev, ...direct } : direct);
+        setLoadFailed(false);
+      }
+      if (actualChatId) {
+        resolvedChatIdRef.current = String(actualChatId);
+        chatCache.syncChatsWithBackend().catch(() => undefined);
+        return String(actualChatId);
+      }
+    } catch (apiErr) {
+      console.warn("Failed to resolve chat via API in ChatScreen:", apiErr);
+      // Clear the guard so a later attempt (after 429 backoff / reconnect) can retry.
+      resolveAttemptedRef.current = null;
+    }
+    return null;
+  };
+
   const syncChatAndMessages = async () => {
     try {
       // Flush offline queue if online/reconnected
@@ -901,31 +972,12 @@ export default function ChatScreen() {
         setChat(foundChat);
         setIsMuted(!!foundChat.isMuted);
         setIsChatPinned(!!foundChat.isPinned);
-        if (String(foundChat.id) !== String(id)) {
-          router.replace(`/chat/${foundChat.id}`);
-          return;
-        }
+        if (redirectToChat(String(foundChat.id))) return;
       } else {
-        // Resolve user ID via API
-        try {
-          const res = await accessOrCreateChat(id as string);
-          const conversation = res?.conversation || res?.data?.conversation || res?.data || res;
-          const actualChatId = conversation?.id || conversation?._id;
-          // Render from the response IMMEDIATELY — don't block on the full
-          // chat-list re-sync (that runs in the background).
-          const direct = await chatFromConversation(conversation);
-          if (direct) {
-            setChat((prev: any) => prev && String(prev.id) === String(direct.id) ? { ...prev, ...direct } : direct);
-            setLoadFailed(false);
-          }
-          chatCache.syncChatsWithBackend().catch(() => undefined);
-          if (actualChatId && String(actualChatId) !== String(id)) {
-            router.replace(`/chat/${actualChatId}`);
-            return;
-          }
-        } catch (apiErr) {
-          console.warn("Failed to resolve chat via API in ChatScreen:", apiErr);
-        }
+        // Bare userId route (brand-new DM) — turn it into a real conversation id
+        // exactly once, then jump to the canonical /chat/<conversationId> route.
+        const actualChatId = await resolveConversationId();
+        if (actualChatId && redirectToChat(String(actualChatId))) return;
       }
 
       const freshMsgs = await chatCache.syncMessagesWithBackend(id as string);
@@ -946,6 +998,12 @@ export default function ChatScreen() {
   }, [chat, id]);
 
   useEffect(() => {
+    // New conversation route: clear the per-id resolution guards (unless we just
+    // navigated to the very id we resolved to) and let the next sync run now.
+    if (resolvedChatIdRef.current !== String(id)) resolvedChatIdRef.current = null;
+    resolveAttemptedRef.current = null;
+    resetThrottle(`chat:${id}`);
+
     loadCachedChatAndMessages();
     syncChatAndMessages();
     // Resolve E2EE keys for this chat so sends encrypt and incoming decrypt.
@@ -954,12 +1012,21 @@ export default function ChatScreen() {
       const myId = String(user?.id || user?._id || '');
       if (!myId) return;
       cipherRef.current = await prepareChat(String(id), myId).catch(() => null);
+      // Direct (unthrottled) re-sync: the mount sync just ran, so a throttled call
+      // here would be silently skipped — leaving every bubble on the 🔒 placeholder
+      // until the next background sync even though we can now decrypt.
       if (cipherRef.current) syncChatAndMessages();
     })();
-  }, [id]);
+  }, [id, socketEpoch]);
 
+  // Fallback poll ONLY when the socket is down — real-time events already keep the
+  // thread live while connected, so polling then just wasted requests (429 storm).
   useEffect(() => {
-    const interval = setInterval(syncChatAndMessages, 5000);
+    const interval = setInterval(() => {
+      const socket = getSocket();
+      if (socket && socket.connected) return;
+      runThrottled(`chat:${id}`, syncChatAndMessages, 5000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [id]);
 
@@ -1065,6 +1132,17 @@ export default function ChatScreen() {
         return;
       }
 
+      // Ensure a brand-new DM (opened by userId) is resolved to a real conversation
+      // id before sending — otherwise the first message to a new contact posts to a
+      // userId and silently drops into the offline queue ("Say hello" forever).
+      let targetChatId = String(chat.id);
+      if (resolvedChatIdRef.current) {
+        targetChatId = resolvedChatIdRef.current;
+      } else if (!chat.isGroupChat && String(chat.id) === String(id)) {
+        const resolved = await resolveConversationId();
+        if (resolved) targetChatId = resolved;
+      }
+
       if (selectedFile) {
         const fileObj = {
           uri: selectedFile.url || 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=200',
@@ -1072,7 +1150,7 @@ export default function ChatScreen() {
           type: selectedFile.type === 'image' ? 'image/jpeg' : selectedFile.type === 'video' ? 'video/mp4' : 'application/pdf'
         } as any;
         const mediaClientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        await sendMediaMessage(chat.id, fileObj, { content: text, clientId: mediaClientId, ...(replyParentId && { parent_message: replyParentId }) });
+        await sendMediaMessage(targetChatId, fileObj, { content: text, clientId: mediaClientId, ...(replyParentId && { parent_message: replyParentId }) });
         setMessageText('');
         setSelectedFile(null);
         setIsAttachmentOpen(false);
@@ -1110,7 +1188,7 @@ export default function ChatScreen() {
         const wire = cipher ? await encryptForChat(cipher, text) : text;
 
         try {
-          await sendTextMessage(chat.id, wire, { clientId: tempId, is_encrypted: !!cipher, ...(replyParentId && { parent_message: replyParentId }) });
+          await sendTextMessage(targetChatId, wire, { clientId: tempId, is_encrypted: !!cipher, ...(replyParentId && { parent_message: replyParentId }) });
           // Mark as sent; sync will reconcile the server id shortly.
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, status: 'sent' } : m
@@ -1122,11 +1200,11 @@ export default function ChatScreen() {
           // reached the server and only the response was lost, the retry carries the same
           // clientId and the backend's unique index returns the existing message instead
           // of creating a duplicate.
-          const queueId = await chatCache.addToOfflineQueue(chat.id, wire, tempId, !!cipher);
+          const queueId = await chatCache.addToOfflineQueue(targetChatId, wire, tempId, !!cipher);
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, id: queueId, status: 'queued' } : m
           ));
-          await chatCache.saveMessageLocally(chat.id, { ...tempMsg, id: queueId, status: 'queued' });
+          await chatCache.saveMessageLocally(targetChatId, { ...tempMsg, id: queueId, status: 'queued' });
         }
       }
     } catch (err: any) {
@@ -2432,9 +2510,15 @@ export default function ChatScreen() {
                         paddingHorizontal: 14,
                         paddingTop: 10,
                         paddingBottom: msg.reactions && msg.reactions.length > 0 ? 14 : 10,
-                        backgroundColor: isMe ? PURPLE : colors.surface,
+                        // Received bubbles: `card` (not `surface`) — surface is nearly
+                        // identical to the screen bg in light mode, making received
+                        // messages almost invisible. Card + hairline border reads
+                        // clearly in both light and dark.
+                        backgroundColor: isMe ? PURPLE : colors.card,
+                        borderWidth: isMe ? 0 : 1,
+                        borderColor: isMe ? 'transparent' : colors.border,
                         shadowColor: isMe ? PURPLE : '#000',
-                        shadowOpacity: isMe ? 0.15 : 0.02,
+                        shadowOpacity: isMe ? 0.15 : 0.06,
                         shadowRadius: 4,
                         shadowOffset: { width: 0, height: 1 },
                         elevation: 1,

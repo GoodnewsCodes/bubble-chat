@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchAllUserChats, fetchMessages, getMyContacts, getSecureMediaUrl, sendTextMessage } from './api';
+import { fetchAllUserChats, fetchMessages, getContacts, getSecureMediaUrl, sendTextMessage } from './api';
 import { authStorage } from './authStorage';
 import { getCachedNickname } from './nicknames';
 import { prepareChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from './e2ee';
@@ -209,8 +209,8 @@ export const chatCache = {
         id: String(c.id || c._id),
         name: isGroup
           ? (c.chatName || "Group Chat")
-          : (getCachedNickname(String(otherUser?.id || otherUser?._id || '')) || otherUser?.full_name || otherUser?.username || "Unknown User"),
-        realName: isGroup ? null : (otherUser?.full_name || otherUser?.username || "Unknown User"),
+          : (getCachedNickname(String(otherUser?.id || otherUser?._id || '')) || otherUser?.full_name || otherUser?.username || otherUser?.email?.split('@')[0] || "Unknown User"),
+        realName: isGroup ? null : (otherUser?.full_name || otherUser?.username || otherUser?.email?.split('@')[0] || "Unknown User"),
         avatar: isGroup ? (c.groupIcon || null) : (otherUser?.avatar || null),
         isGroupChat: isGroup,
         otherUserId: otherUser ? String(otherUser.id || otherUser._id) : null,
@@ -337,7 +337,11 @@ export const chatCache = {
   },
 
   async syncContactsWithBackend(): Promise<any[]> {
-    const response = await getMyContacts();
+    // Rich roster: org colleagues + explicit contacts (self and bots excluded
+    // server-side), matching the web chat list. The narrow /contacts/my endpoint
+    // returned only manually-added contacts, so a user who reached people via the
+    // org directory saw an empty Messages screen ("No conversations yet").
+    const response = await getContacts();
     const list = response?.data || [];
 
     const mapped = list.map((u: any) => ({

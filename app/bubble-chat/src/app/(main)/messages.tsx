@@ -20,7 +20,8 @@ import {
   subscribeToPlusButton,
 } from "../../lib/mockData";
 import { chatCache } from "../../lib/chatCache";
-import { getSocket } from "../../lib/socket";
+import { getSocket, onSocketReady } from "../../lib/socket";
+import { runThrottled } from "../../lib/syncScheduler";
 import { 
   addContact,
   toggleChatPin,
@@ -78,11 +79,19 @@ export default function Messages() {
     setActiveContextItem({ type, id, name, isPinned, isMuted });
   };
 
-  const handlePressItem = (type: 'chat' | 'contact', id: string) => {
+  const handlePressItem = (
+    type: 'chat' | 'contact',
+    id: string,
+    params?: { name?: string; avatar?: string | null; otherUserId?: string },
+  ) => {
     if (isSelectionMode) {
       setSelectedItemIds(prev =>
         prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
       );
+    } else if (params) {
+      // Carry the peer's name/avatar/id so a brand-new DM renders its header
+      // instantly and always has the peer id to resolve/create the conversation.
+      router.push({ pathname: `/chat/${id}` as any, params: { name: params.name || '', avatar: params.avatar || '', otherUserId: params.otherUserId || '' } });
     } else {
       router.push(`/chat/${id}`);
     }
@@ -244,6 +253,12 @@ export default function Messages() {
   // Real-time socket typing states
   const [typingChats, setTypingChats] = useState<Record<string, { fromUserId: string; fromUsername?: string; fromName?: string } | false>>({});
 
+  // Cold-start race fix: if this screen mounts before the socket is initialized,
+  // getSocket() below returns null and NO real-time handlers get attached — ever.
+  // Bumping this epoch when the socket appears re-runs the registration effect.
+  const [socketEpoch, setSocketEpoch] = useState(0);
+  useEffect(() => onSocketReady(() => setSocketEpoch((e) => e + 1)), []);
+
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -369,8 +384,10 @@ export default function Messages() {
 
     const handleConnect = () => {
       console.log("Socket connected/reconnected in Messages screen. Flushing offline queue and syncing...");
+      // Throttled so rapid reconnect churn can't re-fire a full chat+contact sync
+      // on every 'connect' (that was a major contributor to the 429 request storm).
       chatCache.processOfflineQueue().then(() => {
-        syncWithBackend();
+        runThrottled('messages:list', syncWithBackend, 2500);
       });
     };
 
@@ -423,13 +440,19 @@ export default function Messages() {
       socket.off('chat_updated', handleChatUpdated);
       socket.off('connect', handleConnect);
     };
-  }, []);
+  }, [socketEpoch]);
 
   useEffect(() => {
     if (!isFocused) return;
-    
-    // Poll silently every 5 seconds (no spinner UI)
-    const interval = setInterval(syncWithBackend, 5000);
+
+    // Fallback poll ONLY when the socket is down. While connected, real-time events
+    // (new_message, read receipts, unread counts) already keep the list fresh, so
+    // polling then just wasted requests and fed the 429 storm. Throttled + 429-aware.
+    const interval = setInterval(() => {
+      const socket = getSocket();
+      if (socket && socket.connected) return;
+      runThrottled('messages:list', syncWithBackend, 5000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [isFocused]);
 
@@ -499,6 +522,9 @@ export default function Messages() {
 
   // Filter contacts visible per tab
   const filteredContacts = contactsList.filter((c) => {
+    // Never list yourself as a contact you can message.
+    if (currentUserIdRef.current && String(c.id) === String(currentUserIdRef.current)) return false;
+
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
 
@@ -622,7 +648,7 @@ export default function Messages() {
                         isSelectionMode={isSelectionMode}
                         isSelected={isSelected}
                         isTyping={typingChats[matchingChat?.id || '']}
-                        onPress={() => handlePressItem('contact', chatTarget)}
+                        onPress={() => handlePressItem('contact', chatTarget, { name: contact.name, avatar: contact.avatar, otherUserId: String(contact.id) })}
                         onLongPress={() => handleLongPressItem('contact', contact.id, contact.name, false, false)}
                       />
                       {index < filteredContacts.length - 1 && (

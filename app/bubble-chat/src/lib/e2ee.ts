@@ -43,6 +43,12 @@ interface ChatCipherState {
 let keyPairCache: nacl.BoxKeyPair | null = null;
 const chatStateCache = new Map<string, ChatCipherState | null>();
 const groupKeyByEpoch = new Map<string, Uint8Array>();
+// When a chat resolved to `null` (no keys / transient failure) — retryable.
+// Permanently caching null poisoned whole sessions: one 429 or "Conversation
+// not found" during a sync locked EVERY message behind the 🔒 placeholder
+// until app restart, even after the network recovered.
+const nullStateAt = new Map<string, number>();
+const NULL_STATE_RETRY_MS = 30_000;
 
 // ─── Key pair ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +110,14 @@ const unwrapKey = (kp: nacl.BoxKeyPair, wrapped: string): Uint8Array | null => {
 // ─── Per-chat state ───────────────────────────────────────────────────────────
 
 export const prepareChat = async (chatId: string, myId: string): Promise<ChatCipherState | null> => {
-    if (chatStateCache.has(chatId)) return chatStateCache.get(chatId) ?? null;
+    if (chatStateCache.has(chatId)) {
+        const cached = chatStateCache.get(chatId) ?? null;
+        if (cached) return cached;
+        // A null result is retryable (network blip, partner registered a key since,
+        // group key not distributed yet). Honor a short cooldown, then re-resolve.
+        if (Date.now() - (nullStateAt.get(chatId) || 0) < NULL_STATE_RETRY_MS) return null;
+        chatStateCache.delete(chatId);
+    }
     let state: ChatCipherState | null = null;
     try {
         const kp = await ensureKeyPair();
@@ -154,6 +167,7 @@ export const prepareChat = async (chatId: string, myId: string): Promise<ChatCip
         state = null;
     }
     chatStateCache.set(chatId, state);
+    if (!state) nullStateAt.set(chatId, Date.now());
     return state;
 };
 

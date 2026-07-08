@@ -1,7 +1,7 @@
 # Graph Report - bubble-chat  (2026-07-06)
 
 ## Corpus Check
-- 389 files · ~2,066,804 words
+- 389 files · ~2,067,013 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a79318d3`
+- Built from commit: `da12210c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -911,7 +911,7 @@ Cohesion: 0.12
 Nodes (14): clerkTokenCache, liveKitReady, rejoinStyles, styles, getLinkJoinToken(), getPersistedCall(), inviteToCall(), rejoinPersistedCall() (+6 more)
 
 ## Knowledge Gaps
-- **1030 isolated node(s):** `AVATARS`, `EMOJI_CATEGORIES`, `styles`, `TABS`, `TabType` (+1025 more)
+- **1030 isolated node(s):** `styles`, `KEYS`, `DEFAULT_FOLDERS`, `avatarMemoryCache`, `AVATARS` (+1025 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -926,7 +926,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.124) - this node is a cross-community bridge._
 - **Are the 247 inferred relationships involving `cn()` (e.g. with `ChatAvatar()` and `ChatList()`) actually correct?**
   _`cn()` has 247 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `AVATARS`, `EMOJI_CATEGORIES`, `styles` to the rest of the system?**
+- **What connects `styles`, `KEYS`, `DEFAULT_FOLDERS` to the rest of the system?**
   _1034 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.04423076923076923 - nodes in this community are weakly interconnected._

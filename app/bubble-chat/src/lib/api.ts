@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { noteRateLimit } from './syncScheduler';
 
 let GoogleSignin: any = null;
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -305,6 +306,9 @@ export const getAuthHeaders = () => {
 
 const handleResponse = async (res: Response) => {
     if (!res.ok) {
+        // Rate limited — back the whole client's background syncs off for a cooldown
+        // so we stop stampeding the API (a 429 storm previously broke chat resolution).
+        if (res.status === 429) noteRateLimit();
         const err = await res.json().catch(() => ({}));
         // Backend controllers inconsistently use `message` or `error` for error
         // text — read either so the UI never falls back to "Request failed: NNN".

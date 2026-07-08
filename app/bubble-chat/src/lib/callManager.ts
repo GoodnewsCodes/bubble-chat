@@ -71,6 +71,13 @@ const notify = () => {
 
 export const setCallState = (newState: CallState) => {
   currentCallState = newState;
+  // Safety net: the ringtone/ringback belongs ONLY to the two "ringing" states.
+  // Stop it on any other transition (answered → in_call, ended/declined → idle) so
+  // it can never keep looping after the call connects — independent of which socket
+  // event or race drove the change.
+  if (newState.status !== 'calling_out' && newState.status !== 'calling_in') {
+    stopRingtone();
+  }
   // Keep the persisted "active call" in sync so a killed app can offer to rejoin.
   if (newState.status === 'in_call') {
     persistCall(newState.roomId, newState.type);

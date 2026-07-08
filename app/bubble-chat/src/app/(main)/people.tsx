@@ -45,7 +45,8 @@ import { addContact, createGroupChat, getSecureMediaUrl, accessOrCreateChat, get
 import { startOutgoingCall, joinRoomByLink, knockToJoinRoom } from '../../lib/callManager';
 import { useIsOnline, useIsInMeeting } from '../../lib/presence';
 import { authStorage } from '../../lib/authStorage';
-import { getSocket } from '../../lib/socket';
+import { getSocket, onSocketReady } from '../../lib/socket';
+import { runThrottled } from '../../lib/syncScheduler';
 import { useNicknames, getCachedNickname } from '../../lib/nicknames';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -201,9 +202,19 @@ function ContactsTab({
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(syncContacts, 5000);
+    // Was a 5s poll hitting BOTH contacts and chats sync — a heavy storm feeder.
+    // Real-time socket events keep these fresh; refresh on a relaxed, throttled cadence.
+    const interval = setInterval(() => {
+      runThrottled('people:contacts', syncContacts, 10000);
+    }, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  // Cold-start race fix: re-run registration when the socket becomes available
+  // (mounting before initSocket() finished used to leave this screen with no
+  // real-time handlers at all).
+  const [socketEpoch, setSocketEpoch] = useState(0);
+  useEffect(() => onSocketReady(() => setSocketEpoch((e) => e + 1)), []);
 
   useEffect(() => {
     const socket = getSocket();
@@ -224,9 +235,11 @@ function ContactsTab({
       socket.off('typing_start', handleTypingStart);
       socket.off('typing_stop', handleTypingStop);
     };
-  }, []);
+  }, [socketEpoch]);
 
   const filtered = contacts
+    // Never list yourself as one of your own contacts.
+    .filter((c) => !currentUserIdRef.current || String(c.id) !== String(currentUserIdRef.current))
     .filter((c) => (c.name + c.username + (c.org_role || '')).toLowerCase().includes(search.toLowerCase()))
     .filter((c, i, arr) => arr.findIndex((x) => String(x.id) === String(c.id)) === i); // dedupe by id
 
@@ -340,7 +353,7 @@ function ContactsTab({
                 className="flex-row items-center rounded-2xl px-4 py-3.5 mb-3 shadow-sm shadow-purple/5"
                 style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderStrong }}
               >
-                <Link href={`/chat/${chatTarget}`} asChild>
+                <Link href={{ pathname: `/chat/${chatTarget}` as any, params: { name: contact.name, avatar: contact.avatar || '', otherUserId: String(contact.id) } }} asChild>
                   <TouchableOpacity
                     activeOpacity={0.75}
                     className="flex-1 flex-row items-center"
@@ -388,7 +401,7 @@ function ContactsTab({
                   >
                     <Info color="#6c5ce7" size={14} />
                   </TouchableOpacity>
-                  <Link href={`/chat/${chatTarget}`} asChild>
+                  <Link href={{ pathname: `/chat/${chatTarget}` as any, params: { name: contact.name, avatar: contact.avatar || '', otherUserId: String(contact.id) } }} asChild>
                     <TouchableOpacity className="w-8 h-8 rounded-xl bg-purple-soft/40 dark:bg-purple/15 items-center justify-center">
                       <MessageSquare color="#6c5ce7" size={14} />
                     </TouchableOpacity>
@@ -583,6 +596,12 @@ function WorkroomTab({
   const [chats, setChats] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [loadingDm, setLoadingDm] = useState<string | null>(null);
+  const workroomUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    authStorage.getUser().then((u: any) => {
+      if (u) workroomUserIdRef.current = String(u.id || u._id);
+    }).catch(() => {});
+  }, []);
 
   const loadCacheAndSync = async () => {
     const cachedChats = await chatCache.getCachedChats();
@@ -613,7 +632,11 @@ function WorkroomTab({
 
   useEffect(() => {
     loadCacheAndSync();
-    const interval = setInterval(loadCacheAndSync, 5000);
+    // Org directory changes rarely — a 5s poll just fed the request storm. Refresh
+    // every 30s, throttled + 429-backoff-aware via the shared scheduler.
+    const interval = setInterval(() => {
+      runThrottled('workroom:members', loadCacheAndSync, 10000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -652,9 +675,12 @@ function WorkroomTab({
     (c) => c.isGroupChat && c.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredMembers = contacts.filter((m) =>
-    (m.name + (m.org_role || '')).toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredMembers = contacts
+    // Exclude yourself from the workroom directory — you're not your own coworker.
+    .filter((m) => !workroomUserIdRef.current || String(m.id) !== String(workroomUserIdRef.current))
+    .filter((m) =>
+      (m.name + (m.org_role || '')).toLowerCase().includes(search.toLowerCase())
+    );
 
   return (
     <View className="flex-1">

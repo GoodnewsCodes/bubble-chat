@@ -38,11 +38,18 @@ export class RingtonePlayer {
   }
 
   stop() {
+    // Flip the guard FIRST so a late startRinging() (e.g. a duplicate socket event
+    // arriving mid-teardown) can't resurrect this same instance while we're tearing
+    // it down. Muting before pause/remove kills the looping audio even if one of the
+    // native calls throws or resolves asynchronously.
     this.isPlaying = false;
-    if (this.player) {
-      try { this.player.pause(); } catch {}
-      try { this.player.remove(); } catch {}
-      this.player = null;
+    const player = this.player;
+    this.player = null;
+    if (player) {
+      try { player.volume = 0; } catch {}
+      try { player.loop = false; } catch {}
+      try { player.pause(); } catch {}
+      try { player.remove(); } catch {}
     }
   }
 }

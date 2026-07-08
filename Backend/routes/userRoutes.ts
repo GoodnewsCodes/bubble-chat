@@ -119,7 +119,29 @@ router.route('/status/:userId').get(getUserStatus);
  *                     verified_badge: { type: boolean }
  *                     lastSeen: { type: string }
  */
-router.route('/:userId').get(getUserProfile);
+// ── Static routes MUST be registered before the '/:userId' catch-all below ──
+// Express matches in registration order: with '/:userId' first, GET /user/contacts
+// resolved to getUserProfile with userId="contacts" and blew up with
+// `Cast to ObjectId failed for value "contacts"`. ('/contacts/my' only survived
+// because it has two segments.)
+
+/** GET /api/v1/user/contacts/my — Get my contacts */
+router.get('/contacts/my', getMyContacts);
+
+/** GET /api/v1/user/contacts/nicknames — Get my saved aliases for other users */
+router.get('/contacts/nicknames', getContactNicknames);
+
+/** GET /api/v1/user/contacts — Search contacts */
+router.get('/contacts', getContacts);
+
+/** POST /api/v1/user/contacts/add — Add a contact */
+router.post('/contacts/add', addContact);
+
+/** DELETE /api/v1/user/contacts/:userId — Remove a contact */
+router.delete('/contacts/:userId', removeContact);
+
+/** PATCH /api/v1/user/contacts/:contactId/nickname — Save or clear an alias for a user */
+router.patch('/contacts/:contactId/nickname', setContactNickname);
 
 /** POST /api/v1/user/block/:userId — Toggle block/unblock */
 router.route('/block/:userId').post(toggleBlockUser);
@@ -133,23 +155,8 @@ router.post('/:userId/follow', toggleFollowUser);
 /** GET /api/v1/user/:userId/followers */
 router.get('/:userId/followers', getUserFollowers);
 
-/** GET /api/v1/user/contacts/my — Get my contacts */
-router.get('/contacts/my', getMyContacts);
-
-/** GET /api/v1/user/contacts — Search contacts */
-router.get('/contacts', getContacts);
-
-/** POST /api/v1/user/contacts/add — Add a contact */
-router.post('/contacts/add', addContact);
-
-/** DELETE /api/v1/user/contacts/:userId — Remove a contact */
-router.delete('/contacts/:userId', removeContact);
-
-/** GET /api/v1/user/contacts/nicknames — Get my saved aliases for other users */
-router.get('/contacts/nicknames', getContactNicknames);
-
-/** PATCH /api/v1/user/contacts/:contactId/nickname — Save or clear an alias for a user */
-router.patch('/contacts/:contactId/nickname', setContactNickname);
+/** GET /api/v1/user/:userId — Public profile (keep LAST: matches any single segment) */
+router.route('/:userId').get(getUserProfile);
 
 export default router;
 

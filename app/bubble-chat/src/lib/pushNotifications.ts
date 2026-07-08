@@ -8,7 +8,8 @@ import { registerPushToken } from './api';
 // Configure how notifications should behave when they are received while the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // `shouldShowAlert` was deprecated in SDK 53 in favor of the two flags below —
+    // keeping it made every foreground banner log a deprecation warning.
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
