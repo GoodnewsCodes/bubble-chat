@@ -133,6 +133,20 @@ export const createTask = async (req: Request, res: Response): Promise<any> => {
 
     const hasRecipients = recipients && recipients.length > 0;
 
+    // ── Real-time Updates signal ─────────────────────────────────────────────
+    // Nudge every participant's Updates tab (tasks/meetings/calendar) to refetch
+    // without waiting for a manual reload. Creator included so their own screen
+    // updates too.
+    try {
+      const { getIO } = await import('../utils/socket');
+      const io = getIO();
+      const updateTargets = new Set<string>([String(userId), ...recipientsToNotify]);
+      const kind = type === 'meeting' || type === 'event' ? 'meeting' : 'task';
+      for (const t of updateTargets) {
+        io.to(t).emit('updates_changed', { kind, id: String(task._id) });
+      }
+    } catch { /* best-effort socket broadcast */ }
+
     // ── Send Email Invitations ───────────────────────────────────────────────
     try {
       const creator = await User.findById(userId).select('full_name username organization');

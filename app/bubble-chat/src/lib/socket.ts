@@ -1,8 +1,9 @@
 import { io, Socket } from 'socket.io-client';
+import { API_BASE } from './apiBase';
 
-// Env-driven; localhost dev fallback only (no hardcoded production host).
-const BASE_URL = (process.env.EXPO_PUBLIC_API_URL?.replace(/ i$/, '')?.trim()) || 'http://localhost:3000/api/v1';
-const SOCKET_URL = BASE_URL.replace(/\/api\/v1\/?$/, '');
+// Share the exact host api.ts resolved — including the dev-mode localhost→Metro-IP
+// rewrite — so realtime reaches the same backend as HTTP on a physical device.
+const SOCKET_URL = API_BASE;
 
 let socket: Socket | null = null;
 
@@ -46,22 +47,18 @@ export const initSocket = (token: string): Socket => {
         randomizationFactor: 0.5,
     });
 
-    // [DEBUG-INSTRUMENTATION] counters to distinguish a real reconnect storm from
-    // handler stacking. Remove once diagnosed.
-    let __connectCount = 0;
-    let __disconnectCount = 0;
     socket.on('connect', () => {
-        __connectCount += 1;
-        console.log(`✅ [socket] connect #${__connectCount} id=${socket?.id}`);
+        console.log('✅ [socket] connected');
     });
 
     socket.on('disconnect', (reason) => {
-        __disconnectCount += 1;
-        console.log(`❌ [socket] disconnect #${__disconnectCount} reason=${reason}`);
+        // `reason` matters: "io client disconnect" = deliberate (logout),
+        // anything else = network/server and will auto-reconnect.
+        console.log(`❌ [socket] disconnected (${reason})`);
     });
 
     socket.on('connect_error', (err) => {
-        console.error('⚠️ [socket] connect_error:', err.message);
+        console.warn('⚠️ [socket] connect_error:', err.message);
     });
 
     // Flush screens that mounted before the socket existed.
@@ -72,6 +69,26 @@ export const initSocket = (token: string): Socket => {
     readyCallbacks.clear();
 
     return socket;
+};
+
+/**
+ * Point the LIVE socket at a fresh access token. The socket.io object lives for
+ * the whole session and re-sends its `auth` on every (re)connect — so after a REST
+ * token refresh we MUST update `socket.auth` here, otherwise the socket keeps
+ * presenting the old (eventually expired) token and the backend rejects the next
+ * reconnect, silently killing real-time (typing / new_message / receipts / calls).
+ *
+ * We DON'T force a disconnect/reconnect on an already-connected socket: a live
+ * connection was already authenticated at its handshake and socket.io does not
+ * re-verify the token mid-connection, so bouncing it here would just drop realtime
+ * (and flap the user's presence) on every refresh for no gain. Updating `socket.auth`
+ * is enough — the fresh token is used automatically on the next natural reconnect.
+ * Only (re)connect if we're currently disconnected.
+ */
+export const updateSocketToken = (token: string): void => {
+    if (!socket) { initSocket(token); return; }
+    (socket.auth as any) = { token };
+    if (!socket.connected) socket.connect();
 };
 
 export const getSocket = (): Socket | null => {

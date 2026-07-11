@@ -7,7 +7,11 @@
     "start": "node dist/index.js",
     "dev": "nodemon index.ts",
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:test": "ts-node scripts/seed-test.ts",
+    "purge:phantom": "ts-node scripts/purge-phantom-chats.ts",
+    "end:stale": "ts-node scripts/end-stale-meetings.ts",
+    "dedup:meetings": "ts-node scripts/dedup-live-meetings.ts"
   },
   "keywords": [],
   "author": "",

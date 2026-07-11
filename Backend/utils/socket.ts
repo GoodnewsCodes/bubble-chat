@@ -668,6 +668,18 @@ export const initSocket = (server: HttpServer) => {
       if (data.roomId && broadcastToRoom) {
         io.to(data.roomId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
         endGroupCallTracking(data.roomId);
+        // Live Rooms list delta: drop this room from the People "LIVE" list right
+        // away instead of waiting for the 30s poll to notice it's gone.
+        io.emit('meeting_room_update', { action: 'ended', roomId: data.roomId });
+        // AUTHORITATIVE: flip the Meeting doc to status:'ended' in the DB. Without
+        // this the room stayed status:'live' forever (getActiveMeetings queries
+        // status:'live'), so ended calls kept reappearing on the next poll.
+        try {
+          const { autoEndMeetingByRoomId } = await import('../controllers/meetingController');
+          await autoEndMeetingByRoomId(data.roomId);
+        } catch (err) {
+          console.error('[Call] Failed to auto-end meeting on call_end:', err);
+        }
       }
 
       logActivity({

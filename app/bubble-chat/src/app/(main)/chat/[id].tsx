@@ -13,6 +13,7 @@ import {
   Info, Sparkles, BellOff, EyeOff, Archive, Trash2,
   Copy, Pin, Edit2, Check, CheckCheck,
   MicOff, PhoneOff, Volume2, Clock, Play, Pause, MessageSquare, Reply,
+  FolderPlus, Link2, PhoneOutgoing, PhoneIncoming, PhoneMissed,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,7 +46,6 @@ import {
   getChatById,
 } from '../../../lib/api';
 import { startOutgoingCall, startGroupCall } from '../../../lib/callManager';
-import { prepareChat, encryptForChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from '../../../lib/e2ee';
 import { useTheme } from '../../../lib/theme';
 import { useIsOnline, useViewerVisibility } from '../../../lib/presence';
 import { authStorage } from '../../../lib/authStorage';
@@ -58,11 +58,6 @@ const INK = '#1f2030';
 const INK_SOFT = '#9a9aab';
 const BG = '#f8f7ff';
 const PURPLE_SOFT = 'rgba(108,92,231,0.10)';
-
-// [DEBUG-INSTRUMENTATION] module-scoped so they survive remounts — lets us tell
-// "effect re-ran N times for id X" (mount/param churn) from a real connect storm.
-let __chatEffectRuns = 0;
-let __chatOnConnectCalls = 0;
 
 // Render message body text, turning URLs into tappable links. Long URLs are
 // truncated for display (the full URL still opens) so they never widen the bubble.
@@ -252,14 +247,7 @@ export default function ChatScreen() {
     return true;
   };
 
-  // E2EE cipher state for this chat (null = plaintext / keys unavailable).
-  const cipherRef = useRef<Awaited<ReturnType<typeof prepareChat>>>(null);
-  const decryptIncoming = (data: any): string | null => {
-    if (!data?.is_encrypted || !data?.content) return null;
-    const env = parseEnvelope(data.content);
-    const plain = env ? decryptEnvelope(String(id), env, cipherRef.current) : null;
-    return plain ?? ENCRYPTED_PLACEHOLDER;
-  };
+  // E2EE has been removed — all messages are plaintext, rendered directly.
 
   // @mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null); // null = not in mention mode
@@ -391,16 +379,17 @@ export default function ChatScreen() {
   // Deep Aida "Draft" (F5): a full context-aware reply fills the input.
   const [isDrafting, setIsDrafting] = useState(false);
 
-  // For E2EE chats the server can't read the ciphertext, so we hand Aida the
-  // locally-decrypted recent lines (transient — never stored server-side). For
-  // plaintext chats we send nothing and let the server read directly.
-  const buildAidaContext = (limit = 20): string[] | undefined => {
-    if (!cipherRef.current) return undefined;
-    return messages
+  // Hand Aida the recent visible lines as TRANSIENT context for drafts/suggestions
+  // (never stored server-side). DMs are private to the Brain by design, so without
+  // this the AI would draft with no conversational context. Plaintext now, so we
+  // can pass it straight through.
+  const buildAidaContext = React.useCallback((limit = 20): string[] | undefined => {
+    const lines = messages
       .filter(m => m.sender !== 'system' && m.text)
       .slice(-limit)
       .map(m => `${m.sender === 'me' ? 'Me' : (m.senderName || chat?.name || 'Them')}: ${m.text}`);
-  };
+    return lines.length ? lines : undefined;
+  }, [messages, chat?.name]);
 
   const handleDraftForMe = async () => {
     if (isDrafting) return;
@@ -588,9 +577,6 @@ export default function ChatScreen() {
     if (!socket) return;
     if (!id) return;
 
-    __chatEffectRuns += 1;
-    console.log(`[DEBUG] chat socket-effect run #${__chatEffectRuns} id=${id} socket.connected=${socket.connected}`);
-
     const onTypingStart = (data: { fromUserId: string; chatId: string; fromName?: string; fromUsername?: string }) => {
       if (currentUserIdRef.current && String(data.fromUserId) === String(currentUserIdRef.current)) return;
       if (String(data.chatId) === String(id)) {
@@ -608,8 +594,6 @@ export default function ChatScreen() {
     };
 
     const onConnect = () => {
-      __chatOnConnectCalls += 1;
-      console.log(`[DEBUG] chat onConnect #${__chatOnConnectCalls} id=${id} (effectRuns=${__chatEffectRuns})`);
       // A reconnect gets a new socket on the server, which loses prior room
       // membership — re-join so room-scoped events (e.g. group typing) keep flowing.
       socket.emit('join_room', id);
@@ -626,8 +610,13 @@ export default function ChatScreen() {
     // Real-time new message delivery without waiting for poll
     const onNewMessage = (data: any) => {
       if (!data) return;
-      const incomingChatId = data.chat || data.chatId;
-      if (String(incomingChatId) !== String(id)) return;
+      // The backend emits `chat` as an OBJECT { id, chatName, isGroupChat } — reading
+      // it raw and String()-ing yields "[object Object]", so the guard used to drop
+      // EVERY realtime message. Pull the id out of the object (with fallbacks).
+      const incomingChatId = data.chat?.id || data.chat?._id || data.chatId || data.chat;
+      const matches = String(incomingChatId) === String(id);
+      console.log('[msg-debug] onNewMessage', { incomingChatId: String(incomingChatId), routeId: String(id), matches, msgId: String(data.id || data._id) });
+      if (!matches) return;
 
       // ── NEW: discard Aida bot messages in group chats ──
       const isBotSender = data.sender?.is_bot || data.sender?.username?.toLowerCase() === 'aida';
@@ -635,14 +624,15 @@ export default function ChatScreen() {
       const currentUserId = currentUserIdRef.current;
       const senderId = String(data.sender?.id || data.sender?._id || data.sender);
       const isMe = currentUserId && String(senderId) === String(currentUserId);
-      const isSystem = data.message_type === 'system' || data.is_announcement === true;
+      const isCall = data.message_type === 'call';
+      const isSystem = !isCall && (data.message_type === 'system' || data.is_announcement === true);
 
       const formatted = {
         id: String(data.id || data._id || Date.now()),
-        text: decryptIncoming(data) ?? (data.content || data.text || ''),
+        text: data.content || data.text || '',
         is_encrypted: !!data.is_encrypted,
         sender: isMe ? 'me' : (isSystem ? 'system' : 'other'),
-        senderName: data.sender?.full_name || data.sender?.username || undefined,
+        senderName: isMe ? 'Me' : (data.sender?.full_name || data.sender?.username || chatRef.current?.name || undefined),
         senderIsBot: data.sender?.is_bot || data.sender?.username === 'aida',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         timestamp: data.createdAt || new Date().toISOString(),
@@ -651,12 +641,25 @@ export default function ChatScreen() {
         isRead: false,
         mediaUrl: data.mediaUrl,
         message_type: data.message_type || 'text',
+        call_metadata: data.call_metadata || null,
+        isCall,
         isSystem,
       };
 
+      const clientId = data.client_id || data.clientId;
       setMessages(prev => {
-        // Deduplicate by id
+        // Deduplicate by real id
         if (prev.some((m: any) => String(m.id) === String(formatted.id))) return prev;
+        // Reconcile with our own optimistic bubble: the temp message's id IS the
+        // clientId we sent, so replace it in place instead of appending a duplicate.
+        if (clientId) {
+          const tempIdx = prev.findIndex((m: any) => String(m.id) === String(clientId));
+          if (tempIdx !== -1) {
+            const merged = prev.slice();
+            merged[tempIdx] = { ...merged[tempIdx], ...formatted, status: 'sent' } as any;
+            return merged;
+          }
+        }
         return [...prev, formatted as any];
       });
 
@@ -714,6 +717,7 @@ export default function ChatScreen() {
         groupIcon: u.groupIcon,
         chatName: u.chatName,
         groupDescription: u.groupDescription,
+        resources: u.resources,
       });
     };
     socket.on('chat_updated', onChatUpdated);
@@ -722,12 +726,12 @@ export default function ChatScreen() {
     const onMessageEdited = (data: any) => {
       if (!data) return;
       const editedId = String(data.id || data._id || '');
-      const editedChatId = String(data.chat || data.chatId || '');
+      const editedChatId = String(data.chat?.id || data.chat?._id || data.chatId || data.chat || '');
       if (!editedId) return;
       if (editedChatId && editedChatId !== String(id)) return;
       setMessages(prev => prev.map((m: any) =>
         String(m.id) === editedId
-          ? { ...m, text: decryptIncoming(data) ?? data.content ?? data.text ?? m.text, isEdited: true }
+          ? { ...m, text: data.content ?? data.text ?? m.text, isEdited: true }
           : m
       ));
     };
@@ -1006,17 +1010,8 @@ export default function ChatScreen() {
 
     loadCachedChatAndMessages();
     syncChatAndMessages();
-    // Resolve E2EE keys for this chat so sends encrypt and incoming decrypt.
-    (async () => {
-      const user = await authStorage.getUser().catch(() => null);
-      const myId = String(user?.id || user?._id || '');
-      if (!myId) return;
-      cipherRef.current = await prepareChat(String(id), myId).catch(() => null);
-      // Direct (unthrottled) re-sync: the mount sync just ran, so a throttled call
-      // here would be silently skipped — leaving every bubble on the 🔒 placeholder
-      // until the next background sync even though we can now decrypt.
-      if (cipherRef.current) syncChatAndMessages();
-    })();
+    // E2EE disabled on mobile: no prepareChat/key resolution on mount, so the first
+    // send no longer races an async cipher setup. Sends go out as plaintext.
   }, [id, socketEpoch]);
 
   // Fallback poll ONLY when the socket is down — real-time events already keep the
@@ -1135,27 +1130,68 @@ export default function ChatScreen() {
       // Ensure a brand-new DM (opened by userId) is resolved to a real conversation
       // id before sending — otherwise the first message to a new contact posts to a
       // userId and silently drops into the offline queue ("Say hello" forever).
+      //
+      // CRITICAL: only resolve when the route id is a bare *userId* — detected by
+      // `otherUserId === id` (a new-DM placeholder sets both to the userId). For an
+      // already-real conversation the route id IS the conversation id (and differs
+      // from otherUserId), so we must NOT call accessOrCreateChat with it: that
+      // endpoint blindly upserts a DM `[me, id]`, minting a bogus "Unknown User"
+      // conversation and diverting the POST there — the message then vanishes from
+      // the real thread ("sent then deleted").
       let targetChatId = String(chat.id);
       if (resolvedChatIdRef.current) {
         targetChatId = resolvedChatIdRef.current;
-      } else if (!chat.isGroupChat && String(chat.id) === String(id)) {
+      } else if (!chat.isGroupChat && String(chat.otherUserId) === String(id)) {
         const resolved = await resolveConversationId();
         if (resolved) targetChatId = resolved;
       }
 
       if (selectedFile) {
+        const messageType = selectedFile.type === 'image' ? 'image' : selectedFile.type === 'video' ? 'video' : 'file';
         const fileObj = {
           uri: selectedFile.url || 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=200',
           name: selectedFile.name,
           type: selectedFile.type === 'image' ? 'image/jpeg' : selectedFile.type === 'video' ? 'video/mp4' : 'application/pdf'
         } as any;
         const mediaClientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        await sendMediaMessage(targetChatId, fileObj, { content: text, clientId: mediaClientId, ...(replyParentId && { parent_message: replyParentId }) });
+        // Optimistic media bubble (renders the local file immediately, WhatsApp-style).
+        const tempMediaMsg = {
+          id: mediaClientId,
+          text,
+          sender: 'me',
+          senderName: 'Me',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date().toISOString(),
+          reactions: [],
+          isPinned: false,
+          isRead: false,
+          status: 'sending',
+          mediaUrl: fileObj.uri,
+          message_type: messageType,
+          parent_message: replyTarget ? {
+            id: replyParentId,
+            content: replyTarget.text || '[Media]',
+            sender: { full_name: replyTarget.senderName || null },
+          } : null,
+        } as any;
+        setMessages(prev => [...prev, tempMediaMsg]);
         setMessageText('');
         setSelectedFile(null);
         setIsAttachmentOpen(false);
         setIsEmojiOpen(false);
-        await syncChatAndMessages();
+        try {
+          await sendMediaMessage(targetChatId, fileObj, { content: text, clientId: mediaClientId, message_type: messageType, ...(replyParentId && { parent_message: replyParentId }) });
+          setMessages(prev => prev.map((m: any) => m.id === mediaClientId ? { ...m, status: 'sent' } : m));
+          await syncChatAndMessages();
+        } catch (mediaErr) {
+          console.warn("Media send failed, queuing offline:", mediaErr);
+          // Persist the local file + intent; the outbound queue re-uploads it on reconnect.
+          const queueId = await chatCache.addMediaToOfflineQueue(targetChatId, fileObj, {
+            clientId: mediaClientId, content: text, messageType, parentMessageId: replyParentId || undefined,
+          });
+          setMessages(prev => prev.map((m: any) => m.id === mediaClientId ? { ...m, id: queueId, status: 'queued' } : m));
+          await chatCache.saveMessageLocally(targetChatId, { ...tempMediaMsg, id: queueId, status: 'queued' });
+        }
       } else {
         if (!text) return;
         // ── Optimistic send: bubble appears immediately, then resolves to ✓ or marks as failed.
@@ -1182,13 +1218,12 @@ export default function ChatScreen() {
         setIsAttachmentOpen(false);
         setIsEmojiOpen(false);
 
-        // E2EE: encrypt at compose time so both the live send AND any offline
-        // queue retry carry ciphertext. The optimistic bubble keeps plaintext.
-        const cipher = cipherRef.current;
-        const wire = cipher ? await encryptForChat(cipher, text) : text;
+        // E2EE removed — send plaintext.
+        const wire = text;
 
         try {
-          await sendTextMessage(targetChatId, wire, { clientId: tempId, is_encrypted: !!cipher, ...(replyParentId && { parent_message: replyParentId }) });
+          console.log('[msg-debug] sending', { targetChatId, routeId: String(id), tempId });
+          await sendTextMessage(targetChatId, wire, { clientId: tempId, is_encrypted: false, ...(replyParentId && { parent_message: replyParentId }) });
           // Mark as sent; sync will reconcile the server id shortly.
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, status: 'sent' } : m
@@ -1200,7 +1235,7 @@ export default function ChatScreen() {
           // reached the server and only the response was lost, the retry carries the same
           // clientId and the backend's unique index returns the existing message instead
           // of creating a duplicate.
-          const queueId = await chatCache.addToOfflineQueue(targetChatId, wire, tempId, !!cipher);
+          const queueId = await chatCache.addToOfflineQueue(targetChatId, wire, tempId, false);
           setMessages(prev => prev.map((m: any) =>
             m.id === tempId ? { ...m, id: queueId, status: 'queued' } : m
           ));
@@ -1346,16 +1381,26 @@ export default function ChatScreen() {
       await audioRecorder.stop();
       const uri = audioRecorder.uri;
       if (!uri) throw new Error('No audio was captured.');
-      await sendMediaMessage(
-        chat.id,
-        { uri, name: `voice-${Date.now()}.m4a`, type: 'audio/m4a' } as any,
-        {
+      const voiceClientId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const fileObj = { uri, name: `voice-${Date.now()}.m4a`, type: 'audio/m4a' } as any;
+      try {
+        await sendMediaMessage(chat.id, fileObj, {
+          clientId: voiceClientId,
           message_type: 'voice',
           media_duration: durationSecs,
           ...(replyParentId && { parent_message: replyParentId }),
-        }
-      );
-      await syncChatAndMessages();
+        });
+        await syncChatAndMessages();
+      } catch (voiceErr) {
+        // Offline / failed upload: queue the recorded file so it sends on reconnect
+        // (the local m4a persists in cache until then).
+        console.warn('Voice send failed, queuing offline:', voiceErr);
+        await chatCache.addMediaToOfflineQueue(String(chat.id), fileObj, {
+          clientId: voiceClientId, messageType: 'voice', mediaDuration: durationSecs,
+          parentMessageId: replyParentId || undefined,
+        });
+        await syncChatAndMessages();
+      }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to send voice message.');
     } finally {
@@ -1400,6 +1445,38 @@ export default function ChatScreen() {
     } finally {
       setIsForwardLoading(null);
       sendingRef.current = false;
+    }
+  };
+
+  // Tag a shared file/image/video message into the group's Resources so every
+  // member can find it in the Info panel (web parity: conversation.resources).
+  // In an org group, also feed it to the Brain (fire-and-forget) so Aida
+  // remembers the file.
+  const handleTagToResources = async (msg: any) => {
+    setActiveContextMessage(null);
+    if (!chat?.isGroupChat || !msg?.mediaUrl) return;
+    try {
+      const label = msg.fileName
+        || (msg.message_type === 'image' ? 'Shared image'
+          : msg.message_type === 'video' ? 'Shared video'
+          : msg.message_type === 'voice' ? 'Voice note'
+          : 'Shared file');
+      const next = [
+        ...(chat.resources || []),
+        { label, url: msg.mediaUrl, type: 'file' as const, addedAt: new Date().toISOString() },
+      ];
+      const { updateGroupSettings, brainIngestUrl } = await import('../../../lib/api');
+      await updateGroupSettings(chat.id, { resources: next });
+      setChat((prev: any) => (prev ? { ...prev, resources: next } : prev));
+      chatCache.patchCachedChat(String(chat.id), { resources: next }).catch(() => undefined);
+      // Brain memory: best-effort, never blocks the tag.
+      const ingestUrl = getSecureMediaUrl(msg.mediaUrl);
+      if (ingestUrl && (chat.organization || chat.isDefaultOrgChat)) {
+        brainIngestUrl(ingestUrl, label).catch(() => undefined);
+      }
+      showToast('Tagged to group Resources');
+    } catch {
+      showToast('Failed to tag resource');
     }
   };
 
@@ -1460,6 +1537,7 @@ export default function ChatScreen() {
               <Avatar
                 url={chat.avatar}
                 name={chat.name || chat.organization}
+                userId={chat.isGroupChat ? undefined : (chat.otherUserId || chat.id)}
                 size={76}
                 isGroup={!!(chat.isGroupChat || chat.organization)}
                 style={{ borderRadius: 22 }}
@@ -1544,6 +1622,44 @@ export default function ChatScreen() {
             }
             return null;
           })()}
+
+          {/* Group Resources: tagged files + links, visible to every member.
+              Fed by "Tag to Resources" on file messages and by group settings. */}
+          {chat.isGroupChat && Array.isArray(chat.resources) && chat.resources.length > 0 && (
+            <View style={{ backgroundColor: colors.card, borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 10 }}>
+              <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                Group Resources ({chat.resources.length})
+              </Text>
+              {chat.resources.map((r: any, idx: number) => (
+                <TouchableOpacity
+                  key={`${r.url || r.label}-${idx}`}
+                  disabled={!r.url}
+                  onPress={() => {
+                    const target = r.type === 'file' ? getSecureMediaUrl(r.url) : r.url;
+                    if (target) Linking.openURL(target).catch(() => showToast('Could not open resource'));
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: colors.border }}
+                >
+                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: PURPLE_SOFT, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                    {r.type === 'file'
+                      ? <FileText size={15} color={PURPLE} />
+                      : <Link2 size={15} color={PURPLE} />}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 13.5, fontFamily: 'Poppins_600SemiBold', color: colors.text }}>
+                      {r.label || 'Resource'}
+                    </Text>
+                    {!!r.url && (
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: 'Poppins_400Regular', color: INK_SOFT, marginTop: 1 }}>
+                        {r.url}
+                      </Text>
+                    )}
+                  </View>
+                  <ChevronRight size={15} color={INK_SOFT} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* List group members */}
           {chat.isGroupChat && (() => {
@@ -2393,8 +2509,66 @@ export default function ChatScreen() {
 
               const msg = item.data as any;
               const isMe = msg.sender === 'me';
-              const isSystem = msg.sender === 'system' || msg.isSystem || msg.is_announcement;
+              // Legacy call log: old meetings posted a "📝 Meeting minutes ready…"
+              // file/announcement instead of a proper call entry. Render THOSE as
+              // clean call logs too (phone icon + time) so a missed call reads as one.
+              const isLegacyCallLog =
+                (msg.is_announcement || msg.isSystem || msg.sender === 'system') &&
+                typeof msg.text === 'string' &&
+                /meeting minutes ready|\bvoice call\b|\bvideo call\b/i.test(msg.text);
+              const isCall = msg.isCall || msg.message_type === 'call' || isLegacyCallLog;
+              const isSystem = !isCall && (msg.sender === 'system' || msg.isSystem || msg.is_announcement);
               const isSelected = selectedMessageIds.includes(msg.id);
+
+              // ── Call log entry ─ WhatsApp/Signal-style: icon + type + time ──
+              if (isCall) {
+                const cm = msg.call_metadata || {};
+                // Legacy entries carry no call_metadata — derive what we can from the
+                // old text ("…for \"Voice Call\"…") and the transcript attachment.
+                const legacy = !cm.callType && isLegacyCallLog;
+                const isVideoCall = legacy ? /video/i.test(msg.text || '') : cm.callType === 'video';
+                const missed = !legacy && (cm.status === 'missed' || cm.status === 'declined');
+                const secs = Number(cm.duration || 0);
+                const durationText = missed
+                  ? (cm.status === 'declined' ? 'Declined' : 'Missed')
+                  : secs > 0
+                    ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+                    : ''; // unknown/legacy → show just the time, no "—"
+                const hasMinutes = legacy ? !!msg.mediaUrl : (cm.hasMinutes && !!msg.mediaUrl);
+                const DirIcon = missed ? PhoneMissed : (isMe ? PhoneOutgoing : PhoneIncoming);
+                const accent = missed ? '#f4663b' : '#22c55e';
+                const label = `${isVideoCall ? 'Video' : 'Voice'} call`;
+                const openMinutes = () => {
+                  if (hasMinutes && msg.mediaUrl) Linking.openURL(getSecureMediaUrl(msg.mediaUrl) || msg.mediaUrl).catch(() => {});
+                };
+                return (
+                  <View key={msg.id} style={{ alignItems: 'center', marginVertical: 10, paddingHorizontal: 20 }}>
+                    <TouchableOpacity
+                      activeOpacity={hasMinutes ? 0.7 : 1}
+                      onPress={openMinutes}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 8,
+                        backgroundColor: colors.surface,
+                        borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9,
+                        borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)',
+                      }}
+                    >
+                      <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: `${accent}1a`, alignItems: 'center', justifyContent: 'center' }}>
+                        {isVideoCall ? <Video size={15} color={accent} /> : <Phone size={15} color={accent} />}
+                      </View>
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <DirIcon size={12} color={colors.textSoft} />
+                          <Text style={{ fontSize: 12.5, fontFamily: 'Poppins_600SemiBold', color: colors.text }}>{label}</Text>
+                        </View>
+                        <Text style={{ fontSize: 10.5, fontFamily: 'Poppins_400Regular', color: colors.textSoft, marginTop: 1 }}>
+                          {[msg.time, durationText, hasMinutes ? 'View transcript' : ''].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
 
               // ── System / Announcement Messages ─ render as centered banner ──────
               if (isSystem) {
@@ -3396,6 +3570,15 @@ export default function ChatScreen() {
                   setActiveContextMessage(null);
                 }}
               />
+
+              {/* Group file/image/video → pin it into the group's Resources list */}
+              {chat.isGroupChat && (activeContextMessage as any).mediaUrl && (
+                <ContextMenuItem
+                  icon={<FolderPlus size={16} color={INK_SOFT} />}
+                  label="Tag to Resources"
+                  onPress={() => handleTagToResources(activeContextMessage)}
+                />
+              )}
 
               <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
 

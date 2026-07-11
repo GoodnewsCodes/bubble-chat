@@ -83,7 +83,15 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-image",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Bubble needs your microphone to transcribe what you say during calls.",
+          "speechRecognitionPermission": "Bubble uses speech recognition to create live call transcripts.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -175,13 +175,15 @@ export const createMeeting = async (
 
     const { roomId, title, type, attendees, attendeeNames, chatId, agenda } = req.body;
 
-    // Every participant's client calls this when joining a call (caller AND callee).
-    // Without this guard each of them would create their own Meeting document for the
-    // same roomId, with themselves as "host" — fragmenting the transcript/history and
-    // making host-only-end logic meaningless. Join the existing live record instead.
+    // Every participant's client calls this when joining a call (caller AND callee),
+    // near-simultaneously. Without atomicity each created their own Meeting for the
+    // same roomId (two "Voice Call" rows, doubled minutes messages/dots). Join the
+    // existing live record instead — and let the partial-unique index on roomId
+    // serialize the create so a race resolves to a single meeting.
     if (roomId) {
-      const existing = await Meeting.findOne({ roomId, status: 'live' });
-      if (existing) {
+      const joinExisting = async () => {
+        const existing = await Meeting.findOne({ roomId, status: 'live' });
+        if (!existing) return null;
         const alreadyIn =
           String(existing.host) === String(userId) ||
           existing.attendees.some((a: any) => String(a) === String(userId));
@@ -194,22 +196,41 @@ export const createMeeting = async (
           }
           await existing.save();
         }
-        return res.status(200).json({ message: 'Joined existing meeting', meeting: existing });
-      }
+        return existing;
+      };
+      const joined = await joinExisting();
+      if (joined) return res.status(200).json({ message: 'Joined existing meeting', meeting: joined });
     }
 
-    const meeting = await Meeting.create({
-      roomId: roomId || `room-${Date.now()}`,
-      title: title || 'Untitled Meeting',
-      host: userId,
-      type: type || 'video',
-      agenda: agenda || '',
-      attendees: attendees || [],
-      attendeeNames: attendeeNames || [],
-      chatId: chatId || undefined,
-      startedAt: new Date(),
-      status: 'live',
-    });
+    let meeting;
+    try {
+      meeting = await Meeting.create({
+        roomId: roomId || `room-${Date.now()}`,
+        title: title || 'Untitled Meeting',
+        host: userId,
+        type: type || 'video',
+        agenda: agenda || '',
+        attendees: attendees || [],
+        attendeeNames: attendeeNames || [],
+        chatId: chatId || undefined,
+        startedAt: new Date(),
+        status: 'live',
+      });
+    } catch (createErr: any) {
+      // Lost the create race (partial-unique index on live roomId): the other
+      // participant's client created it first — join theirs instead of erroring.
+      if (createErr?.code === 11000 && roomId) {
+        const winner = await Meeting.findOne({ roomId, status: 'live' });
+        if (winner) {
+          if (!winner.attendees.some((a: any) => String(a) === String(userId)) && String(winner.host) !== String(userId)) {
+            winner.attendees.push(userId);
+            await winner.save();
+          }
+          return res.status(200).json({ message: 'Joined existing meeting', meeting: winner });
+        }
+      }
+      throw createErr;
+    }
 
     // TEMP diagnostic (remove after verifying active-rooms): confirm a live record is born.
     console.log(`[CreateMeeting] created roomId=${meeting.roomId} status=${meeting.status} host=${userId}`);
@@ -281,6 +302,9 @@ export const createMeeting = async (
       for (const aid of (attendees || [])) {
         io.to(String(aid)).emit('meeting_room_update', { action: 'started', room: roomCard });
       }
+      // Real-time Updates signal: refresh attendees' Updates tab (meetings list).
+      const updateTargets = new Set<string>([String(userId), ...((attendees || []) as any[]).map(String)]);
+      for (const t of updateTargets) io.to(t).emit('updates_changed', { kind: 'meeting', id: String(meeting._id) });
     } catch { /* best-effort socket broadcast */ }
 
     res.status(201).json({ message: 'Meeting created', meeting });
@@ -335,8 +359,25 @@ export const getActiveMeetings = async (
       .sort({ startedAt: -1 })
       .lean();
 
+    // Real-time truth filter: a room is only genuinely "live" if someone is
+    // actually connected to its socket room right now. Calls that ended without a
+    // clean end event (app killed, missed call_end) leave the Meeting stuck at
+    // status:'live' forever — this is why ended calls kept lingering. We keep a
+    // room only if it has ≥1 connected socket OR it just started (grace for a room
+    // still spinning up before anyone has joined the socket room).
+    const SPINUP_GRACE_MS = 2 * 60 * 1000;
+    const now = Date.now();
+    let adapterRooms: any = null;
+    try { adapterRooms = (await import('../utils/socket')).getIO().sockets.adapter.rooms; } catch { /* socket not ready */ }
+    const isRoomActive = (m: any): boolean => {
+      const fresh = m.startedAt && (now - new Date(m.startedAt).getTime()) < SPINUP_GRACE_MS;
+      if (fresh) return true;
+      if (!adapterRooms) return true; // can't verify — don't hide (fail-open)
+      return (adapterRooms.get(m.roomId)?.size || 0) > 0;
+    };
+
     // Shape into the "room card" format the frontend expects.
-    const rooms = meetings.map((m: any) => ({
+    const rooms = meetings.filter(isRoomActive).map((m: any) => ({
       id: String(m._id),
       roomId: m.roomId,
       title: m.title || 'Untitled Meeting',
@@ -347,7 +388,7 @@ export const getActiveMeetings = async (
       startedAt: m.startedAt,
     }));
 
-    console.log(`[ActiveMeetings] returning ${rooms.length} live room(s)`);
+    console.log(`[ActiveMeetings] ${meetings.length} live in DB → ${rooms.length} actually occupied`);
     res.status(200).json({ rooms });
   } catch (err: any) {
     res.status(500).json({ message: 'Failed to fetch active meetings', error: err.message });
@@ -368,8 +409,17 @@ export const getMeetings = async (
     const limit = parseInt((req.query.limit as string) || '20');
     const skip = (page - 1) * limit;
 
+    // Incremental sync: with a `since` cursor, return only meetings touched after
+    // it (updatedAt bumps when a meeting starts/ends or its transcript/summary/
+    // action-items are written). Lets the mobile Agenda/History fetch deltas.
+    const sinceRaw = typeof req.query.since === 'string' ? req.query.since : undefined;
+    const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
+    const sinceValid = sinceDate && !isNaN(sinceDate.getTime());
+    const serverTime = new Date();
+
     const meetings = await Meeting.find({
       $or: [{ host: userId }, { attendees: userId }],
+      ...(sinceValid ? { updatedAt: { $gt: sinceDate } } : {}),
     })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -379,7 +429,7 @@ export const getMeetings = async (
       .populate('filesShared.uploadedBy', 'full_name username avatar')
       .lean();
 
-    res.status(200).json({ meetings, page, limit });
+    res.status(200).json({ meetings, page, limit, syncedAt: serverTime.toISOString(), incremental: !!sinceValid });
   } catch (err: any) {
     res
       .status(500)
@@ -792,6 +842,17 @@ export const endMeeting = async (
     if (!meeting)
       return res.status(404).json({ message: 'Meeting not found' });
 
+    // Idempotent end: a call ends via several paths that can all fire near-together
+    // (socket call_end → autoEnd, this HTTP /end, an empty-room check). Only the
+    // FIRST transition from 'live' → 'ended' should broadcast, post the minutes
+    // system message, and run the AI. A second call on an already-ended meeting
+    // returns success without re-emitting — this is what stopped the "View
+    // transcript" alert and the "minutes ready" chat message from stacking up, and
+    // the "failed to end meeting" error from a double-end.
+    if (meeting.status !== 'live') {
+      return res.status(200).json({ message: 'Meeting already ended', meeting, alreadyEnded: true });
+    }
+
     // A multi-party meeting only terminates for everyone when the host ends it.
     // A non-host calling /end is just leaving — keep the meeting 'live' for the
     // rest of the group instead of tearing it down under them. 1:1 calls (at most
@@ -843,6 +904,16 @@ export const endMeeting = async (
       for (const pid of allParticipantIds) {
         io.to(pid).emit('meeting_ended', endPayload);
       }
+      // Live Rooms list delta: tell org members + attendees to DROP this room
+      // immediately so ended calls don't linger until the next 30s poll.
+      const endedPayload = { action: 'ended', roomId: meeting.roomId };
+      const hostUser = await User.findById(meeting.host).select('organization').lean();
+      const orgId = (hostUser as any)?.organization;
+      if (orgId) {
+        const orgMembers = await User.find({ organization: orgId }).select('_id').lean();
+        for (const m of orgMembers) io.to(String(m._id)).emit('meeting_room_update', endedPayload);
+      }
+      for (const pid of allParticipantIds) io.to(pid).emit('meeting_room_update', endedPayload);
       console.log(`[Meeting] Broadcasted meeting_ended for room ${meeting.roomId} to ${allParticipantIds.length} participants`);
     } catch (socketErr) {
       console.error('[Meeting] Socket emit meeting_ended failed:', socketErr);
@@ -917,6 +988,8 @@ export const autoEndMeetingByRoomId = async (roomId: string): Promise<void> => {
         title: meeting.title,
       };
       io.to(meeting.roomId).emit('meeting_ended', endPayload);
+      // Drop the room from everyone's "LIVE" list in real time.
+      io.emit('meeting_room_update', { action: 'ended', roomId: meeting.roomId });
       const allParticipantIds = [String(meeting.host), ...meeting.attendees.map((a: any) => String(a))];
       for (const pid of allParticipantIds) {
         io.to(pid).emit('meeting_ended', endPayload);
@@ -1188,37 +1261,55 @@ export const runBackgroundMeetingAI = async (
       }
     }
 
-    // Drop a "📝 Meeting minutes ready" system message into the originating
-    // chat so the transcript download surfaces directly in the conversation
-    // where the call started.
+    // Drop a WhatsApp/Signal-style CALL LOG entry into the originating chat — a
+    // call icon + type + duration + time, tappable to view the transcript when one
+    // was captured. This replaces the old "📝 Meeting minutes ready … 0 action
+    // items" clutter; an empty call still logs a clean entry (like WhatsApp) but
+    // carries no minutes link. Idempotent: at most one call entry per meeting even
+    // if the end flow races across end-paths.
+    const hasContent = (rawTranscript || '').trim().length >= 40 || resolvedActionItems.length > 0;
     if (meeting.chatId) {
       try {
-        const baseUrl = process.env.API_PUBLIC_URL || process.env.BASE_URL || '';
-        const transcriptUrl = `${baseUrl}/api/v1/meetings/${meeting._id}/transcript.md`;
-        const systemContent = `📝 Meeting minutes ready for "${meeting.title}". ${resolvedActionItems.length} action item${resolvedActionItems.length === 1 ? '' : 's'} captured.`;
-
-        const systemMessage = await Message.create({
+        const already = await Message.findOne({
           chat: meeting.chatId,
-          sender: meeting.host,
-          content: systemContent,
-          message_type: 'file',
-          mediaUrl: transcriptUrl,
-          mediaType: 'file',
-          media_metadata: { mime_type: 'text/markdown' },
-          is_announcement: true,
-        });
+          message_type: 'call',
+          'call_metadata.meetingId': String(meeting._id),
+        }).select('_id').lean();
 
-        await Conversation.findByIdAndUpdate(meeting.chatId, {
-          latestMessage: systemMessage._id,
-        });
+        if (!already) {
+          const baseUrl = process.env.API_PUBLIC_URL || process.env.BASE_URL || '';
+          const transcriptUrl = `${baseUrl}/api/v1/meetings/${meeting._id}/transcript.md`;
+          const callType = meeting.type === 'video' ? 'video' : 'voice';
+          const label = callType === 'video' ? 'Video call' : 'Voice call';
 
-        try {
-          const { getIO } = await import('../utils/socket');
-          const io = getIO();
-          io.to(String(meeting.chatId)).emit('new_message', systemMessage);
-        } catch (_) { /* silent */ }
+          const callMessage = await Message.create({
+            chat: meeting.chatId,
+            sender: meeting.host,
+            content: label,
+            message_type: 'call',
+            ...(hasContent ? { mediaUrl: transcriptUrl, mediaType: 'file' } : {}),
+            call_metadata: {
+              callType,
+              duration: meeting.duration || 0,
+              status: 'completed',
+              hasMinutes: hasContent,
+              meetingId: String(meeting._id),
+            },
+            is_announcement: true,
+          });
+
+          await Conversation.findByIdAndUpdate(meeting.chatId, {
+            latestMessage: callMessage._id,
+          });
+
+          try {
+            const { getIO } = await import('../utils/socket');
+            const io = getIO();
+            io.to(String(meeting.chatId)).emit('new_message', callMessage);
+          } catch (_) { /* silent */ }
+        }
       } catch (chatErr) {
-        console.error('[Meeting Minutes] Failed to post system message:', chatErr);
+        console.error('[Call Log] Failed to post call entry:', chatErr);
       }
     }
 
@@ -1238,6 +1329,9 @@ export const runBackgroundMeetingAI = async (
       const allParticipantIds2 = [String(meeting.host), ...meeting.attendees.map((a: any) => String(a))];
       for (const pid of allParticipantIds2) {
         io.to(pid).emit('meeting_ended', enrichedPayload);
+        // Action-item Tasks were just created in the background — nudge the
+        // Updates/Action Items tab to refetch so they appear without a reload.
+        io.to(pid).emit('updates_changed', { kind: 'task', id: String(meeting._id) });
       }
     } catch (_) { /* silent */ }
 

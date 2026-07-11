@@ -77,19 +77,9 @@ brainEventBus.on('group_message_sent', async (payload: { messageId: string; chat
     const message = await Message.findById(messageId).populate('sender', 'full_name username');
     if (!message || !message.content) return;
 
-    // E2EE group messages arrive as ciphertext; the Brain is a key recipient
-    // for group chats and decrypts through its isolated key service. If it
-    // can't (missing/rotated key), skip rather than ingest ciphertext noise.
-    let messageText = message.content;
-    if (message.is_encrypted) {
-      const { decryptForBrain } = await import('./brainKeyService');
-      const plain = await decryptForBrain(chatId, message.content);
-      if (!plain) {
-        console.warn(`[Brain Event] Could not decrypt group message ${messageId} — skipped.`);
-        return;
-      }
-      messageText = plain;
-    }
+    // E2EE removed — group messages are plaintext, ingested directly. (Only group
+    // messages reach this listener; DMs are never ingested by the Brain.)
+    const messageText = message.content;
     if (messageText.trim().length < 10) return;
 
     const senderName = (message.sender as any)?.full_name || (message.sender as any)?.username || 'User';
@@ -409,5 +399,5 @@ brainEventBus.on('qa_resolved', async (payload: { questionMessageId: string; rep
  *  - qa_resolved             : closed-loop capture of expert replies routed via the brain
  */
 export const initBrainEventListener = () => {
-  console.log('🧠 [Brain Event Listener] Initialized — group_message_sent, chat_file_shared, meeting_ended, calendar_event_created, document_uploaded, qa_resolved. DMs excluded (E2E encrypted).');
+  console.log('🧠 [Brain Event Listener] Initialized — group_message_sent, chat_file_shared, meeting_ended, calendar_event_created, document_uploaded, qa_resolved. DMs excluded by design (private 1:1s are never ingested).');
 };

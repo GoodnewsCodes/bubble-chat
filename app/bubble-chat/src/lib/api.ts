@@ -6,7 +6,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { noteRateLimit } from './syncScheduler';
+import { noteRateLimit, resetBackoff } from './syncScheduler';
 
 let GoogleSignin: any = null;
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -18,12 +18,10 @@ if (!isExpoGo) {
     }
 }
 
-const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
-if (!ENV_API_URL) {
-  console.warn('[api] EXPO_PUBLIC_API_URL is not set — using the localhost dev fallback. Set it (EAS secret) to the Bubble Space backend for real builds.');
-}
-const BASE_URL = ENV_API_URL || 'http://localhost:3000/api/v1';
-const API_BASE = BASE_URL.replace(/\/api\/v1\/?$/, '');
+// Host resolution lives in ./apiBase (shared with socket.ts, no import cycle).
+// Re-exported here so existing importers of `../lib/api` keep working.
+import { BASE_URL, API_BASE, API_MISCONFIGURED } from './apiBase';
+export { API_BASE, API_MISCONFIGURED };
 
 const originalFetch = globalThis.fetch;
 
@@ -67,17 +65,26 @@ const isTokenExpiringSoon = (token: string | null, skewSec = 30): boolean => {
 const refreshAccessToken = async (): Promise<string | null> => {
     if (inFlightRefresh) return inFlightRefresh;
 
+    // Only nuke the session when the SERVER rejects the refresh token (it's truly
+    // invalid). A network blip / 5xx / 429 used to wipe the session AND disconnect
+    // the socket ("io client disconnect") — the user silently lost real-time and
+    // got logged out over a moment of bad Wi-Fi.
+    let sessionInvalid = false;
+
     inFlightRefresh = (async (): Promise<string | null> => {
         try {
             const refreshToken = await AsyncStorage.getItem('bubble_refresh_token');
-            if (!refreshToken) return null;
+            if (!refreshToken) { sessionInvalid = true; return null; }
 
             const res = await originalFetch(`${BASE_URL}/auth/refresh-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken }),
             });
-            if (!res.ok) return null;
+            if (!res.ok) {
+                if (res.status === 401 || res.status === 403) sessionInvalid = true;
+                return null; // other statuses (5xx/429) are transient — keep the session
+            }
 
             const data = await res.json().catch(() => null);
             const newAccess = data?.data?.accessToken;
@@ -92,15 +99,15 @@ const refreshAccessToken = async (): Promise<string | null> => {
             setApiToken(newAccess);
             return newAccess;
         } catch (err) {
-            console.error('[api] refresh failed:', err);
+            console.warn('[api] refresh failed (transient — keeping session):', err);
             return null;
         }
     })();
 
     try {
         const result = await inFlightRefresh;
-        if (!result) {
-            // Refresh failed — clear session so the next request lands on /login cleanly.
+        if (!result && sessionInvalid) {
+            // Genuine invalidation — clear session so the next request lands on /login.
             await AsyncStorage.multiRemove([
                 'bubble_access_token',
                 'bubble_refresh_token',
@@ -251,7 +258,7 @@ export const startGoogleAuth = async (inviteCode?: string): Promise<{ accessToke
     return null;
 };
 
-import { initSocket, disconnectSocket } from './socket';
+import { initSocket, disconnectSocket, getSocket, updateSocketToken } from './socket';
 
 // In-memory cache — seeded from AsyncStorage at startup via initApiFromStorage()
 const tokenCache: { accessToken: string | null } = { accessToken: null };
@@ -287,12 +294,22 @@ export const initApiFromStorage = async (): Promise<void> => {
 export const setApiToken = (token: string | null): void => {
     tokenCache.accessToken = token;
     if (token) {
+        if (getSocket()) {
+            // Existing session (e.g. token refresh): the socket already exists with
+            // its listeners attached — just repoint it at the fresh token so the next
+            // reconnect handshake authenticates. Re-running initSocket() here would
+            // no-op and leave the socket carrying the stale token.
+            updateSocketToken(token);
+            return;
+        }
         const sock = initSocket(token);
         import('./callManager').then(m => m.setupCallSocketListeners(sock));
         import('./presence').then(m => m.setupPresenceListeners(sock));
         import('./taskListeners').then(m => m.setupTaskListeners(sock));
     } else {
         disconnectSocket();
+        // Don't carry a prior account's 429 cooldown into the next session.
+        resetBackoff();
     }
 };
 
@@ -534,8 +551,9 @@ export const accessOrCreateChat = async (userId: string) => {
     return handleResponse(res);
 };
 
-export const fetchAllUserChats = async () => {
-    const res = await fetch(`${BASE_URL}/chat`, { headers: getAuthHeaders() });
+export const fetchAllUserChats = async (since?: string) => {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    const res = await fetch(`${BASE_URL}/chat${qs}`, { headers: getAuthHeaders() });
     return handleResponse(res);
 };
 
@@ -598,8 +616,9 @@ export const removeFromGroup = async (chatId: string, userId: string) => {
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
 
-export const fetchMessages = async (chatId: string) => {
-    const res = await fetch(`${BASE_URL}/message/${chatId}`, {
+export const fetchMessages = async (chatId: string, since?: string) => {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    const res = await fetch(`${BASE_URL}/message/${chatId}${qs}`, {
         headers: getAuthHeaders(),
     });
     return handleResponse(res);
@@ -620,26 +639,6 @@ export const sendTextMessage = async (
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ chatId, content, message_type: 'text', ...opts }),
-    });
-    return handleResponse(res);
-};
-
-// ─── E2EE key exchange ────────────────────────────────────────────────────────
-
-export const getChatKeys = async (chatId: string) => {
-    const res = await fetch(`${BASE_URL}/chat/${chatId}/keys`, { headers: getAuthHeaders() });
-    return handleResponse(res);
-};
-
-export const postChatKeys = async (
-    chatId: string,
-    epoch: number,
-    keys: { recipientId: string; encryptedKey: string }[]
-) => {
-    const res = await fetch(`${BASE_URL}/chat/${chatId}/keys`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ epoch, keys }),
     });
     return handleResponse(res);
 };
@@ -903,24 +902,6 @@ export const deleteStory = async (storyId: string) => {
 };
 
 // ─── E2EE ─────────────────────────────────────────────────────────────────────
-
-export const uploadPublicKey = async (publicKey: string) => {
-    const res = await fetch(`${BASE_URL}/user/public-key`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ publicKey }),
-    });
-    return handleResponse(res);
-};
-
-export const getPublicKey = async (userId: string) => {
-    const res = await fetch(`${BASE_URL}/user/${userId}/public-key`, {
-        headers: getAuthHeaders(),
-    });
-    return handleResponse(res);
-};
-
-
 
 // ─── Workspace Files ──────────────────────────────────────────────────────────
 

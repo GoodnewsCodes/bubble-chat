@@ -134,7 +134,8 @@ const ScreenShareSchema = new Schema<IScreenShare>(
 
 const MeetingSchema = new Schema<IMeeting>(
   {
-    roomId: { type: String, required: true, index: true },
+    // Indexed via the partial-unique index below (one live meeting per room).
+    roomId: { type: String, required: true },
     title: { type: String, default: 'Untitled Meeting' },
     host: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     attendees: [{ type: Schema.Types.ObjectId, ref: 'User' }],
@@ -175,5 +176,13 @@ const MeetingSchema = new Schema<IMeeting>(
 
 MeetingSchema.index({ host: 1, createdAt: -1 });
 MeetingSchema.index({ attendees: 1, createdAt: -1 });
+// At most ONE live meeting per room. Caller + callee create the meeting near-
+// simultaneously on connect; without this a race spawned two live records for the
+// same call (two "Voice Call" rows, doubled minutes messages, doubled dots).
+// Partial so ended meetings can share a roomId over time.
+MeetingSchema.index(
+  { roomId: 1 },
+  { unique: true, partialFilterExpression: { status: 'live' } }
+);
 
 export const Meeting = mongoose.model<IMeeting>('Meeting', MeetingSchema);

@@ -35,6 +35,12 @@ export interface IConversation extends Document {
   transcriptPolicy?: 'email' | 'save' | 'off'; // how this group's meeting transcripts are handled
   resources?: { label: string; url?: string; type?: 'link' | 'file'; addedAt?: Date }[]; // group docs/links that feed the AI
 
+  // E2EE sender-key generation. Bumps whenever the group re-keys (member removed
+  // or periodic rotation) so ex-members can't read post-removal traffic. Messages
+  // record the epoch that encrypted them; the Brain is a sender-key recipient for
+  // org/group chats only (DMs never carry sender keys, so they stay private).
+  keyEpoch?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -135,6 +141,9 @@ const ConversationSchema: Schema<IConversation> = new Schema(
         addedAt: { type: Date, default: Date.now },
       },
     ],
+
+    // E2EE sender-key generation (see IConversation). Starts at 1 on first key.
+    keyEpoch: { type: Number, default: 1 },
   },
   {
     timestamps: true,

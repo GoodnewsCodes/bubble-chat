@@ -11,7 +11,8 @@ import {
 import { Track } from 'livekit-client';
 import { MessageSquare, Users, FileText, X, Send, Smile, Paperclip, Mic, MicOff } from 'lucide-react-native';
 import { getSocket } from '../lib/socket';
-import { uploadGroupOrOrgImage, getSecureMediaUrl } from '../lib/api';
+import { uploadGroupOrOrgImage, getSecureMediaUrl, addMeetingTranscriptChunk } from '../lib/api';
+import { LiveTranscriber, isTranscriptionAvailable } from '../lib/liveTranscription';
 
 // In-call chat message — mirrors web LiveKitMeetingModal's ChatMessageEntry so a
 // web↔mobile call shares the same `meeting_chat_message` socket shape.
@@ -253,7 +254,13 @@ function VideoArea({ isVideo, fallback }: { isVideo: boolean; fallback: React.Re
     );
   }
 
-  if (!isVideo) {
+  // Audio→video upgrade: a voice call stays on the audio-conference stage only
+  // until SOMEONE turns a camera on. The moment any camera track is live (local
+  // toggled their camera, or a peer did), switch everyone to the video grid — so
+  // flipping the camera mid-voice-call actually shows video instead of silently
+  // publishing a track no one sees.
+  const anyCameraLive = cameraTracks.some((t) => t.participant?.isCameraEnabled);
+  if (!isVideo && !anyCameraLive) {
     // Voice call: show the multi-participant audio-conference stage. `fallback`
     // (single avatar) is retained only for the brief pre-connect moment handled
     // by the parent overlay, not here.
@@ -345,9 +352,13 @@ type PanelTab = 'people' | 'chat' | 'transcript';
  * events the web meeting modal uses (`meeting_chat_message`,
  * `meeting_transcript_chunk`, `meeting_reaction`) so web↔mobile calls interoperate.
  */
-function CallPanel({ roomId, userName, onReact, registerControls, hideFabs }: {
+function CallPanel({ roomId, userName, userId, meetingDbId, onReact, registerControls, hideFabs }: {
   roomId?: string;
   userName: string;
+  /** Local user id — stamped on transcript chunks for speaker attribution. */
+  userId?: string;
+  /** Meeting DB id — lets each speaker persist their own transcript chunks. */
+  meetingDbId?: string | null;
   onReact: (emoji: string) => void;
   /** Lets the parent overlay's control tray open the chat panel / emoji bar
    *  (so the floating FABs can be hidden in favor of the web-style tray). */
@@ -385,18 +396,55 @@ function CallPanel({ roomId, userName, onReact, registerControls, hideFabs }: {
     return () => { socket.off('meeting_chat_message', onMessage); };
   }, [roomId, userName]);
 
-  // Live captions over socket (same event the web modal consumes). Receive-only on
-  // mobile — the local speaker's words are captured post-call via audio upload.
+  // Live captions from PEERS over the socket (same event the web modal consumes).
+  // The backend relays with `socket.to(room)`, so our OWN chunks never echo back —
+  // we append those locally in the recognizer below instead.
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
     const onChunk = (data: any) => {
       if (roomId && data?.roomId && String(data.roomId) !== String(roomId)) return;
+      // Guard against a same-device echo: ignore chunks stamped with our own id.
+      if (userId && data?.speakerId && String(data.speakerId) === String(userId)) return;
       setTranscript(prev => [...prev, { speaker: data?.speaker, text: data?.text, time: nowTime() }]);
     };
     socket.on('meeting_transcript_chunk', onChunk);
     return () => { socket.off('meeting_transcript_chunk', onChunk); };
-  }, [roomId]);
+  }, [roomId, userId]);
+
+  // On-device live transcription (mobile parity with the web's Web Speech API).
+  // Transcribes THIS device's mic; each final line is (1) shown locally, (2)
+  // relayed to peers over the socket, and (3) persisted so the post-call
+  // transcript/summary is populated. No-op in Expo Go (native module absent).
+  useEffect(() => {
+    if (!isTranscriptionAvailable()) return;
+    const speaker = userName || 'You';
+    const transcriber = new LiveTranscriber((text: string) => {
+      // 1) local display
+      setTranscript(prev => [...prev, { speaker, text, time: nowTime() }]);
+      // 2) relay to peers
+      getSocket()?.emit('meeting_transcript_chunk', { roomId, speaker, speakerId: userId, text });
+      // 3) persist (each client saves its own chunk exactly once)
+      if (meetingDbId) {
+        addMeetingTranscriptChunk(String(meetingDbId), { speaker, speakerId: userId, text, timestamp: Date.now() })
+          .catch(() => undefined);
+      }
+    });
+    // The module IS available here (checked above), so a false result means the
+    // speaker denied the mic/speech permission — tell them, otherwise the transcript
+    // tab just sits empty and looks broken.
+    let cancelled = false;
+    transcriber.start().then((ok) => {
+      if (!ok && !cancelled) {
+        setTranscript(prev => [...prev, {
+          speaker: 'System',
+          text: 'Live captions are off — grant microphone & speech-recognition permission in Settings to enable transcription.',
+          time: nowTime(),
+        }]);
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; transcriber.stop(); };
+  }, [roomId, userId, userName, meetingDbId]);
 
   const openPanel = (t: PanelTab) => { setTab(t); setOpen(true); setUnread(0); };
 
@@ -578,6 +626,10 @@ export interface LiveKitCallRoomProps {
   roomId?: string;
   /** Local user's display name — stamped on outgoing chat messages + reactions. */
   userName?: string;
+  /** Local user id — stamps transcript chunks for speaker attribution/dedupe. */
+  userId?: string;
+  /** Meeting DB id — lets the on-device transcriber persist its own chunks. */
+  meetingDbId?: string | null;
   /** Avatar/placeholder shown before remote video or on voice calls. */
   fallback: React.ReactNode;
   /** Reports the live roster up to the overlay (header avatar cluster/count). */
@@ -605,6 +657,8 @@ export default function LiveKitCallRoom({
   onScreenShareError,
   roomId,
   userName,
+  userId,
+  meetingDbId,
   fallback,
   onParticipantsChanged,
   registerPanelControls,
@@ -661,6 +715,8 @@ export default function LiveKitCallRoom({
       <CallPanel
         roomId={roomId}
         userName={userName || 'You'}
+        userId={userId}
+        meetingDbId={meetingDbId}
         onReact={handleReact}
         registerControls={registerPanelControls}
         hideFabs={!!registerPanelControls}

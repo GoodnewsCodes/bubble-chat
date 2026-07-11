@@ -34,14 +34,7 @@ export const authStorage = {
       [KEYS.LAST_LOGIN, Date.now().toString()],
     ]);
     setApiToken(accessToken); // keep in-memory cache in sync
-    // Every auth path (Clerk OAuth login/signup, Google, password, OTP) lands
-    // here, so this is the one place guaranteed to run right after a fresh
-    // login. Bootstrap E2EE now instead of waiting for the next cold start —
-    // otherwise a newly-registered user has no public key on the server and
-    // DM partners can't encrypt to them until they restart the app.
-    import('./e2ee')
-      .then(({ bootstrapE2EE }) => bootstrapE2EE(user?.publicKey))
-      .catch((err) => console.warn('[e2ee] bootstrap after login failed:', err));
+    // E2EE removed — no keypair/public-key bootstrap on login.
   },
 
   /** Get stored access token */

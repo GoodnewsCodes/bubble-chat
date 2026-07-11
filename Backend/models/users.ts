@@ -78,9 +78,10 @@ export interface IUser extends Document {
   password?: string;
   refreshToken?: string;
 
-  // E2EE
+  // E2EE — legacy account-level public key (retained only for back-compat reads;
+  // Signal identity keys now live per-device on the Device model). Private keys
+  // are NEVER stored server-side.
   publicKey?: string;
-  privateKey?: string;
 
   // Settings
   actionItemEmailMode?: 'each' | 'summary' | 'off';
@@ -131,7 +132,6 @@ const UserSchema: Schema<IUser> = new Schema(
     isVerified: { type: Boolean, default: false },
 
     publicKey: { type: String, default: '' },
-    privateKey: { type: String, select: false },
 
     isPremium: { type: Boolean, default: false },
     is_bot: { type: Boolean, default: false },

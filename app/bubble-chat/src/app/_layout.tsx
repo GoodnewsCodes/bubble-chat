@@ -22,8 +22,8 @@ import * as SplashScreen from "expo-splash-screen";
 import Constants from 'expo-constants';
 import { verifyInstallation } from "nativewind";
 import "../global.css";
-import { initApiFromStorage, getSecureMediaUrl } from "../lib/api";
-import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, Share, PanResponder, Dimensions, Alert, Animated } from "react-native";
+import { initApiFromStorage, getSecureMediaUrl, API_MISCONFIGURED } from "../lib/api";
+import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView, Share, PanResponder, Dimensions, Alert, Animated, AppState } from "react-native";
 import { Image } from "expo-image";
 import { Phone, PhoneOff, Mic, MicOff, Volume2, Video, VideoOff, Minimize2, Maximize2, UserPlus, Link2, X, Monitor, MonitorUp, Smile, MessageSquare } from "lucide-react-native";
 import { CameraView, Camera } from "expo-camera";
@@ -79,6 +79,7 @@ function GlobalCallOverlay() {
   const [showEndSheet, setShowEndSheet] = useState(false);
   // Local user's display name — stamped on this client's in-call chat + reactions.
   const [myName, setMyName] = useState('You');
+  const [myId, setMyId] = useState<string | null>(null);
   // Local avatar — shown beside the callee on the outgoing-call screen so BOTH
   // parties appear while ringing.
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
@@ -86,14 +87,20 @@ function GlobalCallOverlay() {
     authStorage.getUser().then((u) => {
       if (u) {
         setMyName(u.full_name || u.username || 'You');
+        setMyId(String(u._id || u.id || ''));
         setMyAvatar(u.avatar || null);
-        // E2EE bootstrap: ensure a device keypair exists and the server holds
-        // our public key (replaces any legacy server-generated PEM key).
-        import('../lib/e2ee')
-          .then(({ bootstrapE2EE }) => bootstrapE2EE(u.publicKey))
-          .catch((err) => console.warn('[e2ee] bootstrap failed:', err));
+        // E2EE removed — no keypair bootstrap.
       }
     }).catch(() => {});
+  }, []);
+
+  // App-icon unread badge: refresh whenever the app changes foreground state so
+  // the icon count is right the moment the user leaves or returns (WhatsApp-style).
+  useEffect(() => {
+    let badge: typeof import('../lib/badge') | null = null;
+    import('../lib/badge').then((m) => { badge = m; m.syncAppBadge(); }).catch(() => {});
+    const sub = AppState.addEventListener('change', () => { badge?.syncAppBadge(); });
+    return () => sub.remove();
   }, []);
 
   const handleScreenShareError = (err: Error) => {
@@ -135,6 +142,9 @@ function GlobalCallOverlay() {
   }, [callState.status, ringPulse]);
   const [lkToken, setLkToken] = useState<string | null>(null);
   const [lkUrl, setLkUrl] = useState<string | null>(null);
+  // Token fetch failed — shown with a Retry action (web parity: LiveKitMeetingModal
+  // shows an explicit error state instead of a silently stuck call screen).
+  const [lkError, setLkError] = useState<string | null>(null);
 
   // Draggable floating pill position when minimized — clamped to the screen.
   const [pillPos, setPillPos] = useState(() => {
@@ -201,6 +211,7 @@ function GlobalCallOverlay() {
       if (state.status === 'idle') {
         setLkToken(null);
         setLkUrl(null);
+        setLkError(null);
         setIsScreenSharing(false);
         setRoster([]);
         panelControlsRef.current = null;
@@ -225,21 +236,29 @@ function GlobalCallOverlay() {
   useEffect(() => {
     if (!LiveKitCallRoom) return;
     if (callState.status !== 'in_call') return;
-    if (lkToken) return;
+    if (lkToken || lkError) return;
     let cancelled = false;
     getLiveKitToken(callState.roomId, getLinkJoinToken() || undefined)
       .then((res: { token?: string; url?: string }) => {
         if (cancelled) return;
-        if (res?.token && res?.url) {
+        // Server URL: prefer the backend-issued one, then env (web parity with
+        // VITE_LIVEKIT_URL) so a misconfigured backend doesn't dead-end the call.
+        const url = res?.url || process.env.EXPO_PUBLIC_LIVEKIT_URL || null;
+        if (res?.token && url) {
           setLkToken(res.token);
-          setLkUrl(res.url);
+          setLkUrl(url);
         } else {
           console.warn('[LiveKit] token endpoint returned no token/url');
+          setLkError('Could not get call access. Check your connection.');
         }
       })
-      .catch((err) => console.warn('[LiveKit] token fetch failed:', err));
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('[LiveKit] token fetch failed:', err);
+        setLkError(err?.message || 'Could not connect the call.');
+      });
     return () => { cancelled = true; };
-  }, [callState.status, (callState as any).roomId, lkToken]);
+  }, [callState.status, (callState as any).roomId, lkToken, lkError]);
 
   useEffect(() => {
     if (callState.status === 'in_call' && isCameraActive && hasPermission === null) {
@@ -568,6 +587,8 @@ function GlobalCallOverlay() {
               onScreenShareError={handleScreenShareError}
               roomId={(callState as any).roomId}
               userName={myName}
+              userId={myId || undefined}
+              meetingDbId={(callState as any).meetingDbId}
               fallback={renderAvatar(isMinimized ? 46 : 156)}
               onParticipantsChanged={onParticipantsChanged}
               registerPanelControls={registerPanelControls}
@@ -598,11 +619,28 @@ function GlobalCallOverlay() {
         ) : isMinimized ? (
           renderAvatar(46)
         ) : (
-          /* Connecting / Expo Go fallback: light lavender stage with the peer avatar. */
+          /* Connecting / error / Expo Go fallback: lavender stage with peer avatar. */
           <View style={styles.stagePlaceholder}>
             <View style={styles.audioMainAvatarShadow}>{renderAvatar(120)}</View>
             <Text style={styles.stagePlaceholderName} numberOfLines={1}>{name}</Text>
-            <Text style={styles.stagePlaceholderSub}>Connecting…</Text>
+            {callState.status === 'in_call' && lkError ? (
+              <>
+                <Text style={[styles.stagePlaceholderSub, { color: '#e0245e' }]} numberOfLines={2}>{lkError}</Text>
+                <TouchableOpacity
+                  onPress={() => { setLkError(null); /* effect refetches the token */ }}
+                  style={{ marginTop: 10, backgroundColor: 'rgba(108,92,231,0.12)', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 8 }}
+                >
+                  <Text style={{ color: PURPLE, fontFamily: 'Poppins_700Bold', fontSize: 12.5 }}>Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : callState.status === 'in_call' && !LiveKitCallRoom ? (
+              /* Expo Go: signaling works but native WebRTC media can't run here. */
+              <Text style={styles.stagePlaceholderSub} numberOfLines={3}>
+                Connected — audio/video needs the development build{'\n'}(Expo Go can't run call media)
+              </Text>
+            ) : (
+              <Text style={styles.stagePlaceholderSub}>Connecting…</Text>
+            )}
           </View>
         )}
       </View>
@@ -875,13 +913,28 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Pre-load stored token into in-memory cache for synchronous getAuthHeaders()
-    initApiFromStorage().then(() => {
-      const { chatCache } = require("../lib/chatCache");
-      chatCache.initAvatarCache().then(() => {
-        chatCache.syncAvatarsWithBackend().catch(() => {});
-      });
-    }).catch(() => {});
+    // Move any cache written by a previous AsyncStorage build into MMKV before
+    // the cache layer is read (one-time, idempotent), then boot the API + avatar
+    // cache. Chained so avatar/init reads hit the migrated MMKV store, not empty.
+    // Loud, visible signal if a real build shipped without the backend URL — the app
+    // would otherwise silently talk to localhost and just appear frozen.
+    if (API_MISCONFIGURED) {
+      Alert.alert(
+        'Configuration error',
+        'The app backend URL is not configured, so it cannot connect. Please contact support or reinstall an official build.',
+      );
+    }
+
+    const { migrateAsyncStorageToMMKV } = require("../lib/storage");
+    migrateAsyncStorageToMMKV().finally(() => {
+      // Pre-load stored token into in-memory cache for synchronous getAuthHeaders()
+      initApiFromStorage().then(() => {
+        const { chatCache } = require("../lib/chatCache");
+        chatCache.initAvatarCache().then(() => {
+          chatCache.syncAvatarsWithBackend().catch(() => {});
+        });
+      }).catch(() => {});
+    });
 
     // Configure Google Sign-In
     const isExpoGo = Constants.appOwnership === 'expo';
@@ -912,7 +965,28 @@ export default function RootLayout() {
       console.warn("Failed to register push notifications on mount:", err);
     });
 
-    return () => clearInterval(interval);
+    // Begin OS-level connectivity monitoring so `isOnline()` is accurate for
+    // sync gating, and flush the outbound queue the instant the network returns
+    // (WhatsApp-style: queued messages send first on reconnect).
+    const { startNetworkMonitor, onReconnect } = require("../lib/network");
+    startNetworkMonitor();
+    const flushQueue = () => {
+      const { chatCache } = require("../lib/chatCache");
+      chatCache.processOfflineQueue().catch(() => {});
+      chatCache.processPendingContacts().catch(() => {});
+    };
+    const unsubReconnect = onReconnect(flushQueue);
+    // Also flush when the app returns to the foreground — a message queued in a
+    // prior session should go out as soon as the user reopens the app.
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") flushQueue();
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubReconnect();
+      appStateSub.remove();
+    };
   }, []);
 
   useEffect(() => {

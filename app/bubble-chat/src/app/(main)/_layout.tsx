@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { MessageSquare, User, Users, Plus, Share2 } from "lucide-react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
@@ -6,7 +6,7 @@ import { BlurView } from "expo-blur";
 import { triggerPlusButton } from "../../lib/mockData";
 import { useTheme } from "../../lib/theme";
 import { NicknameProvider } from "../../lib/nicknames";
-import { fetchActiveMeetings } from "../../lib/api";
+import { fetchActiveMeetings, getUnreadChatCount } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 import { setInMeetingUsers, setViewerVisibility } from "../../lib/presence";
 import { subscribeCallState, CallState } from "../../lib/callManager";
@@ -55,6 +55,62 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       socket?.off('meeting_ended', refresh);
     };
   }, []);
+
+  // ── WhatsApp-style tab counters ──────────────────────────────────────────
+  // Chats: authoritative total-unread number, kept live via socket events.
+  // Updates: an unseen-activity dot that clears once the Updates tab is opened.
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [unseenUpdates, setUnseenUpdates] = useState(0);
+  const unreadThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const refreshUnread = async () => {
+      try {
+        const res: any = await getUnreadChatCount();
+        const count = Math.max(0, Number(res?.count ?? res?.data?.count ?? 0) || 0);
+        if (!cancelled) setUnreadTotal(count);
+      } catch { /* best-effort */ }
+    };
+    // Throttle bursts (many new_message/unread events in quick succession).
+    const bumpUnread = () => {
+      if (unreadThrottle.current) return;
+      unreadThrottle.current = setTimeout(() => { unreadThrottle.current = null; refreshUnread(); }, 600);
+    };
+    refreshUnread();
+    const socket = getSocket();
+    const onUpdates = () => setUnseenUpdates(n => (currentRouteName === 'updates' ? 0 : n + 1));
+    socket?.on('new_message', bumpUnread);
+    socket?.on('receive_message', bumpUnread);
+    socket?.on('unread_count_updated', bumpUnread);
+    socket?.on('messages_read', bumpUnread);
+    socket?.on('new_chat', bumpUnread);
+    socket?.on('connect', refreshUnread);
+    socket?.on('updates_changed', onUpdates);
+    return () => {
+      cancelled = true;
+      if (unreadThrottle.current) { clearTimeout(unreadThrottle.current); unreadThrottle.current = null; }
+      socket?.off('new_message', bumpUnread);
+      socket?.off('receive_message', bumpUnread);
+      socket?.off('unread_count_updated', bumpUnread);
+      socket?.off('messages_read', bumpUnread);
+      socket?.off('new_chat', bumpUnread);
+      socket?.off('connect', refreshUnread);
+      socket?.off('updates_changed', onUpdates);
+    };
+  }, []);
+  // Opening the Chats or Updates tab clears that tab's indicator.
+  useEffect(() => {
+    if (currentRouteName === 'updates') setUnseenUpdates(0);
+    if (currentRouteName === 'messages') {
+      // Re-pull shortly after landing on Chats so the number reflects reads.
+      const t = setTimeout(() => {
+        getUnreadChatCount().then((res: any) => {
+          setUnreadTotal(Math.max(0, Number(res?.count ?? res?.data?.count ?? 0) || 0));
+        }).catch(() => {});
+      }, 800);
+      return () => clearTimeout(t);
+    }
+  }, [currentRouteName]);
 
   // Glow the People icon while a call is ringing / in progress, so an active call
   // reads at a glance from anywhere in the app.
@@ -129,7 +185,23 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
             if (route.name === "messages") {
               displayName = "Chats";
-              iconComponent = <MessageSquare color={color} size={iconSize} />;
+              iconComponent = (
+                <View style={{ position: 'relative' }}>
+                  <MessageSquare color={color} size={iconSize} />
+                  {unreadTotal > 0 && (
+                    <View style={{
+                      position: 'absolute', top: -7, right: -10, minWidth: 16, height: 16,
+                      paddingHorizontal: 3, borderRadius: 8, backgroundColor: '#f4663b',
+                      alignItems: 'center', justifyContent: 'center',
+                      borderWidth: 1.5, borderColor: isDark ? 'rgba(15,16,24,0.82)' : 'rgba(248,247,255,0.78)',
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Poppins_700Bold', lineHeight: 12 }}>
+                        {unreadTotal > 99 ? '99+' : unreadTotal}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
             } else if (route.name === "people") {
               displayName = "People";
               iconComponent = (
@@ -159,7 +231,23 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               );
             } else if (route.name === "updates") {
               displayName = "Updates";
-              iconComponent = <Share2 color={color} size={iconSize} />;
+              iconComponent = (
+                <View style={{ position: 'relative' }}>
+                  <Share2 color={color} size={iconSize} />
+                  {unseenUpdates > 0 && (
+                    <View style={{
+                      position: 'absolute', top: -7, right: -10, minWidth: 16, height: 16,
+                      paddingHorizontal: 3, borderRadius: 8, backgroundColor: '#f4663b',
+                      alignItems: 'center', justifyContent: 'center',
+                      borderWidth: 1.5, borderColor: isDark ? 'rgba(15,16,24,0.82)' : 'rgba(248,247,255,0.78)',
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Poppins_700Bold', lineHeight: 12 }}>
+                        {unseenUpdates > 99 ? '99+' : unseenUpdates}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
             } else if (route.name === "profile") {
               displayName = "Profile";
               iconComponent = <User color={color} size={iconSize} />;
@@ -205,17 +293,38 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  // Re-guard the authenticated area. index.tsx routes here on a valid session, but a
+  // deep link / notification tap can target a (main) route directly — without this
+  // check an unauthenticated or onboarding-incomplete user would land in the tabs.
+  // On failure we bounce to '/' (index.tsx) which owns the canonical splash/login/
+  // profile-setup routing, so we don't duplicate that logic here.
+  const [gate, setGate] = useState<'checking' | 'ok' | 'redirect'>('checking');
+
   // Seed viewer reciprocity flags from the stored user so presence/read-receipt
   // gating reflects my own privacy settings from the first render.
   useEffect(() => {
-    authStorage.getUser().then((u: any) => {
-      if (!u) return;
-      setViewerVisibility({
-        showOnline: u.privacy_settings?.show_online_status !== false,
-        readReceipts: u.privacy_settings?.read_receipts !== false,
-      });
-    }).catch(() => {});
+    let active = true;
+    (async () => {
+      try {
+        const valid = await authStorage.isSessionValid();
+        if (!valid) { if (active) setGate('redirect'); return; }
+        const u: any = await authStorage.getUser();
+        if (u) {
+          setViewerVisibility({
+            showOnline: u.privacy_settings?.show_online_status !== false,
+            readReceipts: u.privacy_settings?.read_receipts !== false,
+          });
+        }
+        if (active) setGate(u?.onboardingComplete ? 'ok' : 'redirect');
+      } catch {
+        if (active) setGate('redirect');
+      }
+    })();
+    return () => { active = false; };
   }, []);
+
+  if (gate === 'redirect') return <Redirect href={"/" as any} />;
+  if (gate === 'checking') return null;
 
   return (
     <NicknameProvider>

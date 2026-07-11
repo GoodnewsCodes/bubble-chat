@@ -40,6 +40,10 @@ export interface ITask extends Document {
   // meeting-sourced task, so the follow-up job never double-pings the assignee.
   followUpSentAt?: Date;
 
+  // Set once we've rung attendees at this meeting's start time, so the
+  // "meeting begins → ring everyone" scheduler never re-rings the same event.
+  startRingSentAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +76,7 @@ const TaskSchema = new Schema<ITask>(
     snoozedUntil: { type: Date },
     reminderLevelsSent: { type: [String], default: [] },
     followUpSentAt: { type: Date },
+    startRingSentAt: { type: Date },
   },
   { timestamps: true }
 );

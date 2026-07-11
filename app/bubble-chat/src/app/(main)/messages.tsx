@@ -14,6 +14,7 @@ import { Link, useNavigation, useRouter } from "expo-router";
 import { Search, Pin, BellOff, Check, CheckCheck, MessageSquarePlus, UserPlus, FolderPlus, X, Trash2, Archive, Ban, Users } from "lucide-react-native";
 import { Image } from "expo-image";
 import { Avatar } from "../../components/Avatar";
+import { OfflineBanner } from "../../components/OfflineBanner";
 import { 
   Chat, 
   Contact,
@@ -22,6 +23,7 @@ import {
 import { chatCache } from "../../lib/chatCache";
 import { getSocket, onSocketReady } from "../../lib/socket";
 import { runThrottled } from "../../lib/syncScheduler";
+import { syncAppBadge } from "../../lib/badge";
 import { 
   addContact,
   toggleChatPin,
@@ -236,6 +238,9 @@ export default function Messages() {
     // We only "failed" if the refresh couldn't complete at all. If either source
     // came back, the screen has current data and shouldn't show a warning.
     setSyncFailed(chatsResult.status === "rejected" && contactsResult.status === "rejected");
+
+    // Mirror the authoritative unread total onto the app icon (WhatsApp-style).
+    syncAppBadge();
   };
 
   const currentUserIdRef = useRef<string | null>(null);
@@ -277,20 +282,39 @@ export default function Messages() {
     };
 
     // ── Real-time new message ─ update badge and preview instantly ────────────
-    const handleNewMessage = (data: any) => {
+    const handleNewMessage = async (data: any) => {
       if (!data) return;
-      const chatId = String(data.chat || data.chatId || '');
+      // Backend emits `chat` as an OBJECT { id, chatName, isGroupChat }; String()-ing
+      // it raw gives "[object Object]" and the list never matched → no live preview.
+      const chatId = String(data.chat?.id || data.chat?._id || data.chatId || '');
       if (!chatId) return;
       const currentUserId = currentUserIdRef.current;
       const senderId = String(data.sender?.id || data.sender?._id || data.sender || '');
       const isMe = currentUserId && senderId === String(currentUserId);
-      const isSystem = data.message_type === 'system' || data.is_announcement === true;
+      const isCall = data.message_type === 'call';
+      const isSystem = !isCall && (data.message_type === 'system' || data.is_announcement === true);
 
       if (isSystem) return;
 
-      const previewText = data.message_type === 'text'
-        ? (data.content || data.text || '')
-        : `📎 [${data.message_type || 'Media'}]`;
+      // E2EE removed: previews are plaintext. A call log entry gets a WhatsApp-style
+      // "📞 Voice/Video call" preview.
+      const previewText = isCall
+        ? `📞 ${data.call_metadata?.callType === 'video' ? 'Video' : 'Voice'} call`
+        : data.message_type === 'text'
+          ? (data.content || data.text || '')
+          : `📎 [${data.message_type || 'Media'}]`;
+
+      // A call log entry updates the preview for both parties but never bumps the
+      // unread badge or fires a banner (a finished call isn't an unread message).
+      if (isCall) {
+        setChatsList(prev => prev.map(c => (String(c.id) !== chatId ? c : {
+          ...c,
+          latestMessage: previewText,
+          latestFromMe: !!isMe,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        } as any)));
+        return;
+      }
 
       // Own messages (sent from another device or echoed back) still update the
       // preview + "You:" tick — they just never bump the unread badge or notify.
@@ -380,6 +404,8 @@ export default function Messages() {
       setChatsList(prev => prev.map(c =>
         String(c.id) === String(data.chatId) ? { ...c, unreadCount: data.unreadCount } : c
       ));
+      // Keep the app-icon badge in lockstep with the server's unread counts.
+      syncAppBadge();
     };
 
     const handleConnect = () => {
@@ -415,10 +441,18 @@ export default function Messages() {
       });
     };
 
+    // A brand-new conversation arrived (first message from a never-messaged user,
+    // or a DM just surfaced). It won't be in the cached list yet, so pull a fresh
+    // chat list — throttled to avoid a storm if several fire at once.
+    const handleNewChat = (_conversation: any) => {
+      runThrottled('messages:list', syncWithBackend, 1200);
+    };
+
     socket.on('typing_start', handleTypingStart);
     socket.on('typing_stop', handleTypingStop);
     socket.on('new_message', handleNewMessage);
     socket.on('receive_message', handleNewMessage);
+    socket.on('new_chat', handleNewChat);
     socket.on('messages_read', handleMessagesRead);
     socket.on('message_delivery_receipt', handleDeliveryReceipt);
     socket.on('unread_count_updated', handleUnreadCountUpdated);
@@ -434,6 +468,7 @@ export default function Messages() {
       socket.off('typing_stop', handleTypingStop);
       socket.off('new_message', handleNewMessage);
       socket.off('receive_message', handleNewMessage);
+      socket.off('new_chat', handleNewChat);
       socket.off('messages_read', handleMessagesRead);
       socket.off('message_delivery_receipt', handleDeliveryReceipt);
       socket.off('unread_count_updated', handleUnreadCountUpdated);
@@ -568,6 +603,7 @@ export default function Messages() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        <OfflineBanner />
         {showSyncBanner && (
           <TouchableOpacity
             onPress={() => { setSyncFailed(false); syncWithBackend(); }}
@@ -1346,6 +1382,7 @@ function ChatRow({
         <Avatar
           url={chat.avatar}
           name={chat.name}
+          userId={chat.isGroupChat ? undefined : (chat.otherUserId || chat.id)}
           size={52}
           isGroup={chat.isGroupChat}
           style={{ borderRadius: 14 }}

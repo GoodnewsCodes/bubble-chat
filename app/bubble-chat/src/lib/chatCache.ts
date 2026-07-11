@@ -1,8 +1,11 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchAllUserChats, fetchMessages, getContacts, getSecureMediaUrl, sendTextMessage } from './api';
+// Cache lives in MMKV (synchronous, no async-bridge round-trip) via an
+// AsyncStorage-compatible shim, so every existing `await AsyncStorage.x` call
+// site keeps working while reads become far faster. See ./storage.
+import { mmkvAsyncShim as AsyncStorage } from './storage';
+import { fetchAllUserChats, fetchMessages, getContacts, getSecureMediaUrl, sendTextMessage, sendMediaMessage, addContact } from './api';
 import { authStorage } from './authStorage';
 import { getCachedNickname } from './nicknames';
-import { prepareChat, parseEnvelope, decryptEnvelope, ENCRYPTED_PLACEHOLDER } from './e2ee';
+import { isOnline } from './network';
 
 // Storage Keys
 const KEYS = {
@@ -13,6 +16,9 @@ const KEYS = {
   MESSAGES_PREFIX: 'bubble_cached_messages_',
   OFFLINE_QUEUE: 'bubble_offline_message_queue',
   DRAFTS: 'bubble_chat_drafts',
+  ORG_MEMBERS: 'bubble_cached_org_members',
+  CALL_HISTORY: 'bubble_cached_call_history',
+  PENDING_CONTACTS: 'bubble_chat_pending_contacts',
 };
 
 const DEFAULT_FOLDERS = ["All", "Unread", "Friends", "Work", "Archive"];
@@ -73,6 +79,37 @@ const dedupeById = <T extends { id: string }>(rows: T[]): T[] =>
 let avatarMemoryCache: { [urlOrUserId: string]: string } = {};
 
 export const chatCache = {
+  // ─── Incremental-sync cursors ────────────────────────────────────────────────
+  // Per-resource server timestamp of the last successful sync. Passing it back as
+  // `?since=` fetches only what changed, so we stop refetching whole lists.
+  //
+  // Deliberately IN-MEMORY (not persisted): the first sync of each app launch has
+  // no cursor and does a full fetch, which reconciles deletions/hides that may
+  // have missed their realtime socket event; subsequent syncs in the same session
+  // are incremental. This mirrors WhatsApp — full reconcile on open, deltas while
+  // running — without a persisted cursor that could pin stale rows forever.
+  _syncCursors: {} as Record<string, string>,
+  async getSyncCursor(resource: string): Promise<string | undefined> {
+    return this._syncCursors[resource] || undefined;
+  },
+  async setSyncCursor(resource: string, cursor: string): Promise<void> {
+    this._syncCursors[resource] = cursor;
+  },
+
+  // ─── Generic JSON blob cache ─────────────────────────────────────────────────
+  // Backing store for the Updates/Profile sections (tasks, meetings, calendar
+  // events, org members, digest, profile, invite code, docs…). Keys must be
+  // prefixed `bubble_cached_` so the MMKV migration + cloud backup pick them up.
+  async getCachedJSON<T>(key: string, fallback: T): Promise<T> {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch { return fallback; }
+  },
+  async setCachedJSON(key: string, value: any): Promise<void> {
+    try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch { /* best-effort */ }
+  },
+
   // ─── Folders & Mappings ─────────────────────────────────────────────────────
   
   async getFolders(): Promise<string[]> {
@@ -137,10 +174,12 @@ export const chatCache = {
     if (!user) return [];
     const currentUserId = String(user.id || user._id);
 
-    // Fetch from API
-    const response = await fetchAllUserChats();
+    // Incremental fetch: pass the last cursor so the server returns only changed
+    // conversations. First-ever sync has no cursor → full list.
+    const cursor = await this.getSyncCursor('chats');
+    const response = await fetchAllUserChats(cursor || undefined);
     const list = response?.conversations || [];
-    
+
     // Map to UI Chat objects. Each row is mapped defensively: a single malformed
     // conversation (e.g. missing `users`) must never reject the whole sync, or the
     // list screen would throw away good data and fall back to the error banner.
@@ -161,7 +200,10 @@ export const chatCache = {
       let latestText = null;
       let latestMessageTime = c.updatedAt;
       if (c.latestMessage) {
-        const isSystem = c.latestMessage.message_type === 'system' || c.latestMessage.is_announcement;
+        // A call log entry gets a WhatsApp-style preview ("📞 Voice call") even
+        // though it's flagged is_announcement.
+        const isCall = c.latestMessage.message_type === 'call';
+        const isSystem = !isCall && (c.latestMessage.message_type === 'system' || c.latestMessage.is_announcement);
 
         // ── NEW ──
         const isBotMsg = !!(
@@ -170,8 +212,13 @@ export const chatCache = {
           c.latestMessage.sender?.username === 'aida'
         );
 
-        if (!isSystem && !isBotMsg) {
+        if (isCall) {
+          const ct = c.latestMessage.call_metadata?.callType;
+          latestText = `📞 ${ct === 'video' ? 'Video' : 'Voice'} call`;
+          latestMessageTime = c.latestMessage.sentAt || c.latestMessage.createdAt;
+        } else if (!isSystem && !isBotMsg) {
           if (c.latestMessage.message_type === 'text') {
+            // E2EE removed — previews are plaintext, shown directly.
             latestText = c.latestMessage.content;
           } else {
             latestText = `📎 [${c.latestMessage.message_type || 'Media'}]`;
@@ -251,12 +298,16 @@ export const chatCache = {
      }
     }))).filter(Boolean) as any[];
 
-    // Collapse any duplicate conversations (parallel DM docs / repeated rows)
-    // before caching so each chat renders exactly once.
-    const deduped = dedupeChats(mapped);
+    // On an incremental response, merge the delta over the existing cache: put
+    // fresh rows first so dedupeChats (which keeps the most-recently-updated row
+    // per conversation) prefers them, while untouched cached rows are preserved.
+    // A full response (no cursor) replaces the cache outright.
+    const base = response?.incremental && cursor ? await this.getCachedChats() : [];
+    const deduped = dedupeChats([...mapped, ...base]);
 
-    // Cache mapped list
+    // Cache mapped list + advance the cursor for the next incremental fetch.
     await AsyncStorage.setItem(KEYS.CACHED_CHATS, JSON.stringify(deduped));
+    if (response?.syncedAt) await this.setSyncCursor('chats', response.syncedAt);
     return deduped;
   },
 
@@ -279,26 +330,19 @@ export const chatCache = {
     const response = await fetchMessages(chatId);
     const list = Array.isArray(response) ? response : [];
 
-    // Resolve E2EE state once per sync; failures degrade to lock placeholders.
-    const hasEncrypted = list.some((m: any) => m.is_encrypted && m.content);
-    const cipher = hasEncrypted
-      ? await prepareChat(chatId, currentUserId).catch(() => null)
-      : null;
-    const decryptText = (m: any): string | null => {
-      if (!m.is_encrypted || !m.content) return null;
-      const env = parseEnvelope(m.content);
-      const plain = env ? decryptEnvelope(chatId, env, cipher) : null;
-      return plain ?? ENCRYPTED_PLACEHOLDER;
-    };
-
+    // E2EE removed — all messages are plaintext and render directly from content.
     const mapped = list.map((m: any) => {
       const senderId = String(m.sender?.id || m.sender?._id || m.sender);
       const isMe = senderId === currentUserId;
-      const isSystem = m.message_type === 'system' || m.is_announcement === true;
+      // A 'call' entry is centered like a system row but keeps sender attribution
+      // so the client can show outgoing/incoming direction — so it's NOT lumped in
+      // with generic system messages.
+      const isCall = m.message_type === 'call';
+      const isSystem = !isCall && (m.message_type === 'system' || m.is_announcement === true);
 
       return {
         id: String(m.id || m._id),
-        text: decryptText(m) ?? (m.content || (m.mediaUrl ? `📎 [${m.message_type || 'Media'}]` : '')),
+        text: m.content || (m.mediaUrl ? `📎 [${m.message_type || 'Media'}]` : ''),
         is_encrypted: !!m.is_encrypted,
         sender: isMe ? 'me' : (isSystem ? 'system' : 'other'),
         senderName: m.sender ? (getCachedNickname(senderId) || m.sender?.full_name || m.sender?.username) : undefined,
@@ -312,6 +356,8 @@ export const chatCache = {
         mediaUrl: m.mediaUrl,
         message_type: m.message_type,
         media_metadata: m.media_metadata || null,
+        call_metadata: m.call_metadata || null,
+        isCall,
         transcript: m.transcript || null,
         parent_message: m.parent_message || null,
         is_announcement: m.is_announcement,
@@ -365,6 +411,32 @@ export const chatCache = {
     return deduped;
   },
 
+  // ─── Workroom (org directory) cache ──────────────────────────────────────────
+  // Offline-first: show the cached org roster instantly, then a background fetch
+  // reconciles. Revisiting the People screen never blanks on a network call.
+  async getCachedOrgMembers(): Promise<any[]> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.ORG_MEMBERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  },
+  async setCachedOrgMembers(list: any[]): Promise<void> {
+    try { await AsyncStorage.setItem(KEYS.ORG_MEMBERS, JSON.stringify(list || [])); } catch { /* best-effort */ }
+  },
+
+  // ─── Call history cache ──────────────────────────────────────────────────────
+  // History (call logs + past meetings) is cached so it paints instantly on
+  // revisit; a background refresh then merges the latest entries.
+  async getCachedCallHistory(): Promise<{ logs: any[]; meetings: any[] }> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CALL_HISTORY);
+      return raw ? JSON.parse(raw) : { logs: [], meetings: [] };
+    } catch { return { logs: [], meetings: [] }; }
+  },
+  async setCachedCallHistory(data: { logs: any[]; meetings: any[] }): Promise<void> {
+    try { await AsyncStorage.setItem(KEYS.CALL_HISTORY, JSON.stringify(data || { logs: [], meetings: [] })); } catch { /* best-effort */ }
+  },
+
   // ─── Per-chat message drafts ─────────────────────────────────────────────────
   // Unsent compose text survives navigation and app restarts. Stored plaintext
   // on-device only (never sent anywhere until the user hits send).
@@ -399,6 +471,16 @@ export const chatCache = {
   },
 
   // ─── Offline Queue ─────────────────────────────────────────────────────────
+  // Outbound messages composed while offline (or when a send fails) are persisted
+  // here and flushed, strictly in order, once connectivity returns — so "queued
+  // messages send first" like WhatsApp. Items carry a `clientId` so a retry that
+  // actually reached the server (lost response) is de-duped by the backend's
+  // unique (chat, sender, client_id) index instead of creating a duplicate.
+  //
+  // Item shape (persisted):
+  //   { id, chatId, type: 'text'|'media', timestamp, retryCount?, nextRetryAt?,
+  //     text?, isEncrypted?, parentMessageId?,           // text
+  //     file?: {uri,name,type,size}, content?, messageType?, mediaDuration? }  // media
   async getOfflineQueue(): Promise<any[]> {
     try {
       const raw = await AsyncStorage.getItem(KEYS.OFFLINE_QUEUE);
@@ -408,20 +490,44 @@ export const chatCache = {
     }
   },
 
-  // clientId lets a queued retry be matched against an attempt that actually reached
-  // the server (e.g. the response was lost to a network drop) — without it, the offline
-  // queue would create a genuine duplicate message every time it had to retry.
-  async addToOfflineQueue(chatId: string, text: string, clientId?: string, isEncrypted?: boolean): Promise<string> {
+  async addToOfflineQueue(chatId: string, text: string, clientId?: string, isEncrypted?: boolean, parentMessageId?: string): Promise<string> {
     const queue = await this.getOfflineQueue();
-    const tempId = clientId || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newItem = {
+    const tempId = clientId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    queue.push({
       id: tempId,
       chatId,
+      type: 'text',
       text, // already ciphertext when isEncrypted — encrypted at compose time
       isEncrypted: !!isEncrypted,
+      parentMessageId: parentMessageId || undefined,
       timestamp: new Date().toISOString(),
-    };
-    queue.push(newItem);
+      retryCount: 0,
+    });
+    await AsyncStorage.setItem(KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
+    return tempId;
+  },
+
+  // Queue a media/voice message. The local file `uri` is persisted and re-sent on
+  // flush, so a photo/voice note composed offline uploads once the network returns.
+  async addMediaToOfflineQueue(
+    chatId: string,
+    file: { uri: string; name?: string; type?: string; size?: number },
+    opts?: { clientId?: string; content?: string; messageType?: string; mediaDuration?: number; parentMessageId?: string },
+  ): Promise<string> {
+    const queue = await this.getOfflineQueue();
+    const tempId = opts?.clientId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    queue.push({
+      id: tempId,
+      chatId,
+      type: 'media',
+      file,
+      content: opts?.content || '',
+      messageType: opts?.messageType,
+      mediaDuration: opts?.mediaDuration,
+      parentMessageId: opts?.parentMessageId || undefined,
+      timestamp: new Date().toISOString(),
+      retryCount: 0,
+    });
     await AsyncStorage.setItem(KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
     return tempId;
   },
@@ -433,31 +539,101 @@ export const chatCache = {
     return updated;
   },
 
+  // Persist a per-item retry increment + next-attempt time without disturbing order.
+  async _patchQueueItem(tempId: string, patch: { retryCount?: number; nextRetryAt?: number }): Promise<void> {
+    const queue = await this.getOfflineQueue();
+    const updated = queue.map((it: any) => (it.id === tempId ? { ...it, ...patch } : it));
+    await AsyncStorage.setItem(KEYS.OFFLINE_QUEUE, JSON.stringify(updated));
+  },
+
   _isProcessingQueue: false,
+  _retryTimer: null as ReturnType<typeof setTimeout> | null,
+  _MAX_QUEUE_RETRIES: 8,
+
+  // Send one queued item. Text and media take their own API path; both pass the
+  // item id as clientId so the backend de-dupes lost-response retries.
+  async _sendQueueItem(item: any): Promise<void> {
+    if (item.type === 'media' && item.file?.uri) {
+      const fileObj = { uri: item.file.uri, name: item.file.name, type: item.file.type, size: item.file.size } as any;
+      await sendMediaMessage(item.chatId, fileObj, {
+        clientId: item.id,
+        content: item.content,
+        message_type: item.messageType,
+        media_duration: item.mediaDuration,
+        ...(item.parentMessageId && { parent_message: item.parentMessageId }),
+      });
+    } else {
+      await sendTextMessage(item.chatId, item.text, {
+        clientId: item.id,
+        is_encrypted: !!item.isEncrypted,
+        ...(item.parentMessageId && { parent_message: item.parentMessageId }),
+      });
+    }
+  },
 
   async processOfflineQueue(): Promise<void> {
-    // syncChatAndMessages can fire from multiple triggers in quick succession (socket
-    // reconnect, send-success, screen focus) — without this guard, two overlapping
-    // calls would both read the same unprocessed item and send it twice.
+    // Multiple triggers (socket reconnect, NetInfo reconnect, send-success, screen
+    // focus, app foreground) can fire in quick succession — this guard stops two
+    // overlapping passes from both grabbing the same item and sending it twice.
     if (this._isProcessingQueue) return;
+    // Don't burn through retry budget while offline — a reconnect re-triggers us.
+    if (!isOnline()) return;
     this._isProcessingQueue = true;
     try {
       const queue = await this.getOfflineQueue();
       if (queue.length === 0) return;
 
-      console.log(`Processing offline queue: ${queue.length} items`);
+      const now = Date.now();
+      console.log(`Processing offline queue: ${queue.length} item(s)`);
+      // Strict FIFO: process from the head. If the head item is still backing off,
+      // stop the whole pass (preserves order + "queued sends first"); a scheduled
+      // timer or the next trigger resumes it.
       for (const item of queue) {
+        if (item.nextRetryAt && item.nextRetryAt > now) break;
         try {
-          await sendTextMessage(item.chatId, item.text, { clientId: item.id, is_encrypted: !!item.isEncrypted });
+          await this._sendQueueItem(item);
           await this.removeFromOfflineQueue(item.id);
         } catch (err) {
-          console.warn("Offline queue processing failed, stopping queue send:", err);
+          const retryCount = (item.retryCount || 0) + 1;
+          if (retryCount > this._MAX_QUEUE_RETRIES) {
+            // Give up on a persistently failing item (e.g. deleted chat) so it can't
+            // block every message behind it forever.
+            console.warn(`Dropping queued message after ${retryCount} failed attempts:`, item.id, err);
+            await this.removeFromOfflineQueue(item.id);
+            continue;
+          }
+          // Exponential backoff with jitter (2s → 60s cap), then stop the pass.
+          const delay = Math.min(60000, 2000 * 2 ** (retryCount - 1)) * (0.75 + Math.random() * 0.5);
+          await this._patchQueueItem(item.id, { retryCount, nextRetryAt: now + delay });
+          console.warn(`Offline queue send failed (attempt ${retryCount}), backing off ${Math.round(delay)}ms:`, err);
           break;
         }
       }
     } finally {
       this._isProcessingQueue = false;
+      await this._scheduleQueueRetry();
     }
+  },
+
+  // Arm a single timer for the head item's next attempt so backoff resumes on its
+  // own. Processing is strict FIFO, so only the head governs the next wake. No
+  // timer is armed while offline — `onReconnect` re-triggers processing instead,
+  // which also avoids a tight loop of offline attempts.
+  async _scheduleQueueRetry(): Promise<void> {
+    try {
+      if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
+      if (!isOnline()) return;
+      const queue = await this.getOfflineQueue();
+      if (queue.length === 0) return;
+      const now = Date.now();
+      const head = queue[0];
+      // Clamp to 1s..60s: never a 0ms tight loop, never sleep too long.
+      const wait = Math.max(1000, Math.min((head.nextRetryAt || now) - now, 60000));
+      this._retryTimer = setTimeout(() => {
+        this._retryTimer = null;
+        this.processOfflineQueue().catch(() => {});
+      }, wait);
+    } catch { /* best-effort scheduling */ }
   },
 
   async saveMessageLocally(chatId: string, message: any): Promise<void> {
@@ -500,7 +676,7 @@ export const chatCache = {
   // `chat_updated` socket event) so chat-list / Work / All-chats reflect it without
   // a full backend resync. Accepts raw conversation fields (groupIcon/chatName) and
   // maps them onto the cached chat's UI shape (avatar/name).
-  async patchCachedChat(chatId: string, patch: { groupIcon?: string | null; chatName?: string | null; groupDescription?: string | null }): Promise<void> {
+  async patchCachedChat(chatId: string, patch: { groupIcon?: string | null; chatName?: string | null; groupDescription?: string | null; resources?: any[] }): Promise<void> {
     try {
       const cachedChats = await this.getCachedChats();
       const updatedChats = cachedChats.map((c: any) => {
@@ -510,6 +686,7 @@ export const chatCache = {
           avatar: patch.groupIcon !== undefined ? (patch.groupIcon || null) : c.avatar,
           name: patch.chatName !== undefined && patch.chatName ? patch.chatName : c.name,
           bio: patch.groupDescription !== undefined ? (patch.groupDescription || c.bio) : c.bio,
+          resources: patch.resources !== undefined ? patch.resources : c.resources,
         };
       });
       await AsyncStorage.setItem(KEYS.CACHED_CHATS, JSON.stringify(updatedChats));
@@ -571,6 +748,50 @@ export const chatCache = {
       }
       console.error('Failed to restore cloud backup:', err);
       return false;
+    }
+  },
+
+  // ─── Pending contact adds (offline QR scan / add-by-tag) ─────────────────────
+  // Adding a contact hits the server, so a scan/add done offline is parked here
+  // and completed on reconnect — the user isn't blocked mid-flow.
+  async queuePendingContact(identifier: string): Promise<void> {
+    try {
+      const id = String(identifier || '').trim();
+      if (!id) return;
+      const raw = await AsyncStorage.getItem(KEYS.PENDING_CONTACTS);
+      const list: string[] = raw ? JSON.parse(raw) : [];
+      if (!list.includes(id)) list.push(id);
+      await AsyncStorage.setItem(KEYS.PENDING_CONTACTS, JSON.stringify(list));
+    } catch { /* best-effort */ }
+  },
+
+  async processPendingContacts(): Promise<void> {
+    if (!isOnline()) return;
+    let list: string[] = [];
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.PENDING_CONTACTS);
+      list = raw ? JSON.parse(raw) : [];
+    } catch { return; }
+    if (list.length === 0) return;
+    const remaining: string[] = [];
+    for (const identifier of list) {
+      try {
+        await addContact(identifier);
+      } catch (err) {
+        // Keep it only if the failure looks transient (network); a 4xx (bad tag /
+        // already a contact) shouldn't be retried forever.
+        const status = (err as any)?.status;
+        if (!status || status >= 500) remaining.push(identifier);
+        else console.warn('Dropping un-addable pending contact:', identifier, err);
+      }
+    }
+    try {
+      if (remaining.length) await AsyncStorage.setItem(KEYS.PENDING_CONTACTS, JSON.stringify(remaining));
+      else await AsyncStorage.removeItem(KEYS.PENDING_CONTACTS);
+    } catch { /* best-effort */ }
+    // Refresh the roster so the newly-added contacts appear.
+    if (remaining.length !== list.length) {
+      try { await this.syncContactsWithBackend(); } catch { /* non-fatal */ }
     }
   },
 

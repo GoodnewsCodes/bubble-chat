@@ -291,7 +291,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     'gender', 'date_of_birth', 'hobbies', 'location',
     'notification_settings', 'privacy_settings', 'username',
     'phone_number', 'organization', 'org_role', 'app_background', 'custom_background',
-    'actionItemEmailMode', 'digestPreferences', 'publicKey'
+    'actionItemEmailMode', 'digestPreferences'
   ];
 
   // Check username uniqueness if being updated
@@ -713,7 +713,9 @@ export const saveBackup = async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
 
-  const { backupData } = req.body;
+  // req.body is undefined (not {}) when the JSON body was rejected (e.g. over
+  // the size limit) — guard before destructuring.
+  const backupData = req.body?.backupData;
   if (!backupData) {
     res.status(400).json({ message: 'Backup data is required.' });
     return;

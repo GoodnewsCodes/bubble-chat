@@ -41,6 +41,7 @@ import {
   subscribeToPlusButton,
 } from '../../lib/mockData';
 import { chatCache } from '../../lib/chatCache';
+import { isOnline as isNetworkOnline } from '../../lib/network';
 import { addContact, createGroupChat, getSecureMediaUrl, accessOrCreateChat, getOrgMembers, fetchMeetings, fetchCallLogs, fetchMeetingById, deleteCallLog, fetchActiveMeetings } from '../../lib/api';
 import { startOutgoingCall, joinRoomByLink, knockToJoinRoom } from '../../lib/callManager';
 import { useIsOnline, useIsInMeeting } from '../../lib/presence';
@@ -53,6 +54,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { BlurView } from 'expo-blur';
 import { Avatar as SharedAvatar } from '../../components/Avatar';
 import { MeetingDetailModal } from '../../components/MeetingDetailModal';
+import { OfflineBanner } from '../../components/OfflineBanner';
 
 // ─────────────────────────────────────────────
 // Helper
@@ -246,6 +248,14 @@ function ContactsTab({
   const handleAdd = async () => {
     const tag = addIdentifier.trim();
     if (!tag) return;
+    // Offline: park the request and complete it on reconnect instead of failing.
+    if (!isNetworkOnline()) {
+      await chatCache.queuePendingContact(tag);
+      setAddIdentifier('');
+      setShowAddModal(false);
+      Alert.alert("You're offline", "We'll add this contact as soon as you're back online.");
+      return;
+    }
     try {
       await addContact(tag);
       setAddIdentifier('');
@@ -299,6 +309,7 @@ function ContactsTab({
       </View>
 
       <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+        <OfflineBanner />
         {/* Section header */}
         <View className="flex-row items-center mb-3 mt-1">
           <Text className="text-[10px] font-bold text-ink-soft dark:text-[#9a9bb6] uppercase tracking-widest font-sans">
@@ -379,11 +390,9 @@ function ContactsTab({
                         <Text className="text-[11px] font-semibold text-purple mt-0.5 font-sans">
                           {typingInfo.fromUsername ? `@${typingInfo.fromUsername} is typing...` : typingInfo.fromName ? `${typingInfo.fromName} is typing...` : 'typing...'}
                         </Text>
-                      ) : matchingChat?.latestMessage ? (
-                        <Text className="text-[11px] text-ink-soft dark:text-[#9a9bb6] mt-0.5 font-sans" numberOfLines={1}>
-                          {matchingChat.latestMessage}
-                        </Text>
                       ) : (
+                        // Contacts always show identity (username + role) — not the last
+                        // message. This is a directory, not the chat list.
                         <Text className="text-[11px] text-ink-soft dark:text-[#9a9bb6] mt-0.5 font-sans" numberOfLines={1}>
                           @{contact.username}
                           {contact.org_role ? ` · ${contact.org_role}` : ''}
@@ -607,6 +616,11 @@ function WorkroomTab({
     const cachedChats = await chatCache.getCachedChats();
     setChats(cachedChats);
 
+    // Offline-first: paint the cached org roster immediately so revisiting People
+    // never shows a blank/loading directory, then reconcile from the network.
+    const cachedMembers = await chatCache.getCachedOrgMembers();
+    if (cachedMembers.length) setContacts(cachedMembers);
+
     try {
       // searchUsers('') now intentionally returns only explicit contacts (org
       // colleagues shouldn't auto-populate a personal surface). Workroom needs the
@@ -623,10 +637,13 @@ function WorkroomTab({
         organization: u.organization || "",
       }));
       setContacts(coworkersList);
+      chatCache.setCachedOrgMembers(coworkersList);
     } catch (err) {
       console.warn("Workroom coworker fetch failed, fallback to cache:", err);
-      const cachedContacts = await chatCache.getCachedContacts();
-      setContacts(cachedContacts);
+      if (!cachedMembers.length) {
+        const cachedContacts = await chatCache.getCachedContacts();
+        setContacts(cachedContacts);
+      }
     }
   };
 
@@ -859,8 +876,10 @@ function HistoryTab({
         fetchMeetings(1, 50).catch(() => ({ meetings: [] })),
       ]);
       const logs = (logsRes as any)?.logs || (logsRes as any)?.data || (Array.isArray(logsRes) ? logsRes : []);
+      const mtgs = Array.isArray((meetingsRes as any)?.meetings) ? (meetingsRes as any).meetings : (Array.isArray(meetingsRes) ? (meetingsRes as any) : []);
       setCallLogs(logs);
-      setMeetings(Array.isArray((meetingsRes as any)?.meetings) ? (meetingsRes as any).meetings : (Array.isArray(meetingsRes) ? (meetingsRes as any) : []));
+      setMeetings(mtgs);
+      chatCache.setCachedCallHistory({ logs, meetings: mtgs });
     } catch (err) {
       console.warn('Failed to load call history:', err);
     } finally {
@@ -869,7 +888,17 @@ function HistoryTab({
   };
 
   useEffect(() => {
-    load();
+    // Offline-first: paint cached history instantly (no spinner on revisit), then
+    // refresh in the background and re-cache the latest.
+    (async () => {
+      const cached = await chatCache.getCachedCallHistory();
+      if (cached.logs.length || cached.meetings.length) {
+        setCallLogs(cached.logs);
+        setMeetings(cached.meetings);
+        setLoading(false);
+      }
+      load();
+    })();
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, []);
@@ -1052,13 +1081,26 @@ export default function PeopleScreen() {
     refresh();
     const intervalId = setInterval(refresh, 30_000);
     const socket = getSocket();
-    socket?.on('meeting_room_update', refresh);
-    socket?.on('meeting_ended', refresh);
+    // Optimistically drop an ended room from the list immediately — the 30s poll
+    // (and a stale-read race on the backend) would otherwise keep it visible.
+    const dropRoom = (roomId?: string) => {
+      if (roomId) setLiveRooms(prev => prev.filter((r: any) => String(r.roomId) !== String(roomId)));
+    };
+    const onRoomUpdate = (data: any) => {
+      if (data?.action === 'ended') dropRoom(data.roomId);
+      refresh();
+    };
+    const onMeetingEnded = (data: any) => { dropRoom(data?.roomId); refresh(); };
+    const onCallEnded = (data: any) => { dropRoom(data?.roomId); refresh(); };
+    socket?.on('meeting_room_update', onRoomUpdate);
+    socket?.on('meeting_ended', onMeetingEnded);
+    socket?.on('call_ended', onCallEnded);
     return () => {
       cancelled = true;
       clearInterval(intervalId);
-      socket?.off('meeting_room_update', refresh);
-      socket?.off('meeting_ended', refresh);
+      socket?.off('meeting_room_update', onRoomUpdate);
+      socket?.off('meeting_ended', onMeetingEnded);
+      socket?.off('call_ended', onCallEnded);
     };
   }, []);
   useEffect(() => {
@@ -1096,6 +1138,14 @@ export default function PeopleScreen() {
   const handleBarcodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
+    // Offline: the QR encodes the person's username/tag — park it and add on reconnect.
+    if (!isNetworkOnline()) {
+      await chatCache.queuePendingContact(data);
+      setIsScannerOpen(false);
+      Alert.alert("You're offline", `We'll add "${data}" as soon as you're back online.`);
+      setScanned(false);
+      return;
+    }
     try {
       await addContact(data);
       Alert.alert("Success", `Contact "${data}" added successfully!`);

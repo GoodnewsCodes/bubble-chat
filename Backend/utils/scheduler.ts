@@ -278,6 +278,91 @@ export const initTaskReminderScheduler = () => {
   console.log('⏰ [TaskReminders] Background auto-reminder initialized (runs every 30 min).');
 };
 
+/**
+ * "Meeting begins → ring everyone" — when a scheduled meeting's start time
+ * arrives, ring every invited attendee (WhatsApp-style): an `incoming_call`
+ * socket event for anyone with the app open, plus a push notification so it also
+ * rings when the app is closed. Runs every minute; each meeting is rung exactly
+ * once (guarded by `startRingSentAt`).
+ */
+export const processMeetingStartRings = async () => {
+  try {
+    const { Task } = await import('../models/task');
+    const { User } = await import('../models/users');
+    const { getIO } = await import('./socket');
+    const { sendPushNotification } = await import('./push');
+
+    const now = new Date();
+    // Fire for meetings whose start time is within the last 60s (a minute-resolution
+    // cron can land just after start) up to 30s ahead. Never ring a meeting that
+    // started long ago (missed by downtime) — that would ring people out of the blue.
+    const windowStart = new Date(now.getTime() - 60 * 1000);
+    const windowEnd = new Date(now.getTime() + 30 * 1000);
+
+    const due = await Task.find({
+      type: 'meeting',
+      status: { $in: ['todo', 'in-progress'] },
+      start_time: { $gte: windowStart, $lte: windowEnd },
+      startRingSentAt: { $exists: false },
+    }).limit(25);
+
+    if (due.length === 0) return;
+
+    let io: any = null;
+    try { io = getIO(); } catch { /* socket not ready — skip this pass */ }
+    if (!io) return;
+
+    for (const task of due) {
+      try {
+        const hostId = String(task.assignedTo || task.user_id);
+        const host = await User.findById(hostId).select('full_name username');
+        const hostName = host?.full_name || host?.username || 'Someone';
+        const type = task.meetingType || 'video';
+        // Deterministic room id so every attendee who accepts lands in the SAME room.
+        const roomId = `bubble-evt-${String(task._id)}`;
+
+        const attendees = new Set<string>([
+          ...((task.recipients || []) as any[]).map(String),
+          hostId,
+        ]);
+
+        for (const uid of attendees) {
+          io.to(uid).emit('incoming_call', {
+            fromUserId: hostId,
+            roomId,
+            callerName: `${task.title}`,
+            type,
+            isEvent: true,
+          });
+        }
+
+        sendPushNotification(
+          [...attendees],
+          `Meeting starting: ${task.title}`,
+          `${hostName}'s meeting is starting now — tap to join.`,
+          { roomId, type: 'incoming_call', callType: type, callerName: task.title, isEvent: true },
+          'call'
+        ).catch(err => console.error('[MeetingRing] push failed:', err));
+
+        (task as any).startRingSentAt = new Date();
+        await task.save();
+        console.log(`🔔 [MeetingRing] Rang ${attendees.size} attendee(s) for meeting "${task.title}" (${task._id}).`);
+      } catch (err) {
+        console.error(`❌ [MeetingRing] Failed ringing meeting ${task._id}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [MeetingRing] Scheduler processing error:', err);
+  }
+};
+
+export const initMeetingStartRingScheduler = () => {
+  cron.schedule('* * * * *', async () => {
+    await processMeetingStartRings();
+  });
+  console.log('🔔 [MeetingRing] Meeting-start ringer initialized (runs every minute).');
+};
+
 // ─── Action-Item Follow-Up Loop ───────────────────────────────────────────────
 
 /**

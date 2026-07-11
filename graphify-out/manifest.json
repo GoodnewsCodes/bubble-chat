@@ -950,8 +950,8 @@
     "semantic_hash": ""
   },
   "Backend/routes/userRoutes.ts": {
-    "mtime": 1782476665.8217607,
-    "ast_hash": "5de955a40464fdc763ade772db521db4",
+    "mtime": 1783444112.5454392,
+    "ast_hash": "a4355e5e5612896dd0d1268a96ba583c",
     "semantic_hash": ""
   },
   "Backend/routes/workspaceRoutes.ts": {
@@ -1640,8 +1640,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/messages.tsx": {
-    "mtime": 1783315051.2769477,
-    "ast_hash": "b8eaa44a3e9ecad13469b8341c8339f1",
+    "mtime": 1783440876.6568658,
+    "ast_hash": "4f1b3b6995dac2db7939e6ab38f83eef",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/profile.tsx": {
@@ -1690,8 +1690,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/chat/[id].tsx": {
-    "mtime": 1783313088.8518407,
-    "ast_hash": "dc022fad71a5797553195da4d7a50b55",
+    "mtime": 1783473306.5000496,
+    "ast_hash": "707e6d60b2839a0916de4e155ee8e538",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/updates.tsx": {
@@ -1700,13 +1700,13 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/api.ts": {
-    "mtime": 1783059309.5987484,
-    "ast_hash": "f4766a3e5ce8b3715052c5aa9c0d5370",
+    "mtime": 1783434608.2055266,
+    "ast_hash": "b89717ae78bbf130cf6e97f10fa60798",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/people.tsx": {
-    "mtime": 1783289858.6730862,
-    "ast_hash": "b0c03c2083e79e1570bb4108be7bdcaf",
+    "mtime": 1783441010.1937692,
+    "ast_hash": "0188819d583673ef0559f8bc81f5a6ef",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/mockData.ts": {
@@ -1750,23 +1750,23 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/chatCache.ts": {
-    "mtime": 1783315017.5985353,
-    "ast_hash": "9f0bb1db1e6500e60029b9ea6456c69d",
+    "mtime": 1783473275.1158042,
+    "ast_hash": "cd897bd06446f432833b36b61f515aae",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/socket.ts": {
-    "mtime": 1782755652.033506,
-    "ast_hash": "9aab04476f3df2eb7c7604c5e01233f1",
+    "mtime": 1783440835.4031675,
+    "ast_hash": "307d0c21bd00b03a84d12ae68123af18",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/callManager.ts": {
-    "mtime": 1783233774.928935,
-    "ast_hash": "802bef9340e3536bc0c679335e489622",
+    "mtime": 1783435000.0889382,
+    "ast_hash": "70e0ac9358fbf3c3a7cc2264e94807ce",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/ringtone.ts": {
-    "mtime": 1781856169.8173604,
-    "ast_hash": "a5f23f102435f433047701d2f65b31a2",
+    "mtime": 1783434977.920513,
+    "ast_hash": "180504305e15cf052cf25f4ade04c401",
     "semantic_hash": ""
   },
   "Backend/models/backup.ts": {
@@ -1790,8 +1790,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/pushNotifications.ts": {
-    "mtime": 1783259175.5664768,
-    "ast_hash": "abd5f974e66fd1a0be997d024f42cdf9",
+    "mtime": 1783440943.7429633,
+    "ast_hash": "b7844e15c50dd2d69d87e4055882398e",
     "semantic_hash": ""
   },
   "Backend/fix_system_messages.js": {
@@ -2385,8 +2385,8 @@
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/lib/e2ee.ts": {
-    "mtime": 1782992123.4557436,
-    "ast_hash": "06012f32f2b527a9f16b783333a31e40",
+    "mtime": 1783444280.9866836,
+    "ast_hash": "3835f0b324e692d8bc74851fd55e1363",
     "semantic_hash": ""
   },
   "Backend/controllers/keyController.ts": {
@@ -2425,8 +2425,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/e2ee.ts": {
-    "mtime": 1782992966.9284809,
-    "ast_hash": "abf68984f933e08a9769a29c10b24bc1",
+    "mtime": 1783444248.384608,
+    "ast_hash": "70995470bb9f89d41bb1fdae6bdf71a0",
     "semantic_hash": ""
   },
   ".claude/skills/excalidraw-diagram/README.md": {
@@ -2482,6 +2482,11 @@
   "docs/superpowers/specs/2026-07-05-notification-privacy-settings-design.md": {
     "mtime": 1783259397.9056897,
     "ast_hash": "62ba81fdd91f19893cc9a667334cf0fe",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/syncScheduler.ts": {
+    "mtime": 1783434582.825696,
+    "ast_hash": "08a45127a02a088fb7efffebeedb6b7b",
     "semantic_hash": ""
   }
 }

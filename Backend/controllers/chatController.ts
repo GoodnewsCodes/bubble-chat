@@ -94,9 +94,11 @@ export const formatConversation = async (c: any, userId?: any) => {
 
   latestMessage: (c.latestMessage && (!userId || !c.latestMessage.deletedFor || !c.latestMessage.deletedFor.some((id: any) => String(id) === String(userId)))) ? {
     id: c.latestMessage._id,
-    // E2EE messages are ciphertext server-side — list previews show a lock
-    // instead of envelope JSON. Clients that hold the key decrypt in-thread.
-    content: c.latestMessage.is_encrypted ? '🔒 Message' : (c.latestMessage.content || null),
+    // E2EE messages are ciphertext server-side. Return the raw envelope so
+    // key-holding clients can decrypt the list preview (WhatsApp-style) —
+    // clients without the key render their own 🔒 placeholder. The ciphertext
+    // is already visible to every participant in-thread, so nothing leaks.
+    content: c.latestMessage.content || null,
     is_encrypted: c.latestMessage.is_encrypted ?? false,
     mediaUrl: c.latestMessage.mediaUrl || null,
     mediaType: c.latestMessage.mediaType || null,
@@ -145,6 +147,17 @@ export const accessChat = async (req: AuthRequest, res: Response): Promise<void>
   }
   if (!req.user?._id) {
     res.status(401).json({ message: 'Unauthorized' });
+    return;
+  }
+  // Guard: the id MUST belong to a real user. A client that accidentally passes a
+  // conversation id here would otherwise upsert a bogus DM `[me, <convoId>]` — a
+  // phantom "Unknown User" chat that swallows messages. Validate before upserting.
+  if (
+    !mongoose.Types.ObjectId.isValid(String(userId)) ||
+    String(userId) === String(req.user._id) ||
+    !(await User.exists({ _id: userId }))
+  ) {
+    res.status(400).json({ message: 'Invalid userId — not a real user' });
     return;
   }
 
@@ -228,9 +241,24 @@ export const fetchChats = async (req: AuthRequest, res: Response): Promise<void>
 
   try {
     const userObjectId = new mongoose.Types.ObjectId(req.user._id);
+
+    // Incremental sync: when the client passes a `since` cursor, only return
+    // conversations whose activity changed after it (updatedAt bumps on new
+    // messages, renames, membership changes). This lets the mobile app fetch
+    // deltas instead of the whole list on every sync. Absent/invalid `since`
+    // falls back to the full list (unchanged behavior). Note: read-receipt-only
+    // changes don't bump Conversation.updatedAt — those reach the client via the
+    // realtime `messages_read` socket event + local unread zeroing, so a delta
+    // sync intentionally skips them.
+    const sinceRaw = typeof req.query.since === 'string' ? req.query.since : undefined;
+    const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
+    const sinceValid = sinceDate && !isNaN(sinceDate.getTime());
+    const serverTime = new Date();
+
     const rawResults = await Conversation.find({
       users: userObjectId,
       deletedBy: { $ne: userObjectId },
+      ...(sinceValid ? { updatedAt: { $gt: sinceDate } } : {}),
     })
       .populate('users', '-password -refreshToken -privateKey')
       .populate('groupAdmin', '-password -refreshToken -privateKey')
@@ -250,8 +278,18 @@ export const fetchChats = async (req: AuthRequest, res: Response): Promise<void>
     const friendIds = new Set(((me as any)?.contacts || []).map((id: any) => String(id)));
     const results = rawResults.filter((c) => {
       if (c.isGroupChat) return true;
-      if (c.latestMessage) return true;
+      // Phantom-DM guard: drop a 1:1 whose "other" member didn't populate to a real
+      // user (username/full_name/email all absent). These are the bogus "Unknown
+      // User" conversations minted by the old accessChat(conversationId) bug — and
+      // they may even hold mis-routed messages, so this check comes FIRST.
       const other = (c.users as any[])?.find((u: any) => String(u?._id || u) !== String(req.user!._id));
+      const otherResolved = other && (other.username || other.full_name || other.email);
+      if (!otherResolved) return false;
+      if (c.latestMessage) return true;
+      // Dangling latestMessage ref (message doc hard-deleted): populate() yields
+      // null but the conversation DID have traffic — it must stay visible.
+      // populated() returns the original ObjectId when populate matched nothing.
+      if (c.populated('latestMessage')) return true;
       const otherId = String(other?._id || other || '');
       return friendIds.has(otherId);
     });
@@ -299,6 +337,10 @@ export const fetchChats = async (req: AuthRequest, res: Response): Promise<void>
       message: 'Conversations retrieved successfully.',
       total: results.length,
       conversations: formattedConversations,
+      // Cursor for the next incremental fetch, and whether this response was one.
+      // Clients should store `syncedAt` and pass it back as `?since=`.
+      syncedAt: serverTime.toISOString(),
+      incremental: !!sinceValid,
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

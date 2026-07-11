@@ -92,7 +92,10 @@ export const Avatar: React.FC<AvatarProps> = ({
           imageStyle,
           style,
         ]}
-        onError={() => setImgError(true)}
+        onError={() => {
+          console.log('[Avatar] image failed to load', { userId, rawSrc, resolvedUrl });
+          setImgError(true);
+        }}
       />
     );
   }

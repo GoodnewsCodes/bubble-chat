@@ -7,12 +7,22 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { fetchOrgDocs, fetchOrgDoc, createOrgDoc, updateOrgDoc, deleteOrgDoc, ingestOrgFile, brainIngestUrl } from '../../lib/api';
 import { Avatar } from '../../components/Avatar';
+import { OfflineBanner } from '../../components/OfflineBanner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRouter } from 'expo-router';
 import { subscribeToPlusButton } from '../../lib/mockData';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { authStorage } from '../../lib/authStorage';
 import { setViewerVisibility } from '../../lib/presence';
+import { chatCache } from '../../lib/chatCache';
+import { isOnline } from '../../lib/network';
+
+// On-device cache keys so the org/admin section (invite code, employee directory,
+// transcripts) paints offline. `bubble_cached_` prefix rides migration + backup.
+const PROFILE_CACHE = {
+  ORG_DATA: 'bubble_cached_org_data',
+  ORG_TRANSCRIPTS: 'bubble_cached_org_transcripts',
+};
 
 import { getMyProfile, updateProfile, getSecureMediaUrl } from '../../lib/api';
 
@@ -537,7 +547,32 @@ export default function ProfileScreen() {
           setFormData(mapped);
           currentOrg = stored.organization || '';
         }
-        
+
+        // Cache-first: hydrate the org/admin section from disk so invite code,
+        // employee directory and transcripts render with no network.
+        try {
+          const [cOrg, cMembers, cTranscripts] = await Promise.all([
+            chatCache.getCachedJSON<any>(PROFILE_CACHE.ORG_DATA, null),
+            chatCache.getCachedOrgMembers(),
+            chatCache.getCachedJSON<any[]>(PROFILE_CACHE.ORG_TRANSCRIPTS, []),
+          ]);
+          if (cOrg) {
+            setOrgData(cOrg);
+            setOrgFormData({
+              name: cOrg.name || '',
+              description: cOrg.description || '',
+              logo: cOrg.logo || '',
+              allowMembersToShareInvite: cOrg.allowMembersToShareInvite ?? true,
+              emailTranscriptsToMembers: cOrg.emailTranscriptsToMembers ?? true,
+            });
+          }
+          if (cMembers?.length) setOrgMembers(cMembers);
+          if (cTranscripts?.length) setOrgTranscripts(cTranscripts);
+        } catch { /* cache is best-effort */ }
+
+        // Offline: keep the cached view; the network refresh below is skipped.
+        if (!isOnline()) return;
+
         const fresh = await getMyProfile();
         if (fresh?.data) {
           const u = fresh.data;
@@ -574,15 +609,18 @@ export default function ProfileScreen() {
               allowMembersToShareInvite: orgRes.allowMembersToShareInvite ?? true,
               emailTranscriptsToMembers: orgRes.emailTranscriptsToMembers ?? true,
             });
+            await chatCache.setCachedJSON(PROFILE_CACHE.ORG_DATA, orgRes);
           }
           try {
             const membersRes = await getOrgMembers();
             if (membersRes?.members) {
               setOrgMembers(membersRes.members);
+              await chatCache.setCachedOrgMembers(membersRes.members);
             }
             const transcriptsRes = await getOrgTranscripts();
             if (transcriptsRes?.transcripts) {
               setOrgTranscripts(transcriptsRes.transcripts);
+              await chatCache.setCachedJSON(PROFILE_CACHE.ORG_TRANSCRIPTS, transcriptsRes.transcripts);
             }
             const { fetchAllUserChats } = await import('../../lib/api');
             const me = await authStorage.getUser();
@@ -789,6 +827,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
+        <OfflineBanner />
         <View className="w-full" style={{ backgroundColor: colors.bg }}>
           {/* Hero Card */}
           <View className="items-center w-full p-6 border-b" style={{ backgroundColor: colors.card, borderColor: colors.border }}>

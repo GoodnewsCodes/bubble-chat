@@ -4,7 +4,9 @@ import { Phone, Video, Users, User, MicOff, PhoneOff, Volume2, Calendar, Chevron
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { getOrgMembers, fetchTasks, createTaskFull, updateTaskFull, getSecureMediaUrl, fetchCallLogs, deleteCallLog, clearCallLogs, updateCallLog, fetchMeetings, fetchMeetingById, fetchActiveMeetings } from '../../lib/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Cache reads/writes go through the MMKV-backed shim so this screen shares the
+// same store as the rest of the app (avoids a split-brain with updates.tsx tasks).
+import { mmkvAsyncShim as AsyncStorage } from '../../lib/storage';
 import { startOutgoingCall, joinRoomByLink, knockToJoinRoom } from '../../lib/callManager';
 import { authStorage } from '../../lib/authStorage';
 import { getSocket } from '../../lib/socket';
@@ -205,14 +207,18 @@ export default function CallsScreen() {
     const interval = setInterval(loadActiveRooms, 30_000);
     const socket = getSocket();
     const refresh = () => loadActiveRooms();
+    // When a meeting ends, the room leaves the active list AND a new entry belongs in
+    // the "Recent Meetings" history — reload both, else a just-finished call wouldn't
+    // appear (and its later AI summary wouldn't show) until a tab switch or restart.
+    const onMeetingEnded = () => { loadActiveRooms(); loadMeetings(); };
     socket?.on('meeting_room_update', refresh);
-    socket?.on('meeting_ended', refresh);
+    socket?.on('meeting_ended', onMeetingEnded);
     return () => {
       clearInterval(interval);
       socket?.off('meeting_room_update', refresh);
-      socket?.off('meeting_ended', refresh);
+      socket?.off('meeting_ended', onMeetingEnded);
     };
-  }, [loadActiveRooms]);
+  }, [loadActiveRooms, loadMeetings]);
 
   // Join a live room. The host (or an already-admitted attendee) re-enters its
   // LiveKit session directly; everyone else "knocks" and only enters once the host
@@ -387,14 +393,34 @@ export default function CallsScreen() {
       return;
     }
 
+    // Strict HH:MM (00:00–23:59) so garbage like "25:99" or an empty field can't
+    // produce a rolled-over / invalid timestamp the backend then has to reject.
+    const parseHHMM = (s: string): { h: number; m: number } | null => {
+      const match = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(s);
+      if (!match) return null;
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+      return { h, m };
+    };
+    const st = parseHHMM(startTimeText);
+    const et = parseHHMM(endTimeText);
+    if (!st || !et) {
+      Alert.alert('Validation Error', 'Enter valid start and end times as HH:MM (e.g. 09:30).');
+      return;
+    }
+
     try {
       const start = new Date(selectedDate);
-      const [sH, sM] = startTimeText.split(':').map(Number);
-      start.setHours(sH || 10, sM || 0, 0, 0);
+      start.setHours(st.h, st.m, 0, 0);
 
       const end = new Date(selectedDate);
-      const [eH, eM] = endTimeText.split(':').map(Number);
-      end.setHours(eH || 11, eM || 0, 0, 0);
+      end.setHours(et.h, et.m, 0, 0);
+
+      if (end.getTime() <= start.getTime()) {
+        Alert.alert('Validation Error', 'The end time must be after the start time.');
+        return;
+      }
 
       const payload = {
         title: title.trim(),

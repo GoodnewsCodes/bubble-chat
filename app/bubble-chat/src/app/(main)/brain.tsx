@@ -367,18 +367,26 @@ export default function BrainScreen() {
 
   // ── Search ──────────────────────────────────────────────────────────────────
 
+  // Monotonic search id so a slow earlier request can't overwrite a newer one's
+  // results (type "refund", search, refine to "refund policy", search again — the
+  // first response must not clobber the second when it lands late).
+  const searchSeqRef = useRef(0);
+
   const handleSearch = async () => {
     if (!query.trim()) return;
+    const seq = ++searchSeqRef.current;
     setSearching(true);
     setSearchResults([]);
     try {
       const dept = deptFilter === 'all' ? undefined : deptFilter;
       const data = await brainSearch(query, dept, 8);
+      if (seq !== searchSeqRef.current) return; // superseded by a newer search
       setSearchResults(data?.results || []);
     } catch (e: any) {
-      Alert.alert('Search failed', e.message);
+      if (seq !== searchSeqRef.current) return;
+      Alert.alert('Search failed', e?.message || 'Search is temporarily unavailable. Please try again.');
     } finally {
-      setSearching(false);
+      if (seq === searchSeqRef.current) setSearching(false);
     }
   };
 
@@ -474,7 +482,11 @@ export default function BrainScreen() {
       const data = await brainAskQuestion(question.trim());
       setAskResult({ answer: data?.answer, expert: data?.expert });
     } catch (e: any) {
-      setAskResult({ answer: `Error: ${e.message}` });
+      // 503 / network errors often carry no `.message` — avoid "Error: undefined".
+      const msg = e?.message
+        ? `Sorry, I couldn't answer that: ${e.message}`
+        : "The Brain is temporarily unavailable — it may be warming up. Please try again in a moment.";
+      setAskResult({ answer: msg });
     } finally {
       setAsking(false);
     }

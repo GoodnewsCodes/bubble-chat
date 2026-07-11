@@ -606,7 +606,7 @@ export default function Signup() {
               ) : (
                 <View style={styles.googleBtnContent}>
                   <GoogleLogo size={18} />
-                  <Text style={styles.googleBtnText}>Cotinue wwith Google</Text>
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
                 </View>
               )}
             </TouchableOpacity>

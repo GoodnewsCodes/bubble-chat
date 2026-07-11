@@ -10,13 +10,33 @@ export interface IMessage extends Document {
   deliveredTo: mongoose.Types.ObjectId[];
 
   // Rich Messaging Metadata
-  message_type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'contact' | 'system';
+  message_type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'contact' | 'system' | 'call';
   parent_message?: mongoose.Types.ObjectId; // For replies/threading
   is_forwarded: boolean;
   is_announcement: boolean;
   is_encrypted: boolean;
   is_pinned: boolean;
   client_id?: string; // For idempotency
+
+  // ── E2EE (Signal protocol) ──────────────────────────────────────────────────
+  // crypto_version 0/undefined = legacy plaintext (`content`); 2 = E2EE, where
+  // `content` is empty and the body lives in the encrypted fields below. Stamping
+  // the version lets old plaintext history stay readable while new sends encrypt.
+  crypto_version?: number;
+  // Group messages (Sender Keys): ONE opaque ciphertext for every member device.
+  ciphertext?: string;
+  // 1:1 / multi-device (Sesame): one pairwise envelope per recipient device,
+  // including the sender's OTHER devices for self-sync. The server routes these
+  // but cannot read them.
+  envelopes?: {
+    recipientUserId: mongoose.Types.ObjectId;
+    recipientDeviceId: string;
+    type: 'prekey' | 'whisper' | 'senderkey' | 'sealed';
+    body: string; // base64 ciphertext
+  }[];
+  // Group re-key generation this message was encrypted under (matches the
+  // conversation's sender-key epoch), so a re-keyed recipient picks the right key.
+  epoch?: number;
 
   // Marks a message that was sent by the Knowledge Continuity Engine on behalf
   // of a user asking the brain a low-confidence question. Replies whose
@@ -48,6 +68,17 @@ export interface IMessage extends Document {
     duration?: number; // for audio/video
     mime_type?: string;
     quality?: 'sd' | 'hd';
+  };
+
+  // Call-log entry metadata (message_type: 'call'). Rendered WhatsApp/Signal-style
+  // in the thread — a call icon + type + duration, tappable to view the transcript
+  // when one was captured.
+  call_metadata?: {
+    callType?: 'voice' | 'video';
+    duration?: number; // seconds
+    status?: 'completed' | 'missed' | 'declined';
+    hasMinutes?: boolean;
+    meetingId?: string;
   };
 
   // Speech-to-text of a voice note, filled in asynchronously after upload.
@@ -106,7 +137,7 @@ const MessageSchema: Schema<IMessage> = new Schema(
     // Type & Threading
     message_type: {
       type: String,
-      enum: ['text', 'image', 'video', 'voice', 'file', 'location', 'contact', 'system', 'sticker'],
+      enum: ['text', 'image', 'video', 'voice', 'file', 'location', 'contact', 'system', 'sticker', 'call'],
       default: 'text',
     },
     parent_message: {
@@ -119,6 +150,19 @@ const MessageSchema: Schema<IMessage> = new Schema(
     is_pinned: { type: Boolean, default: false },
     client_id: { type: String },
     brainQuestionRef: { type: Boolean, default: false },
+
+    // E2EE payloads (see IMessage). All opaque to the server.
+    crypto_version: { type: Number, default: 0 },
+    ciphertext: { type: String },
+    envelopes: [
+      {
+        recipientUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        recipientDeviceId: { type: String },
+        type: { type: String, enum: ['prekey', 'whisper', 'senderkey', 'sealed'] },
+        body: { type: String },
+      },
+    ],
+    epoch: { type: Number },
 
     workspaceFile: {
       type: mongoose.Schema.Types.ObjectId,
@@ -163,6 +207,13 @@ const MessageSchema: Schema<IMessage> = new Schema(
       duration: { type: Number },
       mime_type: { type: String },
       quality: { type: String, enum: ['sd', 'hd'], default: 'sd' },
+    },
+    call_metadata: {
+      callType: { type: String, enum: ['voice', 'video'] },
+      duration: { type: Number },
+      status: { type: String, enum: ['completed', 'missed', 'declined'] },
+      hasMinutes: { type: Boolean },
+      meetingId: { type: String },
     },
 
     // STT transcript for voice notes (populated asynchronously post-upload).

@@ -9,6 +9,8 @@
 // piling on. Real-time updates still arrive over Socket.IO; these syncs are just
 // a safety net, so dropping redundant ones is harmless.
 
+import { isOnline } from './network';
+
 let backoffUntil = 0;
 
 // Called from api.ts `handleResponse` whenever the server returns 429. Suppresses
@@ -18,6 +20,10 @@ export const noteRateLimit = (retryAfterMs = 30000): void => {
 };
 
 export const isBackedOff = (): boolean => Date.now() < backoffUntil;
+
+// Clear any active 429 cooldown. Called on logout so a rate-limit incurred by one
+// account doesn't suppress syncs for the next account signed in on the same process.
+export const resetBackoff = (): void => { backoffUntil = 0; };
 
 const lastRun: Record<string, number> = {};
 const inFlight: Record<string, boolean> = {};
@@ -30,9 +36,13 @@ export const runThrottled = async <T>(
   key: string,
   fn: () => Promise<T>,
   minIntervalMs = 2500,
-  opts: { respectBackoff?: boolean } = {},
+  opts: { respectBackoff?: boolean; respectNetwork?: boolean } = {},
 ): Promise<T | undefined> => {
   const respectBackoff = opts.respectBackoff !== false;
+  const respectNetwork = opts.respectNetwork !== false;
+  // Offline: don't even attempt the request — the caller keeps showing cached
+  // data instead of stalling on a timeout. A NetInfo reconnect re-triggers sync.
+  if (respectNetwork && !isOnline()) return undefined;
   if (respectBackoff && isBackedOff()) return undefined;
   if (inFlight[key]) return undefined;
   const now = Date.now();

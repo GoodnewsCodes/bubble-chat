@@ -16,7 +16,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { initSocket, getIO } from './utils/socket';
-import { initSecurityScheduler, initTranscriptProcessor, initTaskReminderScheduler, initActionItemFollowUpScheduler, initDailyDigestScheduler, initWeeklyDigestScheduler, initHolidayReminderScheduler } from './utils/scheduler';
+import { initSecurityScheduler, initTranscriptProcessor, initTaskReminderScheduler, initActionItemFollowUpScheduler, initDailyDigestScheduler, initWeeklyDigestScheduler, initHolidayReminderScheduler, initMeetingStartRingScheduler } from './utils/scheduler';
 import { initBrainEventListener } from './utils/brainEventListener';
 import { warmEmbeddings } from './utils/embeddings';
 import { processQueue } from './utils/queue';
@@ -45,6 +45,7 @@ import activityRoutes from './routes/activityRoutes';
 import orgRoutes from './routes/orgRoutes';
 import brainRoutes from './routes/brainRoutes';
 import calendarRoutes from './routes/calendarRoutes';
+import keyRoutes from './routes/keyRoutes';
 import { seedDefaultTemplates } from './controllers/templateController';
 
 const app = express();
@@ -133,7 +134,10 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,
 }));
-app.use(express.json());
+// 25mb: mobile cloud backup POSTs the device's whole cached store as one JSON
+// body; the default 100kb limit rejected it, leaving req.body undefined and
+// crashing the backup controller.
+app.use(express.json({ limit: '25mb' }));
 
 // JSON Parsing Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
@@ -363,6 +367,7 @@ app.use('/api/v1/activity', activityRoutes);
 app.use('/api/v1/org', orgRoutes);
 app.use('/api/v1/brain', brainRoutes);
 app.use('/api/v1/events', calendarRoutes);
+app.use('/api/v1/keys', keyRoutes);
 
 // Catch-all error handler. Without this, errors passed to next(err) by route handlers
 // or multer (e.g. fileFilter rejections, LIMIT_FILE_SIZE) fall through to Express's
@@ -417,6 +422,7 @@ mongoose.connect(mongoURI, { family: 4 })
     initSecurityScheduler();
     initTranscriptProcessor();
     initTaskReminderScheduler();
+    initMeetingStartRingScheduler();
     initActionItemFollowUpScheduler();
     initDailyDigestScheduler();
     initWeeklyDigestScheduler();

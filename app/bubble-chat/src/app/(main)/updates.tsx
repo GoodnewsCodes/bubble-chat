@@ -6,12 +6,25 @@ import { useTheme } from '../../lib/theme';
 import { useNavigation } from 'expo-router';
 import { subscribeToPlusButton } from '../../lib/mockData';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { fetchTasks, createTaskFull, updateTaskFull, uploadMeetingRecording, fetchAiDescription, getCalendarEvents, getOrgMembers, suggestRecurrence, detectPatterns, getPendingPatterns, confirmPattern, dismissPattern, fetchMeetings } from '../../lib/api';
+import { fetchTasks, createTaskFull, updateTaskFull, uploadMeetingRecording, fetchAiDescription, getCalendarEvents, getOrgMembers, suggestRecurrence, detectPatterns, getPendingPatterns, confirmPattern, dismissPattern, fetchMeetings, createMeeting } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { authStorage } from '../../lib/authStorage';
 import * as DocumentPicker from 'expo-document-picker';
+import { OfflineBanner } from '../../components/OfflineBanner';
+import { chatCache } from '../../lib/chatCache';
+import { isOnline } from '../../lib/network';
+
+// On-device cache keys for the Updates section, so the agenda/action-items/
+// calendar paint from disk with no network (WhatsApp-style). Must be prefixed
+// `bubble_cached_` to ride the MMKV migration + cloud backup.
+const UPDATES_CACHE = {
+  TASKS: 'bubble_cached_tasks',
+  CALENDAR: 'bubble_cached_calendar_events',
+  MEETINGS: 'bubble_cached_meetings',
+  HOLIDAYS: 'bubble_cached_holidays',
+  DIGEST: 'bubble_cached_daily_digest',
+};
 
 // Helper to get calendar cells
 const getCalendarCells = (currentDate: Date) => {
@@ -139,10 +152,16 @@ export default function UpdatesScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Cache-first: show the last brief immediately, then refresh when online.
+      const cachedDigest = await chatCache.getCachedJSON<any>(UPDATES_CACHE.DIGEST, null);
+      if (!cancelled && cachedDigest) setDigest(cachedDigest);
+      if (!isOnline()) return;
       try {
         const { getDailyDigest } = await import('../../lib/api');
         const d = await getDailyDigest();
-        if (!cancelled) setDigest(d?.digest || d?.data || d || null);
+        const resolved = d?.digest || d?.data || d || null;
+        if (!cancelled) setDigest(resolved);
+        if (resolved) await chatCache.setCachedJSON(UPDATES_CACHE.DIGEST, resolved);
       } catch { /* digest is optional */ }
     })();
     return () => { cancelled = true; };
@@ -286,6 +305,36 @@ export default function UpdatesScreen() {
     }
   };
 
+  // Agenda-tab items (personal tasks/events) get a done toggle. Completing a
+  // meeting-type agenda item also auto-creates the linked Meeting so it shows up
+  // under "Meetings this day" (agenda → meeting). Org calendar events are
+  // read-only and never reach here (no _id / isOrgEvent).
+  const handleToggleAgendaItem = async (task: any) => {
+    const id = String(task._id || task.id);
+    if (!id || task.isOrgEvent) return;
+    const next = task.status === 'done' ? 'todo' : 'done';
+    setTasks(prev => prev.map(t => (String(t._id || t.id) === id ? { ...t, status: next } : t)));
+    try {
+      await updateTaskFull(id, { status: next });
+      if (next === 'done' && task.type === 'meeting' && !task.meetingRef) {
+        try {
+          const res: any = await createMeeting({ title: task.title || 'Meeting', type: 'video' });
+          const meetingId = res?.meeting?._id || res?.meeting?.id || res?._id || res?.id;
+          if (meetingId) {
+            await updateTaskFull(id, { meetingRef: meetingId });
+            setTasks(prev => prev.map(t => (String(t._id || t.id) === id ? { ...t, meetingRef: meetingId } : t)));
+          }
+          Alert.alert('Meeting created', `A meeting was set up from "${task.title || 'this agenda item'}".`);
+          syncCalendar();
+        } catch { /* best-effort — the done toggle already succeeded */ }
+      }
+    } catch (_) {
+      // Revert optimistic toggle on failure.
+      setTasks(prev => prev.map(t => (String(t._id || t.id) === id ? { ...t, status: task.status } : t)));
+      Alert.alert('Error', 'Could not update agenda item.');
+    }
+  };
+
   // Open the inline editor for an action item (edit title + reassign).
   const startEditItem = (item: any) => {
     setEditingItemId(String(item._id || item.id));
@@ -322,23 +371,36 @@ export default function UpdatesScreen() {
     }
   };
 
+  // Cache-first hydrate: paint every Agenda dataset (tasks, calendar events,
+  // meetings, holidays, org members) from disk before any network so the screen
+  // is fully usable offline. A background sync then refreshes when connectivity
+  // is present.
   const loadCache = async () => {
     try {
-      const raw = await AsyncStorage.getItem('bubble_cached_tasks');
-      if (raw) {
-        setTasks(JSON.parse(raw));
-      }
+      const [cTasks, cCal, cMeet, cHol, cOrg] = await Promise.all([
+        chatCache.getCachedJSON<any[]>(UPDATES_CACHE.TASKS, []),
+        chatCache.getCachedJSON<any[]>(UPDATES_CACHE.CALENDAR, []),
+        chatCache.getCachedJSON<any[]>(UPDATES_CACHE.MEETINGS, []),
+        chatCache.getCachedJSON<any[]>(UPDATES_CACHE.HOLIDAYS, []),
+        chatCache.getCachedOrgMembers(),
+      ]);
+      if (cTasks?.length) setTasks(cTasks);
+      if (cCal?.length) setCalendarEvents(cCal);
+      if (cMeet?.length) setMeetings(cMeet);
+      if (cHol?.length) setHolidayEvents(cHol);
+      if (cOrg?.length) setOrgMembers(cOrg);
     } catch (err) {
-      console.warn("Failed to load cached tasks in updates.tsx:", err);
+      console.warn("Failed to load Updates cache:", err);
     }
   };
 
   const syncTasks = async () => {
+    if (!isOnline()) return;
     try {
       const response = await fetchTasks();
       const list = Array.isArray(response) ? response : (response?.data || []);
       setTasks(list);
-      await AsyncStorage.setItem('bubble_cached_tasks', JSON.stringify(list));
+      await chatCache.setCachedJSON(UPDATES_CACHE.TASKS, list);
     } catch (err) {
       console.warn("Failed to sync tasks silently in updates.tsx:", err);
     }
@@ -347,21 +409,8 @@ export default function UpdatesScreen() {
   // Pull org calendar events (public holidays) + org members (for the notify-team picker).
   // Holidays are shown read-only on the calendar; both are best-effort and non-blocking.
   const syncAux = async () => {
+    // Groups/contacts come from the already-cached chat roster (offline-safe).
     try {
-      const evRes = await getCalendarEvents({ type: 'holiday' });
-      const evList = evRes?.events || evRes?.data || (Array.isArray(evRes) ? evRes : []);
-      setHolidayEvents((evList || []).filter((e: any) => e?.eventType === 'holiday'));
-    } catch (err) {
-      console.warn("Failed to fetch holidays in updates.tsx:", err);
-    }
-    try {
-      const memRes = await getOrgMembers();
-      if (memRes?.members) setOrgMembers(memRes.members);
-    } catch (err) {
-      console.warn("Failed to fetch org members in updates.tsx:", err);
-    }
-    try {
-      const { chatCache } = await import('../../lib/chatCache');
       const cached = await chatCache.getCachedChats();
       setGroups((cached || []).filter((c: any) => c.isGroupChat));
       const cachedContacts = await chatCache.getCachedContacts();
@@ -369,24 +418,48 @@ export default function UpdatesScreen() {
     } catch (err) {
       console.warn("Failed to load groups/contacts in updates.tsx:", err);
     }
+    if (!isOnline()) return;
+    try {
+      const evRes = await getCalendarEvents({ type: 'holiday' });
+      const evList = evRes?.events || evRes?.data || (Array.isArray(evRes) ? evRes : []);
+      const holidays = (evList || []).filter((e: any) => e?.eventType === 'holiday');
+      setHolidayEvents(holidays);
+      await chatCache.setCachedJSON(UPDATES_CACHE.HOLIDAYS, holidays);
+    } catch (err) {
+      console.warn("Failed to fetch holidays in updates.tsx:", err);
+    }
+    try {
+      const memRes = await getOrgMembers();
+      if (memRes?.members) {
+        setOrgMembers(memRes.members);
+        await chatCache.setCachedOrgMembers(memRes.members);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch org members in updates.tsx:", err);
+    }
   };
 
   // Real org calendar events for the visible month + meetings — mirrors the web
   // Events & Meet queries (getCalendarEvents({start,end}) + fetchMeetings) so the
   // agenda and calendar dots reflect the same unified dataset across clients.
   const syncCalendar = React.useCallback(async () => {
+    if (!isOnline()) return;
     try {
       const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
       const evRes: any = await getCalendarEvents({ start: start.toISOString(), end: end.toISOString() });
       const evList = evRes?.events || evRes?.data || (Array.isArray(evRes) ? evRes : []);
-      setCalendarEvents(Array.isArray(evList) ? evList : []);
+      const cal = Array.isArray(evList) ? evList : [];
+      setCalendarEvents(cal);
+      await chatCache.setCachedJSON(UPDATES_CACHE.CALENDAR, cal);
     } catch (err) {
       console.warn('Failed to fetch calendar events in updates.tsx:', err);
     }
     try {
       const mRes: any = await fetchMeetings(1, 50);
-      setMeetings(Array.isArray(mRes?.meetings) ? mRes.meetings : (Array.isArray(mRes) ? mRes : []));
+      const list = Array.isArray(mRes?.meetings) ? mRes.meetings : (Array.isArray(mRes) ? mRes : []);
+      setMeetings(list);
+      await chatCache.setCachedJSON(UPDATES_CACHE.MEETINGS, list);
     } catch (err) {
       console.warn('Failed to fetch meetings in updates.tsx:', err);
     }
@@ -566,9 +639,19 @@ export default function UpdatesScreen() {
       await syncCalendar();
     };
 
+    // Real-time Updates: backend emits `updates_changed` when a task/meeting/event
+    // is created or updated — refetch so the Agenda + Action Items reflect it
+    // without a manual reload.
+    const onUpdatesChanged = async () => {
+      await syncTasks();
+      await syncCalendar();
+    };
+
     socket.on('meeting_ended', onMeetingEnded);
+    socket.on('updates_changed', onUpdatesChanged);
     return () => {
       socket.off('meeting_ended', onMeetingEnded);
+      socket.off('updates_changed', onUpdatesChanged);
     };
   }, []);
 
@@ -835,6 +918,7 @@ export default function UpdatesScreen() {
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+        <OfflineBanner />
         {/* Banner if priority meeting is live */}
         {activeNowMeeting && (
           <TouchableOpacity
@@ -927,7 +1011,17 @@ export default function UpdatesScreen() {
               const dayTasks = tasks.filter(t => new Date(t.start_time).toDateString() === cell.date.toDateString());
               const dayHolidays = holidayEvents.filter(h => itemDate(h).toDateString() === cell.date.toDateString());
               const dayCalEvents = calendarEvents.filter((e: any) => e?.eventType !== 'holiday' && new Date(e.startTime).toDateString() === cell.date.toDateString());
-              const dayItems = [...dayTasks, ...dayHolidays, ...dayCalEvents];
+              // Dedupe by stable identity so the SAME underlying event/holiday can't
+              // produce two dots (e.g. a holiday returned twice, or an event present
+              // in both the range query and the holiday query) — that was the "two
+              // red dots for one holiday" bug.
+              const seenDots = new Set<string>();
+              const dayItems = [...dayTasks, ...dayHolidays, ...dayCalEvents].filter((it: any) => {
+                const key = String(it._id || it.id || `${it.title || ''}|${it.start_time || it.startTime || it.date || ''}`);
+                if (seenDots.has(key)) return false;
+                seenDots.add(key);
+                return true;
+              });
               const hasMeeting = dayItems.length > 0;
 
               return (
@@ -1055,7 +1149,29 @@ export default function UpdatesScreen() {
                       </View>
                     )}
                   </View>
-                  <Text className="font-bold text-ink dark:text-[#f4f5fb] text-sm mb-2 font-sans">{task.title}</Text>
+                  <View className="flex-row items-start gap-2 mb-2">
+                    {!isOrg && (
+                      <TouchableOpacity
+                        onPress={() => handleToggleAgendaItem(task)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{
+                          width: 20, height: 20, borderRadius: 6, marginTop: 1,
+                          alignItems: 'center', justifyContent: 'center',
+                          borderWidth: task.status === 'done' ? 0 : 1.5,
+                          borderColor: '#c4c3d6',
+                          backgroundColor: task.status === 'done' ? '#22c55e' : 'transparent',
+                        }}
+                      >
+                        {task.status === 'done' && <Check size={13} color="#fff" />}
+                      </TouchableOpacity>
+                    )}
+                    <Text
+                      className="font-bold text-ink dark:text-[#f4f5fb] text-sm font-sans flex-1"
+                      style={task.status === 'done' ? { textDecorationLine: 'line-through', opacity: 0.55 } : undefined}
+                    >
+                      {task.title}
+                    </Text>
+                  </View>
                   {task.description ? (
                     <Text className="text-[12px] text-ink-soft dark:text-[#9a9bb6] mb-2 font-sans" numberOfLines={2}>{task.description}</Text>
                   ) : null}
@@ -1099,6 +1215,11 @@ export default function UpdatesScreen() {
               {selectedDayMeetings.map((m: any) => {
                 const isLive = m.status === 'live';
                 const aiCount = Array.isArray(m.actionItems) ? m.actionItems.length : 0;
+                const summaryText = m.summary || '';
+                // An ended meeting that captured no transcript: backend leaves a
+                // "No transcript was captured…" summary and zero action items. Don't
+                // present it as if it has agenda/action content.
+                const noContent = !isLive && aiCount === 0 && (!summaryText || /^no transcript/i.test(summaryText));
                 return (
                   <TouchableOpacity
                     key={String(m._id || m.id)}
@@ -1122,7 +1243,9 @@ export default function UpdatesScreen() {
                         </View>
                       )}
                     </View>
-                    {m.summary ? (
+                    {noContent ? (
+                      <Text className="text-[12px] text-ink-soft dark:text-[#9a9bb6] mt-1 italic font-sans">No content captured</Text>
+                    ) : m.summary ? (
                       <Text className="text-[12px] text-ink-soft dark:text-[#9a9bb6] mt-1 font-sans" numberOfLines={2}>{m.summary}</Text>
                     ) : null}
                     <View className="flex-row items-center gap-3 mt-2">
@@ -1134,10 +1257,12 @@ export default function UpdatesScreen() {
                           <Text className="text-[9px] font-bold text-purple font-sans">{aiCount} ACTION ITEMS</Text>
                         </View>
                       )}
-                      <View className="flex-row items-center gap-1">
-                        <FileText size={11} color="#6c5ce7" />
-                        <Text className="text-[10px] font-bold text-purple font-sans">View minutes</Text>
-                      </View>
+                      {!noContent && (
+                        <View className="flex-row items-center gap-1">
+                          <FileText size={11} color="#6c5ce7" />
+                          <Text className="text-[10px] font-bold text-purple font-sans">View minutes</Text>
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 );

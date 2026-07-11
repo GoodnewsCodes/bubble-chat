@@ -90,6 +90,7 @@ export const formatMessage = async (m: any) => ({
   mediaType: m.mediaType || null,
   fileSize: m.fileSize || null,
   media_metadata: m.media_metadata || null,
+  call_metadata: m.call_metadata || null,
   transcript: m.transcript || null,
   location: m.location || null,
 
@@ -156,11 +157,11 @@ export const emitToConversation = async (
     // fetchSockets can fail in some adapters; fall back to personal-room only.
   }
 
+  const fanoutUsers = users.filter((u) => !usersInRoom.has(String(u)));
+  console.log(`[msg-debug] emit '${event}' chat=${String(chatId)} roomUsers=${usersInRoom.size} fanout=${fanoutUsers.length}`);
   io.to(String(chatId)).emit(event, payload);
-  for (const u of users) {
-    if (!usersInRoom.has(String(u))) {
-      io.to(String(u)).emit(event, payload);
-    }
+  for (const u of fanoutUsers) {
+    io.to(String(u)).emit(event, payload);
   }
 };
 
@@ -306,7 +307,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
       parent_message,
       fileSize,
       media_metadata,
-      is_encrypted: is_encrypted || false,
+      is_encrypted: false, // E2EE removed — messages are always stored as plaintext
       location,
       mentions: mentions || [],
       readBy: [req.user._id],
@@ -339,6 +340,9 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
     // Echo the sender's optimistic clientId so the client can reconcile its
     // optimistic bubble with the server message by id, eliminating duplicates.
     if (clientId) formatted.clientId = clientId;
+    // Top-level string chatId alongside the `chat` object, so realtime listeners
+    // can match on a plain string without digging into the nested object.
+    formatted.chatId = String(chatId);
     try {
       const io = req.io || getIO();
       await emitToConversation(io, chatId, convo.users as any[], 'new_message', formatted);
@@ -395,9 +399,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
             : senderName;
 
           let pushBody = '';
-          if (newMessage.is_encrypted) {
-            pushBody = '🔐 Sent an encrypted message';
-          } else if (newMessage.message_type === 'text') {
+          if (newMessage.message_type === 'text') {
             pushBody = newMessage.content || 'Sent a message';
           } else if (newMessage.message_type === 'image') {
             pushBody = '🖼️ Sent an image';
@@ -514,9 +516,19 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    // Incremental sync: with a `since` cursor, return only messages created or
+    // updated after it (new messages, plus edits/reactions that bump updatedAt).
+    // The mobile client passes the timestamp of its newest cached message and
+    // merges the delta by id, so it doesn't refetch the whole thread each sync.
+    // Realtime edits/deletes still arrive over sockets; this is the catch-up net.
+    const sinceRaw = typeof req.query.since === 'string' ? req.query.since : undefined;
+    const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
+    const sinceValid = sinceDate && !isNaN(sinceDate.getTime());
+
     const messages = await Message.find({
       chat: req.params.chatId,
-      deletedFor: { $ne: req.user._id }
+      deletedFor: { $ne: req.user._id },
+      ...(sinceValid ? { $or: [{ createdAt: { $gt: sinceDate } }, { updatedAt: { $gt: sinceDate } }] } : {}),
     })
       .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
       .populate('chat')
@@ -700,6 +712,23 @@ export const deleteMessage = async (req: AuthRequest, res: Response): Promise<vo
         return;
       }
       await Message.findByIdAndDelete(messageId);
+
+      // If this was the conversation's latest message, re-point latestMessage to
+      // the newest surviving one. Leaving a dangling ref made populate() return
+      // null, which the chat-list 1:1 gate reads as "empty DM" — silently hiding
+      // the whole conversation from BOTH participants' lists.
+      try {
+        const convoDoc = await Conversation.findById(msg.chat).select('latestMessage');
+        if (convoDoc && String(convoDoc.latestMessage) === String(messageId)) {
+          const newest = await Message.findOne({ chat: msg.chat })
+            .sort({ createdAt: -1 })
+            .select('_id');
+          await Conversation.findByIdAndUpdate(msg.chat, { latestMessage: newest?._id || null });
+        }
+      } catch (repointErr) {
+        console.error('Failed to re-point latestMessage after delete:', repointErr);
+      }
+
       try {
         const io = req.io || getIO();
         const deletePayload = {

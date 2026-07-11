@@ -78,6 +78,13 @@ export const setCallState = (newState: CallState) => {
   if (newState.status !== 'calling_out' && newState.status !== 'calling_in') {
     stopRingtone();
   }
+  // Safety net: the 1s duration ticker belongs ONLY to an active (in_call) call.
+  // Stop it on ANY transition away from in_call — a peer app-kill, a LiveKit drop
+  // with no `call_ended`, or an early overlay dismiss would otherwise leave it
+  // ticking forever (battery/CPU) since only hangUpCall() cleared it before.
+  if (newState.status !== 'in_call') {
+    stopDurationTimer();
+  }
   // Keep the persisted "active call" in sync so a killed app can offer to rejoin.
   if (newState.status === 'in_call') {
     persistCall(newState.roomId, newState.type);
@@ -289,6 +296,11 @@ export const joinRoomByLink = async ({ roomId, type, joinToken }: { roomId: stri
   } catch (err) {
     console.warn('Failed to create meeting record for link join:', err);
   }
+
+  // Join the socket room so we (a) receive room broadcasts (call_ended, knocks)
+  // and (b) count as a live participant — the backend's active-rooms occupancy
+  // check hides rooms with zero connected sockets.
+  try { getSocket()?.emit('join_room', roomId); } catch { /* best-effort */ }
 
   setCallState({
     status: 'in_call',

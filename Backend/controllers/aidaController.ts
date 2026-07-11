@@ -13,21 +13,18 @@ import mongoose from 'mongoose';
 import { queryVectors, hasPinecone } from '../utils/pinecone';
 import { generateEmbedding } from '../utils/embeddings';
 import { Organization } from '../models/organizations';
-import { decryptForBrain } from '../utils/brainKeyService';
 
-// ─── E2EE-aware message text resolution ──────────────────────────────────────
-// Group messages: the Brain is a key recipient and may decrypt via its isolated
-// key service. DM messages: the Brain has NO key by design — encrypted DM
-// content is dropped (returned as null) so Aida never sees private 1:1 text.
+// ─── Message text resolution ─────────────────────────────────────────────────
+// E2EE removed: messages are plaintext. DM content, however, stays off-limits to
+// the Brain by design — Aida never ingests private 1:1 text (only group text).
 const resolveMessageText = async (
   m: any,
-  conversationId: string,
+  _conversationId: string,
   isGroupChat: boolean
 ): Promise<string | null> => {
   if (!m?.content) return m?.content ?? null;
-  if (!m.is_encrypted) return m.content;
-  if (!isGroupChat) return null; // private DM — cryptographically off-limits
-  return decryptForBrain(conversationId, m.content);
+  if (!isGroupChat) return null; // private DM — off-limits to the Brain
+  return m.content;
 };
 
 /** Map messages → "Sender: text" lines, silently skipping undecryptable ones. */
