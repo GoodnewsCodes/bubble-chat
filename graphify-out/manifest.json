@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/chat-window.tsx": {
-    "mtime": 1783537383.1179826,
-    "ast_hash": "742b2c05bf2d6a97b3f89e3b8310ef82",
+    "mtime": 1783832675.7036242,
+    "ast_hash": "eff24ed358093df950f21fc0c9537d8a",
     "semantic_hash": ""
   },
   "BUBBLESPACE/frontend/src/components/chat/create-group-modal.tsx": {
@@ -660,8 +660,8 @@
     "semantic_hash": ""
   },
   "Backend/controllers/meetingController.ts": {
-    "mtime": 1783827353.8807766,
-    "ast_hash": "3db0d043c70184f70a3c72a30fb445c5",
+    "mtime": 1783830784.6701152,
+    "ast_hash": "3645d7a2c46dfdfdb3c2d812a2d0ed2c",
     "semantic_hash": ""
   },
   "Backend/controllers/messageController.ts": {
@@ -1075,8 +1075,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/app.json": {
-    "mtime": 1783550139.8446636,
-    "ast_hash": "cef5ccf7c17d81425dd672842a808df5",
+    "mtime": 1783828414.9607856,
+    "ast_hash": "b504aa49f7c0594719c7a63adcbcd370",
     "semantic_hash": ""
   },
   "app/bubble-chat/assets/expo.icon/icon.json": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/package.json": {
-    "mtime": 1783608148.6640866,
-    "ast_hash": "146646305bf5d55bbc3e7b333f905031",
+    "mtime": 1783828709.14348,
+    "ast_hash": "128f5d4b6417b23805a0a6e90f926108",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/_layout.tsx": {
@@ -1670,8 +1670,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/api.ts": {
-    "mtime": 1783748873.275297,
-    "ast_hash": "a6b78e05d1f4a87c2b38e609d3b683ae",
+    "mtime": 1783831009.1224427,
+    "ast_hash": "f2443b5c6a96819b6b237a7b90e4649b",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/app/(main)/people.tsx": {
@@ -1730,8 +1730,8 @@
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/callManager.ts": {
-    "mtime": 1783682508.0121453,
-    "ast_hash": "aa9971a6f37133c905d35962cb49cdc4",
+    "mtime": 1783831030.2315605,
+    "ast_hash": "25797933b730cd49540a29eb19d87ab8",
     "semantic_hash": ""
   },
   "app/bubble-chat/src/lib/ringtone.ts": {

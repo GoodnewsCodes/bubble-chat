@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "bubble-chat",
+    "name": "Bubble Chat",
     "slug": "bubble-chat",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -105,7 +105,8 @@
             "com.google.android.googlequicksearchbox"
           ]
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
