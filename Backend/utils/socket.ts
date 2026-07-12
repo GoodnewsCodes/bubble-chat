@@ -592,6 +592,15 @@ export const initSocket = (server: HttpServer) => {
         { roomId: data.roomId, host: { $ne: userId } },
         { $addToSet: { attendees: userId } }
       ).catch(err => console.error('[Meeting] Failed to add attendee on call_answer:', err));
+
+      // Stamp the moment the callee picked up (first answer only) so the post-call
+      // log entry reads as an ANSWERED call and its duration counts talk time from
+      // the pickup — not the ring. Guarded on answeredAt absence so a re-answer /
+      // reconnect can't reset it.
+      Meeting.updateOne(
+        { roomId: data.roomId, status: 'live', answeredAt: { $exists: false } },
+        { $set: { answeredAt: new Date() } }
+      ).catch(err => console.error('[Meeting] Failed to stamp answeredAt on call_answer:', err));
     });
 
     socket.on('call_reject', async (data: { toUserId: string; roomId?: string }) => {
@@ -628,6 +637,19 @@ export const initSocket = (server: HttpServer) => {
       if (!isGroupOrInvite) {
         io.to(data.toUserId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
         io.to(userId).emit('call_ended', { byUserId: userId, roomId: data.roomId });
+
+        // A DECLINE (callee rejects the ring) marks the call declined so its log
+        // entry reads "Declined" instead of a bland "completed". We only mark it
+        // when the rejecter is NOT the meeting host and the call was never answered
+        // — a HOST emitting call_reject is a caller giving up on a no-answer, which
+        // must stay classified as "missed", not "declined". No-ops when the caller
+        // never created a meeting (no live record to mark).
+        if (data.roomId) {
+          Meeting.updateOne(
+            { roomId: data.roomId, status: 'live', host: { $ne: userId }, answeredAt: { $exists: false } },
+            { $set: { declinedAt: new Date() } }
+          ).catch(err => console.error('[Meeting] Failed to mark declinedAt on call_reject:', err));
+        }
       }
 
       logActivity({

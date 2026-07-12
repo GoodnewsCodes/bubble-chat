@@ -1033,6 +1033,62 @@ export const runBackgroundMeetingAI = async (
       }
     }
 
+    // ── Non-successful 1:1 call short-circuit ───────────────────────────────────
+    // A declined or never-answered voice/video call has nothing to transcribe or
+    // summarize. Post a clean "Declined"/"Missed" call-log entry into the chat and
+    // skip the entire AI pipeline (Whisper, intelligence, tasks, brain ingestion,
+    // "action items extracted" notifications) — that pipeline is what used to leave
+    // the "📝 Meeting minutes ready … 0 action items" clutter on empty calls.
+    const wasAnswered = !!meeting.answeredAt;
+    const wasDeclined = !!meeting.declinedAt;
+    const isOneToOneCall = meeting.type === 'voice' || meeting.type === 'video';
+    const nobodyElseJoined =
+      (meeting.attendees?.length || 0) === 0 ||
+      (meeting.attendees.length === 1 && String(meeting.attendees[0]) === String(meeting.host));
+    const noTranscript = (rawTranscript || '').trim().length < 40;
+    const unansweredCall = isOneToOneCall && !wasAnswered && nobodyElseJoined && noTranscript;
+
+    if (meeting.chatId && (wasDeclined || unansweredCall)) {
+      try {
+        const already = await Message.findOne({
+          chat: meeting.chatId,
+          message_type: 'call',
+          'call_metadata.meetingId': String(meeting._id),
+        }).select('_id').lean();
+
+        if (!already) {
+          const callType = meeting.type === 'video' ? 'video' : 'voice';
+          const status = wasDeclined ? 'declined' : 'missed';
+          const callMessage = await Message.create({
+            chat: meeting.chatId,
+            sender: meeting.host,
+            content: callType === 'video' ? 'Video call' : 'Voice call',
+            message_type: 'call',
+            call_metadata: {
+              callType,
+              duration: 0,
+              status,
+              hasMinutes: false,
+              meetingId: String(meeting._id),
+            },
+            is_announcement: true,
+          });
+
+          await Conversation.findByIdAndUpdate(meeting.chatId, {
+            latestMessage: callMessage._id,
+          });
+
+          try {
+            const { getIO } = await import('../utils/socket');
+            getIO().to(String(meeting.chatId)).emit('new_message', callMessage);
+          } catch (_) { /* silent */ }
+        }
+      } catch (chatErr) {
+        console.error('[Call Log] Failed to post missed/declined call entry:', chatErr);
+      }
+      return;
+    }
+
     // BACKSTOP: if live speech-recognition produced little/no transcript (e.g. the
     // call was on Safari/Firefox/mobile), transcribe the LiveKit Egress recording
     // via Whisper so every meeting still yields a transcript. No-ops until Egress
@@ -1282,6 +1338,13 @@ export const runBackgroundMeetingAI = async (
           const callType = meeting.type === 'video' ? 'video' : 'voice';
           const label = callType === 'video' ? 'Video call' : 'Voice call';
 
+          // Talk time counts from pickup (answeredAt) to end, not from the ring —
+          // falls back to the full meeting duration for group/scheduled meetings
+          // that have no explicit answer event.
+          const talkDuration = meeting.answeredAt && meeting.endedAt
+            ? Math.max(0, Math.round((new Date(meeting.endedAt).getTime() - new Date(meeting.answeredAt).getTime()) / 1000))
+            : (meeting.duration || 0);
+
           const callMessage = await Message.create({
             chat: meeting.chatId,
             sender: meeting.host,
@@ -1290,7 +1353,7 @@ export const runBackgroundMeetingAI = async (
             ...(hasContent ? { mediaUrl: transcriptUrl, mediaType: 'file' } : {}),
             call_metadata: {
               callType,
-              duration: meeting.duration || 0,
+              duration: talkDuration,
               status: 'completed',
               hasMinutes: hasContent,
               meetingId: String(meeting._id),

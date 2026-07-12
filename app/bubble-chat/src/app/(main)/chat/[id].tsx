@@ -2530,7 +2530,11 @@ export default function ChatScreen() {
                 const missed = !legacy && (cm.status === 'missed' || cm.status === 'declined');
                 const secs = Number(cm.duration || 0);
                 const durationText = missed
-                  ? (cm.status === 'declined' ? 'Declined' : 'Missed')
+                  ? (cm.status === 'declined'
+                      ? 'Declined'
+                      // A no-answer reads as "No answer" for the caller (me) and
+                      // "Missed" for the person who didn't pick up.
+                      : (isMe ? 'No answer' : 'Missed'))
                   : secs > 0
                     ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
                     : ''; // unknown/legacy → show just the time, no "—"

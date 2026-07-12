@@ -214,7 +214,13 @@ export const chatCache = {
 
         if (isCall) {
           const ct = c.latestMessage.call_metadata?.callType;
-          latestText = `📞 ${ct === 'video' ? 'Video' : 'Voice'} call`;
+          const st = c.latestMessage.call_metadata?.status;
+          const kind = ct === 'video' ? 'Video call' : 'Voice call';
+          latestText = st === 'missed'
+            ? `📞 Missed ${ct === 'video' ? 'video' : 'voice'} call`
+            : st === 'declined'
+              ? `📞 Declined ${ct === 'video' ? 'video' : 'voice'} call`
+              : `📞 ${kind}`;
           latestMessageTime = c.latestMessage.sentAt || c.latestMessage.createdAt;
         } else if (!isSystem && !isBotMsg) {
           if (c.latestMessage.message_type === 'text') {

@@ -59,6 +59,14 @@ export interface IMeeting extends Document {
   endedAt?: Date;
   duration?: number;
 
+  // Call-outcome markers (1:1 voice/video calls). answeredAt is stamped when the
+  // callee picks up (socket call_answer); declinedAt when the callee rejects the
+  // ring (socket call_reject). Together with the transcript they classify the
+  // post-call log entry as completed / missed / declined instead of the old
+  // "completed, 0 action items" clutter. Unset for scheduled/group meetings.
+  answeredAt?: Date;
+  declinedAt?: Date;
+
   // Transcript & Intelligence
   transcriptRaw?: string;
   transcriptChunks?: { speaker?: string; speakerId?: string; text: string; timestamp?: number }[];
@@ -147,6 +155,8 @@ const MeetingSchema = new Schema<IMeeting>(
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date },
     duration: { type: Number },
+    answeredAt: { type: Date },
+    declinedAt: { type: Date },
 
     transcriptRaw: { type: String },
     transcriptChunks: [
