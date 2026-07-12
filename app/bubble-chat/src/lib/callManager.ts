@@ -26,7 +26,7 @@ const persistCall = (roomId: string, type: 'voice' | 'video') => {
 
 export type CallState =
   | { status: 'idle' }
-  | { status: 'calling_out'; user: any; type: 'voice' | 'video'; roomId: string; busy?: boolean }
+  | { status: 'calling_out'; user: any; type: 'voice' | 'video'; roomId: string; busy?: boolean; meetingDbId?: string | null }
   | { status: 'calling_in'; callerId: string; callerName: string; callerAvatar?: string; type: 'voice' | 'video'; roomId: string }
   | { status: 'in_call'; user: any; type: 'voice' | 'video'; roomId: string; duration: number; meetingDbId: string | null; hostId?: string | null; isHost?: boolean };
 
@@ -141,11 +141,34 @@ export const startOutgoingCall = async (user: any, type: 'voice' | 'video') => {
     console.warn("Socket not initialized. Attempting call on disconnected socket.");
   }
 
+  // Create the Meeting record NOW, at dial time — not on accept. Without this, a
+  // call the callee never answers (declines, or the 30s ring times out) had no DB
+  // record at all, so it couldn't be logged as a "Missed"/"Declined" call entry.
+  // startEgress:false defers the LiveKit recording until someone actually joins
+  // (see call_accepted below / acceptIncomingCall) — no point recording a ringing,
+  // unanswered room. attendees stays empty: the callee only counts as an attendee
+  // once they actually answer (joinExisting on their own createMeeting call).
+  try {
+    const res = await createMeeting({
+      roomId,
+      title: `${type === 'video' ? 'Video' : 'Voice'} Call`,
+      type,
+      chatId: user.chatId,
+      startEgress: false,
+    });
+    const dbId = res?.meeting?._id || res?._id || null;
+    if (dbId && currentCallState.status === 'calling_out' && currentCallState.roomId === roomId) {
+      setCallState({ ...currentCallState, meetingDbId: dbId });
+    }
+  } catch (err) {
+    console.warn('Failed to create meeting record at dial time:', err);
+  }
+
   // Timeout if no answer after 30 seconds
   if (callTimeout) clearTimeout(callTimeout);
   callTimeout = setTimeout(() => {
     if (socket) {
-      socket.emit('call_reject', { toUserId: user.id || user._id || user.otherUserId });
+      socket.emit('call_reject', { toUserId: user.id || user._id || user.otherUserId, roomId });
     }
     hangUpCall();
   }, 30000);
@@ -205,7 +228,10 @@ export const declineIncomingCall = () => {
   if (callTimeout) clearTimeout(callTimeout);
   stopRingtone();
 
-  socket.emit('call_reject', { toUserId: state.callerId });
+  // roomId is required server-side to mark the Meeting record `declinedAt` (a
+  // roomless reject can't be tied to any call) — this was previously missing here,
+  // silently dropping every real "decline" tap out of the missed/declined tracking.
+  socket.emit('call_reject', { toUserId: state.callerId, roomId: state.roomId });
   setCallState({ status: 'idle' });
 };
 

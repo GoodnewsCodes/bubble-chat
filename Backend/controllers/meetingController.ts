@@ -165,6 +165,27 @@ Return ONLY this JSON (no other text):
 
 // ─── POST /api/v1/meetings ── Create a meeting record ────────────────────────
 
+// Best-effort: start LiveKit audio egress for a meeting that doesn't have one yet.
+// Shared by the fresh-create path and both "joined an existing live meeting" paths —
+// a 1:1 caller now creates the Meeting record at DIAL time (passing startEgress:
+// false) so a missed/declined call has a record to mark, without paying for a
+// recording of a room nobody ever joined. Egress only starts once someone actually
+// joins (the callee's create-or-join call, or the caller's post-accept call).
+const startEgressIfNeeded = async (meeting: any) => {
+  if (meeting.egressId) return;
+  try {
+    const { startRoomAudioEgress } = await import('../utils/livekitEgress');
+    const egress = await startRoomAudioEgress(meeting.roomId);
+    if (egress) {
+      meeting.recordingKey = egress.recordingKey;
+      meeting.egressId = egress.egressId;
+      await meeting.save();
+    }
+  } catch (egressErr) {
+    console.error('[Meeting] Failed to start audio egress:', egressErr);
+  }
+};
+
 export const createMeeting = async (
   req: Request,
   res: Response
@@ -173,7 +194,8 @@ export const createMeeting = async (
     const userId = (req as any).user?._id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { roomId, title, type, attendees, attendeeNames, chatId, agenda } = req.body;
+    const { roomId, title, type, attendees, attendeeNames, chatId, agenda, startEgress } = req.body;
+    const wantsEgress = startEgress !== false;
 
     // Every participant's client calls this when joining a call (caller AND callee),
     // near-simultaneously. Without atomicity each created their own Meeting for the
@@ -199,7 +221,10 @@ export const createMeeting = async (
         return existing;
       };
       const joined = await joinExisting();
-      if (joined) return res.status(200).json({ message: 'Joined existing meeting', meeting: joined });
+      if (joined) {
+        if (wantsEgress) await startEgressIfNeeded(joined);
+        return res.status(200).json({ message: 'Joined existing meeting', meeting: joined });
+      }
     }
 
     let meeting;
@@ -226,6 +251,7 @@ export const createMeeting = async (
             winner.attendees.push(userId);
             await winner.save();
           }
+          if (wantsEgress) await startEgressIfNeeded(winner);
           return res.status(200).json({ message: 'Joined existing meeting', meeting: winner });
         }
       }
@@ -235,20 +261,7 @@ export const createMeeting = async (
     // TEMP diagnostic (remove after verifying active-rooms): confirm a live record is born.
     console.log(`[CreateMeeting] created roomId=${meeting.roomId} status=${meeting.status} host=${userId}`);
 
-    // Start the audio recording immediately so transcription always works, even
-    // on clients without live captions (Safari/Firefox/mobile). Best-effort: no-ops
-    // unless LIVEKIT_EGRESS_ENABLED + the egress worker are provisioned.
-    try {
-      const { startRoomAudioEgress } = await import('../utils/livekitEgress');
-      const egress = await startRoomAudioEgress(meeting.roomId);
-      if (egress) {
-        meeting.recordingKey = egress.recordingKey;
-        meeting.egressId = egress.egressId;
-        await meeting.save();
-      }
-    } catch (egressErr) {
-      console.error('[Meeting] Failed to start audio egress:', egressErr);
-    }
+    if (wantsEgress) await startEgressIfNeeded(meeting);
 
     if (attendees && attendees.length > 0) {
       const hostUser = await User.findById(userId).select('full_name username');

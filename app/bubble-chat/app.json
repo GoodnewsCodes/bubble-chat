@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.bubblechat.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Bubble Chat uses the microphone for voice and video calls.",
+        "NSMicrophoneUsageDescription": "Bubble needs your microphone to transcribe what you say during calls.",
         "NSCameraUsageDescription": "Bubble Chat uses the camera for video calls and profile photos.",
         "NSPhotoLibraryUsageDescription": "Bubble Chat needs photo access so you can send images in chat.",
         "NSPhotoLibraryAddUsageDescription": "Bubble Chat needs permission to save photos and media you share.",
@@ -20,8 +20,10 @@
           "audio",
           "voip"
         ],
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "Bubble uses speech recognition to create live call transcripts."
+      },
+      "bitcode": false
     },
     "android": {
       "package": "com.bubblechat.app",
@@ -44,7 +46,17 @@
         "INTERNET",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
       ]
     },
     "web": {
@@ -89,13 +101,21 @@
         {
           "microphonePermission": "Bubble needs your microphone to transcribe what you say during calls.",
           "speechRecognitionPermission": "Bubble uses speech recognition to create live call transcripts.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c8ec35af-b606-4af3-ae4f-2c1c0a6467b2"
+      }
     }
   }
 }

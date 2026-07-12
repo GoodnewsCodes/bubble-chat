@@ -1532,6 +1532,9 @@ export const createMeeting = async (data: {
     attendees?: string[];
     attendeeNames?: string[];
     chatId?: string;
+    // false defers LiveKit egress until someone actually joins (dial-time create
+    // for a 1:1 call that may go unanswered) — omit/true starts it immediately.
+    startEgress?: boolean;
 }) => {
     const res = await fetch(`${BASE_URL}/meetings`, {
         method: 'POST',

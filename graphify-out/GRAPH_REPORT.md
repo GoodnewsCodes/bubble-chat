@@ -1,7 +1,7 @@
-# Graph Report - bubble-chat  (2026-07-11)
+# Graph Report - bubble-chat  (2026-07-12)
 
 ## Corpus Check
-- 383 files · ~2,071,832 words
+- 383 files · ~2,072,455 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e9fa0352`
+- Built from commit: `4e15ba4b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -915,7 +915,7 @@ Cohesion: 0.67
 Nodes (3): Comprehensive/Technical Diagrams, Depth Assessment (Do This First), Simple/Conceptual Diagrams
 
 ## Knowledge Gaps
-- **1029 isolated node(s):** `deepseekClient`, `AuthRequest`, `AuthRequest`, `deepseekClient`, `AuthRequest` (+1024 more)
+- **1029 isolated node(s):** `deepseekClient`, `IActionItem`, `ISharedFile`, `IScreenShare`, `ActionItemSchema` (+1024 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -923,14 +923,14 @@ Nodes (3): Comprehensive/Technical Diagrams, Depth Assessment (Do This First), S
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `React` connect `Community 88` to `Community 0`, `Community 2`, `Community 3`, `Community 132`, `Community 130`, `Community 6`, `Community 5`, `Community 131`, `Community 9`, `Community 140`, `Community 141`, `Community 142`, `Community 21`, `Community 29`, `Community 159`, `Community 33`, `Community 34`, `Community 165`, `Community 38`, `Community 37`, `Community 39`, `Community 42`, `Community 171`, `Community 45`, `Community 47`, `Community 50`, `Community 52`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 186`, `Community 59`, `Community 189`, `Community 62`, `Community 191`, `Community 64`, `Community 65`, `Community 192`, `Community 63`, `Community 197`, `Community 70`, `Community 73`, `Community 203`, `Community 76`, `Community 205`, `Community 81`, `Community 211`, `Community 213`, `Community 87`, `Community 218`, `Community 91`, `Community 220`, `Community 93`, `Community 221`, `Community 94`, `Community 222`, `Community 224`, `Community 96`, `Community 227`, `Community 228`, `Community 100`, `Community 230`, `Community 231`, `Community 232`, `Community 233`, `Community 99`, `Community 110`, `Community 114`, `Community 118`?**
-  _High betweenness centrality (0.358) - this node is a cross-community bridge._
+  _High betweenness centrality (0.337) - this node is a cross-community bridge._
 - **Why does `initSocket()` connect `Community 92` to `Community 90`, `Community 15`?**
-  _High betweenness centrality (0.153) - this node is a cross-community bridge._
+  _High betweenness centrality (0.151) - this node is a cross-community bridge._
 - **Why does `createMeeting()` connect `Community 58` to `Community 69`, `Community 122`, `Community 16`, `Community 19`, `Community 90`, `Community 31`?**
-  _High betweenness centrality (0.135) - this node is a cross-community bridge._
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
 - **Are the 247 inferred relationships involving `cn()` (e.g. with `ChatAvatar()` and `ChatList()`) actually correct?**
   _`cn()` has 247 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `deepseekClient`, `AuthRequest`, `AuthRequest` to the rest of the system?**
+- **What connects `deepseekClient`, `IActionItem`, `ISharedFile` to the rest of the system?**
   _1033 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.0896551724137931 - nodes in this community are weakly interconnected._
