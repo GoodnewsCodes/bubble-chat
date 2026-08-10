@@ -26,13 +26,13 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 
 async function run() {
   try {
-    console.log('🔌 Connecting to MongoDB…');
+    // console.log('🔌 Connecting to MongoDB…');
     await mongoose.connect(MONGODB_URI);
-    console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN)' : ''}\n`);
+    // console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN)' : ''}\n`);
 
     const cutoff = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000);
     const stale = await Meeting.find({ status: 'live', startedAt: { $lt: cutoff } }).select('_id roomId startedAt').lean();
-    console.log(`🔎 ${stale.length} meeting(s) still 'live' but started before ${cutoff.toISOString()}.`);
+    // console.log(`🔎 ${stale.length} meeting(s) still 'live' but started before ${cutoff.toISOString()}.`);
 
     if (stale.length && !DRY_RUN) {
       const ids = stale.map((m: any) => m._id);
@@ -40,13 +40,13 @@ async function run() {
         { _id: { $in: ids } },
         { $set: { status: 'ended', endedAt: new Date() } }
       );
-      console.log(`🧹 Marked ${res.modifiedCount} meeting(s) as ended.`);
+      // console.log(`🧹 Marked ${res.modifiedCount} meeting(s) as ended.`);
     } else if (DRY_RUN) {
-      console.log('   (DRY RUN — nothing changed.)');
+      // console.log('   (DRY RUN — nothing changed.)');
     }
 
     await mongoose.disconnect();
-    console.log('🔌 Disconnected.');
+    // console.log('🔌 Disconnected.');
   } catch (err) {
     console.error('❌ Error:', err);
     process.exit(1);

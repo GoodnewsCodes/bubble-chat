@@ -26,9 +26,9 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 
 async function run() {
   try {
-    console.log('🔌 Connecting to MongoDB…');
+    // console.log('🔌 Connecting to MongoDB…');
     await mongoose.connect(MONGODB_URI);
-    console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN)' : ''}\n`);
+    // console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN)' : ''}\n`);
 
     const live = await Meeting.find({ status: 'live' }).select('_id roomId startedAt').sort({ startedAt: 1 }).lean();
     const byRoom = new Map<string, any[]>();
@@ -46,13 +46,13 @@ async function run() {
       }
     }
 
-    console.log(`🔎 ${byRoom.size} distinct live room(s); ${losers.length} duplicate live record(s) to collapse.`);
+    // console.log(`🔎 ${byRoom.size} distinct live room(s); ${losers.length} duplicate live record(s) to collapse.`);
     if (losers.length && !DRY_RUN) {
       const res = await Meeting.updateMany(
         { _id: { $in: losers } },
         { $set: { status: 'ended', endedAt: new Date() } }
       );
-      console.log(`🧹 Collapsed ${res.modifiedCount} duplicate meeting(s).`);
+      // console.log(`🧹 Collapsed ${res.modifiedCount} duplicate meeting(s).`);
     }
 
     // Build the partial-unique index now that duplicates are gone (safe to re-run).
@@ -62,14 +62,14 @@ async function run() {
           { roomId: 1 },
           { unique: true, partialFilterExpression: { status: 'live' }, name: 'roomId_live_unique' }
         );
-        console.log('🔐 Ensured partial-unique index on roomId (status: live).');
+        // console.log('🔐 Ensured partial-unique index on roomId (status: live).');
       } catch (idxErr: any) {
         console.error('⚠️  Could not build unique index (resolve remaining dups first):', idxErr?.message || idxErr);
       }
     }
 
     await mongoose.disconnect();
-    console.log('🔌 Disconnected.');
+    // console.log('🔌 Disconnected.');
   } catch (err) {
     console.error('❌ Error:', err);
     process.exit(1);

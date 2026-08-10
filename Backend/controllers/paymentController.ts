@@ -75,12 +75,12 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       },
       user: resolvedUser
         ? {
-            id: resolvedUser._id,
-            full_name: resolvedUser.full_name || null,
-            email: resolvedUser.email || null,
-            uniqueTag: resolvedUser.uniqueTag || null,
-            current_premium_status: resolvedUser.isPremium,
-          }
+          id: resolvedUser._id,
+          full_name: resolvedUser.full_name || null,
+          email: resolvedUser.email || null,
+          uniqueTag: resolvedUser.uniqueTag || null,
+          current_premium_status: resolvedUser.isPremium,
+        }
         : { mode: 'anonymous' },
     });
   } catch (error: any) {
@@ -112,12 +112,12 @@ export const stripeWebhook = async (req: Request, res: Response) => {
     const planType = session.metadata?.planType;
     const amount = (session.amount_total || 0) / 100;
 
-    console.log(`✅ Payment confirmed: $${amount} — plan: ${planType} — user: ${userId}`);
+    // console.log(`✅ Payment confirmed: $${amount} — plan: ${planType} — user: ${userId}`);
 
     if (userId && userId !== 'anonymous') {
       try {
         await User.findByIdAndUpdate(userId, { isPremium: true });
-        console.log(`🔐 Premium upgraded for user: ${userId}`);
+        // console.log(`🔐 Premium upgraded for user: ${userId}`);
       } catch (err) {
         console.error('Premium upgrade failed after payment:', err);
       }
@@ -207,7 +207,7 @@ export const createGoal = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-    
+
     const { title, targetAmount, currency, type, members } = req.body;
 
     const goal = await Goal.create({
@@ -243,7 +243,7 @@ export const contributeToGoal = async (req: Request, res: Response): Promise<any
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const { goalId, amount } = req.body;
-    
+
     const goal = await Goal.findById(goalId);
     if (!goal) return res.status(404).json({ message: "Goal not found" });
 

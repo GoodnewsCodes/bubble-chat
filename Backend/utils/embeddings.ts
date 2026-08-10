@@ -20,9 +20,9 @@ const getExtractor = async (): Promise<any> => {
             const TJS: any = await import('@xenova/transformers');
             // Don't look for local model files; pull the ONNX weights from the hub.
             if (TJS?.env) TJS.env.allowLocalModels = false;
-            console.log('[Embeddings] Loading local model', EMBEDDING_MODEL, '(first run downloads ~30MB)…');
+            // console.log('[Embeddings] Loading local model', EMBEDDING_MODEL, '(first run downloads ~30MB)…');
             const pipe = await TJS.pipeline('feature-extraction', EMBEDDING_MODEL);
-            console.log('[Embeddings] Local embedding model ready.');
+            // console.log('[Embeddings] Local embedding model ready.');
             return pipe;
         })().catch((err) => {
             // Reset so a later call can retry instead of being stuck on a bad promise.

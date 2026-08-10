@@ -49,7 +49,7 @@ export const sendPushNotification = async (
     // Retrieve active push tokens for target users
     const pushTokens = await PushToken.find({ userId: { $in: strUserIds } });
     if (pushTokens.length === 0) {
-      console.log(`[Push] No push tokens registered for user(s): ${strUserIds.join(', ')}`);
+      // console.log(`[Push] No push tokens registered for user(s): ${strUserIds.join(', ')}`);
       return;
     }
 
@@ -66,7 +66,7 @@ export const sendPushNotification = async (
       };
     });
 
-    console.log(`[Push] Dispatching ${messages.length} push notification(s) to Expo...`);
+    // console.log(`[Push] Dispatching ${messages.length} push notification(s) to Expo...`);
 
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
@@ -85,7 +85,7 @@ export const sendPushNotification = async (
     }
 
     const result = await response.json();
-    console.log('[Push] Notification dispatch response:', JSON.stringify(result));
+    // console.log('[Push] Notification dispatch response:', JSON.stringify(result));
   } catch (error) {
     console.error('[Push] Failed to send push notification:', error);
   }

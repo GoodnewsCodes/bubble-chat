@@ -158,7 +158,7 @@ export const emitToConversation = async (
   }
 
   const fanoutUsers = users.filter((u) => !usersInRoom.has(String(u)));
-  console.log(`[msg-debug] emit '${event}' chat=${String(chatId)} roomUsers=${usersInRoom.size} fanout=${fanoutUsers.length}`);
+  // console.log(`[msg-debug] emit '${event}' chat=${String(chatId)} roomUsers=${usersInRoom.size} fanout=${fanoutUsers.length}`);
   io.to(String(chatId)).emit(event, payload);
   for (const u of fanoutUsers) {
     io.to(String(u)).emit(event, payload);
@@ -323,7 +323,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
       });
 
     const isSystem = newMessage.message_type === 'system' || newMessage.is_announcement === true;
-    
+
     if (!isSystem) {
       await Conversation.findByIdAndUpdate(chatId, {
         latestMessage: newMessage._id,
@@ -393,8 +393,8 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
           const senderName = fullMessage.sender && ((fullMessage.sender as any).full_name || (fullMessage.sender as any).username)
             ? ((fullMessage.sender as any).full_name || (fullMessage.sender as any).username)
             : 'Someone';
-          
-          const title = convo.isGroupChat 
+
+          const title = convo.isGroupChat
             ? `${senderName} inside ${convo.chatName || 'Group Chat'}`
             : senderName;
 

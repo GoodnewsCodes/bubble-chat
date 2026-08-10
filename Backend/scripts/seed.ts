@@ -18,10 +18,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble
 const seed = async () => {
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log('MongoDB Connected. Initiating Global Seed Protocol...');
+    // console.log('MongoDB Connected. Initiating Global Seed Protocol...');
 
     // 1. Wipe database
-    console.log('Wiping existing data...');
+    // console.log('Wiping existing data...');
     await User.deleteMany({});
     await Network.deleteMany({});
     await NetworkPost.deleteMany({});
@@ -31,7 +31,7 @@ const seed = async () => {
     await Post.deleteMany({});
 
     // 2. Create Users
-    console.log('Creating users...');
+    // console.log('Creating users...');
     const hashedPassword = await bcrypt.hash('password123', 12);
 
     const alpha = await User.create({
@@ -72,10 +72,10 @@ const seed = async () => {
     await alpha.save();
     await beta.save();
 
-    console.log('Users and social graph established.');
+    // console.log('Users and social graph established.');
 
     // 4. Create Community Networks
-    console.log('Establishing community networks...');
+    // console.log('Establishing community networks...');
     const designNet = await Network.create({
       title: "Design Explorers",
       description: "A hub for designers pushing visual bounds.",
@@ -111,10 +111,10 @@ const seed = async () => {
       content: "Has anyone tried integrating Gemma models with Node.js recently?",
     });
 
-    console.log('Community updates transmitted.');
+    // console.log('Community updates transmitted.');
 
     // 6. Create OPay Goals & Transactions
-    console.log('Setting up Finance & OPay Goals...');
+    // console.log('Setting up Finance & OPay Goals...');
     const savingGoal = await Goal.create({
       user_id: alpha._id,
       title: "New MacBook Pro Fund",
@@ -195,7 +195,7 @@ const seed = async () => {
       likes: [alpha._id, beta._id],
     });
 
-    console.log('--- GLOBAL SEED PROTOCOL COMPLETE ---');
+    // console.log('--- GLOBAL SEED PROTOCOL COMPLETE ---');
 
   } catch (error) {
     console.error('Seed Error:', error);

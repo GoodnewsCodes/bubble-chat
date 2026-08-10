@@ -366,7 +366,7 @@ export const ingest = async (req: Request, res: Response): Promise<any> => {
         job.status = 'completed';
         job.resultDocumentId = doc._id;
         await job.save();
-        console.log(`[Brain Ingest] Successfully processed Job ${job._id} for Org ${org.name}`);
+        // console.log(`[Brain Ingest] Successfully processed Job ${job._id} for Org ${org.name}`);
       } catch (jobErr: any) {
         console.error(`[Brain Ingest Background] Job ${job._id} failed:`, jobErr);
         job.status = 'failed';

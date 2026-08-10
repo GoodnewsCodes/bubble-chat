@@ -1,6 +1,7 @@
-import dotenv from 'dotenv';
-// Load environment variables immediately before any other module imports
-dotenv.config();
+import { loadEnvironment, watchEnvironmentChanges } from './utils/envLoader';
+// Load environment variables (.env.local overrides .env) immediately before module imports
+loadEnvironment();
+watchEnvironmentChanges();
 
 import { assertCriticalEnv } from './utils/envCheck';
 assertCriticalEnv();
@@ -79,7 +80,7 @@ if (process.env.FRONTEND_URL) {
   }
 }
 
-console.log('✅ CORS allowed origins:', allowedOrigins);
+// console.log('✅ CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -138,6 +139,26 @@ app.use(helmet({
 // body; the default 100kb limit rejected it, leaving req.body undefined and
 // crashing the backup controller.
 app.use(express.json({ limit: '25mb' }));
+
+// Parse incoming HTTP cookies for HttpOnly auth tokens
+app.use((req: any, res: any, next: any) => {
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const cookies: Record<string, string> = {};
+    cookieHeader.split(';').forEach((cookie: string) => {
+      const parts = cookie.split('=');
+      if (parts.length >= 2) {
+        const name = parts[0].trim();
+        const value = parts.slice(1).join('=').trim();
+        cookies[name] = decodeURIComponent(value);
+      }
+    });
+    req.cookies = cookies;
+  } else {
+    req.cookies = {};
+  }
+  next();
+});
 
 // JSON Parsing Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
@@ -399,7 +420,7 @@ const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-ch
 
 mongoose.connect(mongoURI, { family: 4 })
   .then(async () => {
-    console.log('✅ MongoDB connected successfully.');
+    // console.log('✅ MongoDB connected successfully.');
 
     // One-time self-heal: an earlier schema named the digest date field
     // `generatedDate`; it's now `date`. The old unique index
@@ -412,7 +433,7 @@ mongoose.connect(mongoURI, { family: 4 })
       for (const stale of ['userId_1_generatedDate_-1', 'generatedDate_1']) {
         if (existing.some((i: any) => i.name === stale)) {
           await digestCol.dropIndex(stale).catch(() => undefined);
-          console.log(`🧹 Dropped stale dailydigests index: ${stale}`);
+          // console.log(`🧹 Dropped stale dailydigests index: ${stale}`);
         }
       }
     } catch (err: any) {
@@ -440,8 +461,8 @@ mongoose.connect(mongoURI, { family: 4 })
     // reach the container. Without this, Node may only bind to localhost
     // inside the container, making it unreachable from outside → 502.
     server.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📄 Swagger docs available at /api-docs`);
+      // console.log(`🚀 Server is running on port ${PORT}`);
+      // console.log(`📄 Swagger docs available at /api-docs`);
 
       // Start Message Queue Worker
       processQueue(async (payload) => {

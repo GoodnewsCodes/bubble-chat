@@ -97,7 +97,7 @@ brainEventBus.on('group_message_sent', async (payload: { messageId: string; chat
       'chat'
     );
 
-    console.log(`[Brain Event] Ingested group message ${messageId} for org ${org.name}`);
+    // console.log(`[Brain Event] Ingested group message ${messageId} for org ${org.name}`);
   } catch (err) {
     console.error('[Brain Event] group_message_sent ingestion failed:', err);
   }
@@ -140,7 +140,7 @@ brainEventBus.on('meeting_ended', async (payload: {
       'meeting'
     );
 
-    console.log(`[Brain Event] Re-indexed meeting ${meetingId} into org ${org.name} brain`);
+    // console.log(`[Brain Event] Re-indexed meeting ${meetingId} into org ${org.name} brain`);
   } catch (err) {
     console.error('[Brain Event] meeting_ended ingestion failed:', err);
   }
@@ -188,7 +188,7 @@ brainEventBus.on('calendar_event_created', async (payload: {
       'calendar'
     );
 
-    console.log(`[Brain Event] Ingested calendar event "${title}" for org ${org.name}`);
+    // console.log(`[Brain Event] Ingested calendar event "${title}" for org ${org.name}`);
   } catch (err) {
     console.error('[Brain Event] calendar_event_created ingestion failed:', err);
   }
@@ -227,7 +227,7 @@ brainEventBus.on('document_uploaded', async (payload: {
       department
     );
 
-    console.log(`[Brain Event] Ingested uploaded document "${title}" for org ${org.name}`);
+    // console.log(`[Brain Event] Ingested uploaded document "${title}" for org ${org.name}`);
 
     if (uploadedBy) {
       logActivity({
@@ -285,7 +285,7 @@ brainEventBus.on('chat_file_shared', async (payload: {
     if (!isAudioVideo && !isTextLike && !isDoc) {
       // Images and other binaries — no text extractor. Skip rather than poison
       // the brain with binary garbage.
-      console.log(`[Brain Event] chat_file_shared skipped (unsupported mime: ${mimeType || 'unknown'})`);
+      // console.log(`[Brain Event] chat_file_shared skipped (unsupported mime: ${mimeType || 'unknown'})`);
       return;
     }
 
@@ -333,7 +333,7 @@ brainEventBus.on('chat_file_shared', async (payload: {
       isAudioVideo ? 'chat' : 'chat_file'
     );
 
-    console.log(`[Brain Event] Ingested chat file (${isAudioVideo ? 'transcript' : isDoc ? 'document' : 'text'}) for org ${org.name}`);
+    // console.log(`[Brain Event] Ingested chat file (${isAudioVideo ? 'transcript' : isDoc ? 'document' : 'text'}) for org ${org.name}`);
   } catch (err) {
     console.error('[Brain Event] chat_file_shared ingestion failed:', err);
   }
@@ -380,7 +380,7 @@ brainEventBus.on('qa_resolved', async (payload: { questionMessageId: string; rep
     // Reward the expert for closing the loop.
     await updateExpertiseRadar(answererId, org._id.toString(), ['qa', 'resolved'], 10);
 
-    console.log(`[Brain Event] Closed-loop Q&A ingested for org ${org.name}`);
+    // console.log(`[Brain Event] Closed-loop Q&A ingested for org ${org.name}`);
   } catch (err) {
     console.error('[Brain Event] qa_resolved ingestion failed:', err);
   }
@@ -399,5 +399,5 @@ brainEventBus.on('qa_resolved', async (payload: { questionMessageId: string; rep
  *  - qa_resolved             : closed-loop capture of expert replies routed via the brain
  */
 export const initBrainEventListener = () => {
-  console.log('🧠 [Brain Event Listener] Initialized — group_message_sent, chat_file_shared, meeting_ended, calendar_event_created, document_uploaded, qa_resolved. DMs excluded by design (private 1:1s are never ingested).');
+  // console.log('🧠 [Brain Event Listener] Initialized — group_message_sent, chat_file_shared, meeting_ended, calendar_event_created, document_uploaded, qa_resolved. DMs excluded by design (private 1:1s are never ingested).');
 };

@@ -45,7 +45,7 @@ export const assertCriticalEnv = (): void => {
   const missingFeature = FEATURE.filter(s => isMissing(s.name));
 
   if (missingCritical.length === 0 && missingFeature.length === 0) {
-    console.log('[envCheck] All critical + feature env vars present ✓');
+    // console.log('[envCheck] All critical + feature env vars present ✓');
     return;
   }
 

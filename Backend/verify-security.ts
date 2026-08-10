@@ -10,9 +10,9 @@ async function verify() {
     await mongoose.connect(MONGO_URI);
     const code = await SecurityCode.findOne({ isCurrent: true });
     if (code) {
-      console.log('✅ ACTIVE SECURITY CODE FOUND:', code.code);
+      // console.log('✅ ACTIVE SECURITY CODE FOUND:', code.code);
     } else {
-      console.log('❌ NO ACTIVE SECURITY CODE FOUND');
+      // console.log('❌ NO ACTIVE SECURITY CODE FOUND');
     }
     await mongoose.disconnect();
   } catch (err) {

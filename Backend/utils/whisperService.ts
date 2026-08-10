@@ -43,7 +43,7 @@ const CHUNK_DURATION_SECONDS = 600;           // Split long recordings into 10-m
 /** Transcode any audio/video file to mono 16 kHz MP3 for Whisper compatibility. */
 const transcodeToMp3 = (inputPath: string, outputPath: string): Promise<void> =>
   new Promise<void>((resolve, reject) => {
-    console.log(`[Whisper] Transcoding → ${path.basename(outputPath)}`);
+    // console.log(`[Whisper] Transcoding → ${path.basename(outputPath)}`);
     ffmpeg(inputPath)
       .audioChannels(1)
       .audioFrequency(16000)
@@ -132,7 +132,7 @@ export const transcribeAudio = async (filePath: string): Promise<string> => {
     }
 
     // Step 3: Large file — chunk into 10-min segments
-    console.log(`[Whisper] File ${(fileSize / 1024 / 1024).toFixed(1)} MB exceeds limit — chunking.`);
+    // console.log(`[Whisper] File ${(fileSize / 1024 / 1024).toFixed(1)} MB exceeds limit — chunking.`);
     const duration = await getAudioDuration(workingPath);
     const parts: string[] = [];
     let offset = 0;
@@ -150,7 +150,7 @@ export const transcribeAudio = async (filePath: string): Promise<string> => {
       });
       const text = typeof response === 'string' ? response : (response as any).text || '';
       if (text.trim()) parts.push(text.trim());
-      console.log(`[Whisper] Chunk ${idx + 1}: ${Math.round(offset)}s–${Math.round(Math.min(offset + CHUNK_DURATION_SECONDS, duration))}s ✓`);
+      // console.log(`[Whisper] Chunk ${idx + 1}: ${Math.round(offset)}s–${Math.round(Math.min(offset + CHUNK_DURATION_SECONDS, duration))}s ✓`);
       offset += CHUNK_DURATION_SECONDS;
       idx++;
     }

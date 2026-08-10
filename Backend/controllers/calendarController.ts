@@ -475,7 +475,7 @@ export const endMeeting = async (req: Request, res: Response): Promise<any> => {
           tags,
         });
 
-        console.log(`[Calendar] Meeting ${event._id} enriched and indexed into brain.`);
+        // console.log(`[Calendar] Meeting ${event._id} enriched and indexed into brain.`);
       } catch (enrichErr) {
         console.error('[Calendar] End meeting enrichment failed:', enrichErr);
       }

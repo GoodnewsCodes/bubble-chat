@@ -9,7 +9,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-ch
     { content: { $regex: /Meeting Scheduled|Bubble call/i } },
     { $set: { message_type: 'system', is_announcement: true } }
   );
-  console.log(`Updated ${updateResult.modifiedCount} text messages to system messages.`);
+  // // console.log(`Updated ${updateResult.modifiedCount} text messages to system messages.`);
 
   // 2. Fix the latestMessage pointer for all conversations
   const conversations = await db.collection('conversations').find({}).toArray();
@@ -41,6 +41,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-ch
     }
   }
 
-  console.log(`Fixed latestMessage pointers for ${fixedCount} conversations.`);
+  // // console.log(`Fixed latestMessage pointers for ${fixedCount} conversations.`);
   process.exit(0);
 });

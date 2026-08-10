@@ -66,8 +66,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 if (process.env.JWT_KEY) {
     passport.use(new JwtStrategy({
         jwtFromRequest: ExtractJwt.fromExtractors([
+            (req: any) => req?.cookies?.access_token || null,
             ExtractJwt.fromAuthHeaderAsBearerToken(),
-            (req) => req.headers['x-auth-token']
+            (req: any) => req?.headers?.['x-auth-token']
         ]),
         secretOrKey: process.env.JWT_KEY
     }, async (payload, done) => {

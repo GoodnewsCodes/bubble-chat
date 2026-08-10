@@ -259,7 +259,7 @@ export const createMeeting = async (
     }
 
     // TEMP diagnostic (remove after verifying active-rooms): confirm a live record is born.
-    console.log(`[CreateMeeting] created roomId=${meeting.roomId} status=${meeting.status} host=${userId}`);
+    // console.log(`[CreateMeeting] created roomId=${meeting.roomId} status=${meeting.status} host=${userId}`);
 
     if (wantsEgress) await startEgressIfNeeded(meeting);
 
@@ -364,7 +364,7 @@ export const getActiveMeetings = async (
     }
 
     // TEMP diagnostic (remove after verifying active-rooms): log scope + result count.
-    console.log(`[ActiveMeetings] user=${userId} orgId=${orgId || 'none'}`);
+    // console.log(`[ActiveMeetings] user=${userId} orgId=${orgId || 'none'}`);
 
     const meetings = await Meeting.find(query)
       .populate('host', 'full_name username avatar')
@@ -401,7 +401,7 @@ export const getActiveMeetings = async (
       startedAt: m.startedAt,
     }));
 
-    console.log(`[ActiveMeetings] ${meetings.length} live in DB → ${rooms.length} actually occupied`);
+    // console.log(`[ActiveMeetings] ${meetings.length} live in DB → ${rooms.length} actually occupied`);
     res.status(200).json({ rooms });
   } catch (err: any) {
     res.status(500).json({ message: 'Failed to fetch active meetings', error: err.message });
@@ -927,7 +927,7 @@ export const endMeeting = async (
         for (const m of orgMembers) io.to(String(m._id)).emit('meeting_room_update', endedPayload);
       }
       for (const pid of allParticipantIds) io.to(pid).emit('meeting_room_update', endedPayload);
-      console.log(`[Meeting] Broadcasted meeting_ended for room ${meeting.roomId} to ${allParticipantIds.length} participants`);
+      // console.log(`[Meeting] Broadcasted meeting_ended for room ${meeting.roomId} to ${allParticipantIds.length} participants`);
     } catch (socketErr) {
       console.error('[Meeting] Socket emit meeting_ended failed:', socketErr);
     }
@@ -1011,7 +1011,7 @@ export const autoEndMeetingByRoomId = async (roomId: string): Promise<void> => {
       console.error('[Meeting] autoEndMeetingByRoomId socket emit failed:', socketErr);
     }
 
-    console.log(`[Meeting] Auto-ended empty-room meeting ${meeting._id} (room ${roomId})`);
+    // console.log(`[Meeting] Auto-ended empty-room meeting ${meeting._id} (room ${roomId})`);
 
     setImmediate(async () => {
       // No explicit user chose save/email preferences here — default to saving the
@@ -1115,7 +1115,7 @@ export const runBackgroundMeetingAI = async (
         if (fromAudio && fromAudio.trim()) {
           rawTranscript = fromAudio;
           await Meeting.findByIdAndUpdate(meeting._id, { $set: { transcriptRaw: fromAudio } });
-          console.log(`[Meeting AI] Transcribed Egress recording for meeting ${meeting._id} (${fromAudio.length} chars).`);
+          // console.log(`[Meeting AI] Transcribed Egress recording for meeting ${meeting._id} (${fromAudio.length} chars).`);
         }
       } catch (whisperErr) {
         console.error('[Meeting AI] Egress transcription failed:', whisperErr);
@@ -1247,7 +1247,7 @@ export const runBackgroundMeetingAI = async (
           organizationId: org._id,
           tags: ['minutes', 'meeting', meeting.title.toLowerCase()],
         });
-        console.log(`[Meeting AI] Saved meeting minutes as OrgDocument for org: ${org.name}`);
+        // console.log(`[Meeting AI] Saved meeting minutes as OrgDocument for org: ${org.name}`);
       } catch (docErr) {
         console.error('[Meeting AI] Failed to save minutes document:', docErr);
       }
@@ -1268,7 +1268,7 @@ export const runBackgroundMeetingAI = async (
               intelligence.summary,
               resolvedActionItems.map(ai => ({ text: ai.text, assignedToName: ai.assignedToName }))
             );
-            console.log(`[Meeting Email] Transcript email sent to: ${user.email}`);
+            // console.log(`[Meeting Email] Transcript email sent to: ${user.email}`);
           }
         } catch (emailErr) {
           console.error('[Meeting Email] Failed sending transcript email:', emailErr);
@@ -1303,7 +1303,7 @@ export const runBackgroundMeetingAI = async (
               console.error('[Meeting Email] Failed sending absentee recap:', recapErr);
             }
           }
-          console.log(`[Meeting Email] Absentee recap sent to ${absentees.length} org member(s).`);
+          // console.log(`[Meeting Email] Absentee recap sent to ${absentees.length} org member(s).`);
         } catch (absErr) {
           console.error('[Meeting Email] Absentee recap pass failed:', absErr);
         }
@@ -1625,8 +1625,8 @@ export const downloadTranscriptMarkdown = async (req: Request, res: Response): P
 
     const transcriptBody = chunks.length > 0
       ? chunks
-          .map((c) => `${fmtTimestamp(c.timestamp)} **${c.speaker || 'Speaker'}**: ${c.text}`)
-          .join('\n\n')
+        .map((c) => `${fmtTimestamp(c.timestamp)} **${c.speaker || 'Speaker'}**: ${c.text}`)
+        .join('\n\n')
       : (meeting.transcriptRaw || '_No transcript captured._');
 
     const decisions = ''; // future: surface meeting.summary structured decisions

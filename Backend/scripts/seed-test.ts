@@ -50,11 +50,11 @@ const TEST_EMAIL_RE = /@bubble\.test$/i;
 // Small, realistic roster. Emails are stable & scoped to @bubble.test so the
 // reset below only ever touches seeded accounts.
 const ROSTER: { name: string; email: string; username: string; role: 'admin' | 'employee'; org_role: string }[] = [
-    { name: 'Ada Founder',  email: 'ada@bubble.test',   username: 'ada',   role: 'admin',    org_role: 'Founder' },
-    { name: 'Ben Backend',  email: 'ben@bubble.test',   username: 'ben',   role: 'employee', org_role: 'Backend Engineer' },
+    { name: 'Ada Founder', email: 'ada@bubble.test', username: 'ada', role: 'admin', org_role: 'Founder' },
+    { name: 'Ben Backend', email: 'ben@bubble.test', username: 'ben', role: 'employee', org_role: 'Backend Engineer' },
     { name: 'Chidi Design', email: 'chidi@bubble.test', username: 'chidi', role: 'employee', org_role: 'Product Designer' },
-    { name: 'Dara Mobile',  email: 'dara@bubble.test',  username: 'dara',  role: 'employee', org_role: 'Mobile Engineer' },
-    { name: 'Efe Marketing', email: 'efe@bubble.test',  username: 'efe',   role: 'employee', org_role: 'Marketing Lead' },
+    { name: 'Dara Mobile', email: 'dara@bubble.test', username: 'dara', role: 'employee', org_role: 'Mobile Engineer' },
+    { name: 'Efe Marketing', email: 'efe@bubble.test', username: 'efe', role: 'employee', org_role: 'Marketing Lead' },
 ];
 
 function uniqueTagFor(username: string): string {
@@ -78,9 +78,9 @@ async function seedMessage(convId: any, senderId: any, memberIds: any[], content
 
 async function run() {
     try {
-        console.log('🔌 Connecting to MongoDB…');
+        // console.log('🔌 Connecting to MongoDB…');
         await mongoose.connect(MONGODB_URI);
-        console.log('✅ Connected.\n');
+        // console.log('✅ Connected.\n');
 
         // ── Reset: wipe prior @bubble.test users + their convos + messages ──
         const oldUsers = await User.find({ email: TEST_EMAIL_RE }).select('_id');
@@ -91,9 +91,9 @@ async function run() {
             const delMsgs = await Message.deleteMany({ chat: { $in: oldConvoIds } });
             const delConvos = await Conversation.deleteMany({ _id: { $in: oldConvoIds } });
             const delUsers = await User.deleteMany({ _id: { $in: oldIds } });
-            console.log(`🧹 Reset: removed ${delUsers.deletedCount} users, ${delConvos.deletedCount} conversations, ${delMsgs.deletedCount} messages.\n`);
+            // console.log(`🧹 Reset: removed ${delUsers.deletedCount} users, ${delConvos.deletedCount} conversations, ${delMsgs.deletedCount} messages.\n`);
         } else {
-            console.log('🧹 Reset: no prior @bubble.test data found.\n');
+            // console.log('🧹 Reset: no prior @bubble.test data found.\n');
         }
         // Fresh org each run so scoping is clean.
         await Organization.deleteMany({ name: ORG });
@@ -135,7 +135,7 @@ async function run() {
                     owner: user._id,
                     inviteCode: `org-${Math.random().toString(36).slice(2, 10)}`,
                 });
-                console.log(`🏢 Created organization "${ORG}" (invite: ${orgDoc.inviteCode})`);
+                // console.log(`🏢 Created organization "${ORG}" (invite: ${orgDoc.inviteCode})`);
             }
             users[person.username] = user;
         }
@@ -178,20 +178,20 @@ async function run() {
         await seedMessage(group._id, users.chidi._id, groupIds, 'I’ll demo the updated screens after.');
 
         // ── Summary ──
-        console.log('\n🌱 Seeded fresh test org:');
-        console.log('──────────────────────────────────────────────────────────');
-        console.log(`   Organization: ${ORG}`);
-        console.log(`   Password (all users): ${PASSWORD}`);
+        // console.log('\n🌱 Seeded fresh test org:');
+        // console.log('──────────────────────────────────────────────────────────');
+        // console.log(`   Organization: ${ORG}`);
+        // console.log(`   Password (all users): ${PASSWORD}`);
         for (const p of ROSTER) {
-            console.log(`   • ${p.name.padEnd(15)} ${p.email.padEnd(20)} @${p.username.padEnd(6)} [${p.org_role}]`);
+            // console.log(`   • ${p.name.padEnd(15)} ${p.email.padEnd(20)} @${p.username.padEnd(6)} [${p.org_role}]`);
         }
-        console.log('   Conversations: 2 DMs (Ada↔Ben, Ada↔Chidi) + 1 group (Product Team)');
-        console.log('──────────────────────────────────────────────────────────');
-        console.log('   Log two of them in on web + mobile to test messaging, calls,');
-        console.log('   presence, mentions and the People/Updates screens.\n');
+        // console.log('   Conversations: 2 DMs (Ada↔Ben, Ada↔Chidi) + 1 group (Product Team)');
+        // console.log('──────────────────────────────────────────────────────────');
+        // console.log('   Log two of them in on web + mobile to test messaging, calls,');
+        // console.log('   presence, mentions and the People/Updates screens.\n');
 
         await mongoose.disconnect();
-        console.log('🔌 Disconnected.');
+        // console.log('🔌 Disconnected.');
     } catch (err) {
         console.error('❌ Error:', err);
         process.exit(1);

@@ -135,7 +135,7 @@ export const getAidaBotUser = async () => {
       avatar: '',
       uniqueTag: 'bubble-AIDA-001',
     });
-    console.log('[Aida] Bot user created:', bot._id);
+    // console.log('[Aida] Bot user created:', bot._id);
   }
   return bot;
 };
@@ -169,7 +169,7 @@ const retrieveOrgContext = async (
                 return `--- [Brain Match: ${title}] (Dept: ${dept}) ---\n${chunk}`;
               })
               .join('\n\n');
-            console.log(`[Aida RAG] Retrieved ${matches.length} matches from Pinecone namespace: ${namespace}`);
+            // console.log(`[Aida RAG] Retrieved ${matches.length} matches from Pinecone namespace: ${namespace}`);
             return { context: contextText, docsFound: matches.length };
           }
         }
@@ -1222,7 +1222,7 @@ export const createOrgDoc = async (req: Request, res: Response): Promise<void> =
       createdBy: userId,
     });
 
-    console.log(`[OrgDocs] New doc created: "${doc.title}" (dept: ${doc.department}, access: ${doc.accessLevel})`);
+    // console.log(`[OrgDocs] New doc created: "${doc.title}" (dept: ${doc.department}, access: ${doc.accessLevel})`);
 
     // Embed the document into the vector brain so it's retrievable via RAG, not
     // just Mongo full-text. Resolve the creator's org and fire the brain event.
@@ -1549,17 +1549,17 @@ export const getAidaWritingSuggestions = async (req: Request, res: Response): Pr
           .join('\n')
           .slice(0, 2000);
       } else {
-      const recent = await Message.find({ chat: conversationId })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate('sender', 'full_name username')
-        .lean();
-      conversationContext = (await buildTranscriptLines(
-        recent.reverse(),
-        String(conversationId),
-        !!(conv as any)?.isGroupChat,
-        (m: any) => (m.sender?.full_name || m.sender?.username || 'User')
-      )).join('\n');
+        const recent = await Message.find({ chat: conversationId })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .populate('sender', 'full_name username')
+          .lean();
+        conversationContext = (await buildTranscriptLines(
+          recent.reverse(),
+          String(conversationId),
+          !!(conv as any)?.isGroupChat,
+          (m: any) => (m.sender?.full_name || m.sender?.username || 'User')
+        )).join('\n');
       }
 
       const { resolveUserOrg } = await import('../utils/orgResolver');

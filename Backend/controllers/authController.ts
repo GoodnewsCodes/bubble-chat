@@ -33,6 +33,38 @@ const generateAccessToken = (userId: string) => {
 const generateRefreshToken = (userId: string) =>
   jwt.sign({ id: userId }, getRefreshKey(), { expiresIn: '30d' });
 
+// ─── Cookie Helpers ────────────────────────────────────────────────────────────
+
+export const setAuthCookies = (res: Response, accessToken: string, refreshToken?: string) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieOptions: any = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+
+  res.cookie('access_token', accessToken, cookieOptions);
+
+  if (refreshToken) {
+    res.cookie('refresh_token', refreshToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+  }
+};
+
+export const clearAuthCookies = (res: Response) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const clearOptions: any = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+  };
+  res.clearCookie('access_token', clearOptions);
+  res.clearCookie('refresh_token', clearOptions);
+};
+
 // ─── OTP Helper ───────────────────────────────────────────────────────────────
 
 const generateOTP = (): string =>
@@ -213,7 +245,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           await sendOTPEmail(existing.email, existing.full_name || 'User', otp);
         } catch (emailErr: any) {
           console.warn(`⚠️ Could not send OTP email to ${existing.email}:`, emailErr.message);
-          console.log(`[DEV/TESTING] OTP for ${existing.email} is: ${otp}`);
+          // console.log(`[DEV/TESTING] OTP for ${existing.email} is: ${otp}`);
         }
       }
 
@@ -342,7 +374,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         await sendOTPEmail(email, full_name || 'User', otp);
       } catch (emailErr: any) {
         console.warn(`⚠️ Could not send OTP email to ${email}:`, emailErr.message);
-        console.log(`[DEV/TESTING] OTP for ${email} is: ${otp}`);
+        // console.log(`[DEV/TESTING] OTP for ${email} is: ${otp}`);
       }
     }
 
@@ -412,6 +444,8 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
 
     const accessToken = generateAccessToken(String(user._id));
 
+    setAuthCookies(res, accessToken, refreshToken);
+
     res.status(200).json({
       message: 'Email verified successfully. Welcome to Bubble!',
       data: { accessToken, refreshToken, user: formatUser(user) },
@@ -453,7 +487,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
         await sendOTPEmail(user.email, user.full_name || 'User', otp);
       } catch (emailErr: any) {
         console.warn(`⚠️ Could not send OTP email to ${user.email}:`, emailErr.message);
-        console.log(`[DEV/TESTING] OTP for ${user.email} is: ${otp}`);
+        // console.log(`[DEV/TESTING] OTP for ${user.email} is: ${otp}`);
       }
     }
 
@@ -511,7 +545,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           await sendOTPEmail(user.email, user.full_name || 'User', otp);
         } catch (emailErr: any) {
           console.warn(`⚠️ Could not send OTP email to ${user.email}:`, emailErr.message);
-          console.log(`[DEV/TESTING] OTP for ${user.email} is: ${otp}`);
+          // console.log(`[DEV/TESTING] OTP for ${user.email} is: ${otp}`);
         }
       }
 
@@ -556,6 +590,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       userAgent: req.headers['user-agent'],
     });
 
+    setAuthCookies(res, accessToken, refreshToken);
+
     res.status(200).json({
       message: 'Login successful. Welcome back!',
       data: { accessToken, refreshToken, user: formatUser(user) },
@@ -588,6 +624,8 @@ export const logout = async (req: any, res: Response): Promise<void> => {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    clearAuthCookies(res);
 
     res.status(200).json({ message: 'Logged out successfully.' });
   } catch (err: any) {
@@ -623,7 +661,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       await sendPasswordResetEmail(user.email!, user.full_name || 'User', otp);
     } catch (emailErr: any) {
       console.warn(`⚠️ Could not send password reset email to ${user.email}:`, emailErr.message);
-      console.log(`[DEV/TESTING] Reset OTP for ${user.email} is: ${otp}`);
+      // console.log(`[DEV/TESTING] Reset OTP for ${user.email} is: ${otp}`);
     }
 
     res.status(200).json({
@@ -735,7 +773,7 @@ export const changePassword = async (req: any, res: Response): Promise<void> => 
 
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { refreshToken: token } = req.body;
+    const token = req.body?.refreshToken || req.cookies?.refresh_token;
 
     if (!token) {
       res.status(400).json({ message: 'Refresh token is required.' });
@@ -760,6 +798,8 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     const newRefreshToken = generateRefreshToken(String(user._id));
 
     await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken });
+
+    setAuthCookies(res, newAccessToken, newRefreshToken);
 
     res.status(200).json({
       message: 'Tokens refreshed successfully.',
@@ -880,6 +920,8 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
       isOnline: true,
       lastSeen: new Date(),
     });
+
+    setAuthCookies(res, accessToken, refreshToken);
 
     // ── Invite-code handling (unchanged logic) ────────────────────────────────
     const rawState = req.query.state as string | undefined;

@@ -211,7 +211,7 @@ export const initSocket = (server: HttpServer) => {
 
   io.on('connection', (socket: Socket) => {
     const userId = (socket as any).userId;
-    console.log(`✅ Authenticated socket connection: ${socket.id} (User: ${userId})`);
+    // console.log(`✅ Authenticated socket connection: ${socket.id} (User: ${userId})`);
 
     // Automatically register user on connection and join their personal room
     socket.join(userId); // <-- personal room: guarantees delivery even when no chat is open
@@ -251,7 +251,7 @@ export const initSocket = (server: HttpServer) => {
         const convo = await Conversation.findById(chatId);
         if (convo && convo.users.map((id: any) => id.toString()).includes(userId)) {
           socket.join(chatId);
-          console.log(`[Room] User ${userId} joined conversation room: ${chatId}`);
+          // console.log(`[Room] User ${userId} joined conversation room: ${chatId}`);
           return;
         }
 
@@ -268,7 +268,7 @@ export const initSocket = (server: HttpServer) => {
 
         if (meeting || chatId.startsWith('meet-') || chatId.startsWith('bubble-')) {
           socket.join(chatId);
-          console.log(`[Room] User ${userId} joined meeting room: ${chatId}`);
+          // console.log(`[Room] User ${userId} joined meeting room: ${chatId}`);
         } else {
           console.warn(`[Room Security] User ${userId} attempted to join unauthorized room: ${chatId}`);
         }
@@ -280,7 +280,7 @@ export const initSocket = (server: HttpServer) => {
     socket.on('leave_room', (chatId: string) => {
       socket.leave(chatId);
       scheduleEmptyRoomCheck(chatId);
-      console.log(`[Room] User ${userId} left room: ${chatId}`);
+      // console.log(`[Room] User ${userId} left room: ${chatId}`);
     });
 
     // ─── Direct Messages (legacy peer-to-peer fallback) ───────────────────────
@@ -376,7 +376,7 @@ export const initSocket = (server: HttpServer) => {
       // This ensures silent diarization — whoever is speaking is always correctly identified
       const speakerName = (socket as any).fullName || (socket as any).username || data.speaker || 'Participant';
       const speakerId = userId || data.userId;
-      
+
       // Relay for LIVE display only. Persistence is intentionally NOT done here:
       // each speaking client saves its own chunk exactly once via the HTTP
       // addMeetingTranscriptChunk endpoint (with its speakerId). Saving here too caused
@@ -386,7 +386,7 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('meeting_started', (data: { roomId: string, meetingId: string }) => {
-      console.log(`[Meeting] Relaying meeting_started for room: ${data.roomId}`);
+      // console.log(`[Meeting] Relaying meeting_started for room: ${data.roomId}`);
       io.to(data.roomId).emit('meeting_started', data);
     });
 
@@ -412,7 +412,7 @@ export const initSocket = (server: HttpServer) => {
       } catch (err) {
         console.error('[Meeting] Failed to verify host on meeting_ended:', err);
       }
-      console.log(`[Meeting] Relaying meeting_ended for room: ${data.roomId}`);
+      // console.log(`[Meeting] Relaying meeting_ended for room: ${data.roomId}`);
       io.to(data.roomId).emit('meeting_ended', data);
       endGroupCallTracking(data.roomId);
       clearActiveCallsForRoom(data.roomId);
@@ -793,7 +793,7 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('disconnect', async () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      // console.log(`Socket disconnected: ${socket.id}`);
       try {
         const set = onlineSockets.get(userId);
         if (set) {

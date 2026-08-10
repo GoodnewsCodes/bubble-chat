@@ -82,9 +82,9 @@ export const uploadToFilebase = async (
   const accessKey = process.env.FILEBASE_ACCESS_KEY;
   const secretKey = process.env.FILEBASE_SECRET_KEY;
   const bypassFilebase = process.env.BYPASS_FILEBASE === 'true' || !accessKey || !secretKey;
-  
+
   if (bypassFilebase) {
-    console.log('ℹ️ Bypassing Filebase, saving file locally.');
+    // console.log('ℹ️ Bypassing Filebase, saving file locally.');
     return saveFileLocally(fileData, fileKey);
   }
 
@@ -174,7 +174,7 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     return;
   }
   const key = keyOrUrl.startsWith('http') ? extractKeyFromUrl(keyOrUrl) : keyOrUrl;
-  
+
   // Handle local fallback files directly
   if (key.startsWith('/uploads/') || key.startsWith('uploads/')) {
     const filename = key.replace(/^\/?uploads\//, '');
@@ -221,15 +221,15 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
       res.setHeader('Content-Range', response.ContentRange);
     }
     res.setHeader('Accept-Ranges', 'bytes');
-    
+
     // Explicitly allow cross-origin embedder policies to access this resource
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    
+
     if (downloadName) {
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
     }
-    
+
     const stream = response.Body as Readable;
     stream.pipe(res);
   } catch (error: any) {

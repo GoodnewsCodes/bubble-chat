@@ -44,7 +44,7 @@ export const findOrCreateGoogleUser = async (input: GoogleProfileInput) => {
   // 1. Existing Google user.
   let user = await User.findOne({ googleId });
   if (user) {
-    console.log(`[googleAuth] Matched existing googleId for user ${user._id}`);
+    // console.log(`[googleAuth] Matched existing googleId for user ${user._id}`);
     return user;
   }
 
@@ -56,7 +56,7 @@ export const findOrCreateGoogleUser = async (input: GoogleProfileInput) => {
       if (!user.avatar && input.avatar) user.avatar = input.avatar;
       try {
         await user.save();
-        console.log(`[googleAuth] Linked googleId to existing email account ${user._id}`);
+        // console.log(`[googleAuth] Linked googleId to existing email account ${user._id}`);
       } catch (linkErr: any) {
         // Another concurrent login may have linked it first — re-read and return.
         console.warn(`[googleAuth] Link save failed (${linkErr.code || linkErr.message}); re-reading.`);
@@ -79,7 +79,7 @@ export const findOrCreateGoogleUser = async (input: GoogleProfileInput) => {
       uniqueTag,
       role: 'employee',
     });
-    console.log(`[googleAuth] Created new Google user ${user._id}`);
+    // console.log(`[googleAuth] Created new Google user ${user._id}`);
     return user;
   } catch (createErr: any) {
     // E11000: a row for this googleId/email/uniqueTag was created in parallel, or

@@ -198,7 +198,7 @@ export const reembedFailedDocs = async (limit = 10): Promise<number> => {
                 doc.embedStatus = 'embedded';
                 await doc.save();
                 healed++;
-                console.log(`[BrainIngest] re-embedded "${doc.title}" (${ids.length} chunks)`);
+                // console.log(`[BrainIngest] re-embedded "${doc.title}" (${ids.length} chunks)`);
             }
         } catch (err) {
             console.error(`[BrainIngest] re-embed failed for "${doc.title}":`, err);

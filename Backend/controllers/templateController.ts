@@ -38,7 +38,7 @@ export const createTemplate = async (req: Request, res: Response): Promise<any> 
       title,
       description,
       content: content || {},
-      tags:    tags || [],
+      tags: tags || [],
     });
 
     res.status(201).json({ message: 'Template created', template });
@@ -175,5 +175,5 @@ export const seedDefaultTemplates = async (systemUserId: string): Promise<void> 
   ];
 
   await Template.insertMany(defaults);
-  console.log('✅ Default templates seeded');
+  // console.log('✅ Default templates seeded');
 };

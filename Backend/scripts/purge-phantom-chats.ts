@@ -28,9 +28,9 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 
 async function run() {
   try {
-    console.log('🔌 Connecting to MongoDB…');
+    // console.log('🔌 Connecting to MongoDB…');
     await mongoose.connect(MONGODB_URI);
-    console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN — nothing will be deleted)' : ''}\n`);
+    // console.log(`✅ Connected.${DRY_RUN ? '  (DRY RUN — nothing will be deleted)' : ''}\n`);
 
     const dms = await Conversation.find({ isGroupChat: { $ne: true } }).select('_id users').lean();
     const phantomIds: any[] = [];
@@ -47,20 +47,20 @@ async function run() {
     }
 
     if (phantomIds.length === 0) {
-      console.log('✨ No phantom conversations found. Nothing to purge.');
+      // console.log('✨ No phantom conversations found. Nothing to purge.');
     } else {
-      console.log(`🔎 Found ${phantomIds.length} phantom conversation(s).`);
+      // console.log(`🔎 Found ${phantomIds.length} phantom conversation(s).`);
       if (!DRY_RUN) {
         const delMsgs = await Message.deleteMany({ chat: { $in: phantomIds } });
         const delConvos = await Conversation.deleteMany({ _id: { $in: phantomIds } });
-        console.log(`🧹 Purged ${delConvos.deletedCount} conversations and ${delMsgs.deletedCount} messages.`);
+        // console.log(`🧹 Purged ${delConvos.deletedCount} conversations and ${delMsgs.deletedCount} messages.`);
       } else {
-        console.log('   (DRY RUN — set DRY_RUN=0 or unset it to actually delete.)');
+        // console.log('   (DRY RUN — set DRY_RUN=0 or unset it to actually delete.)');
       }
     }
 
     await mongoose.disconnect();
-    console.log('🔌 Disconnected.');
+    // console.log('🔌 Disconnected.');
   } catch (err) {
     console.error('❌ Error:', err);
     process.exit(1);

@@ -22,7 +22,7 @@ export const rotateSecurityCode = async () => {
       expiresAt: expiresAt,
     });
 
-    console.log(`🔒 SECURITY UPDATED: New Weekly Security Code rotation completed. ID: ${code._id}`);
+    // console.log(`🔒 SECURITY UPDATED: New Weekly Security Code rotation completed. ID: ${code._id}`);
     return code;
   } catch (err) {
     console.error('❌ Error during security code rotation:', err);
@@ -33,13 +33,13 @@ export const rotateSecurityCode = async () => {
 export const initSecurityScheduler = () => {
   // Sunday at 00:00 (Midnight)
   cron.schedule('0 0 * * 0', async () => {
-    console.log('⏳ Sunday Midnight: Initiating weekly security rotation...');
+    // console.log('⏳ Sunday Midnight: Initiating weekly security rotation...');
     await rotateSecurityCode();
   });
 
   SecurityCode.findOne({ isCurrent: true }).then(async (code) => {
     if (!code) {
-      console.log('🛡️ No active security code found. Initializing first-run rotation...');
+      // console.log('🛡️ No active security code found. Initializing first-run rotation...');
       await rotateSecurityCode();
     }
   });
@@ -71,7 +71,7 @@ export const processTranscriptQueue = async () => {
 
     if (unprocessed.length === 0) return;
 
-    console.log(`🎙️ [Transcript] Processing ${unprocessed.length} meeting transcript(s)...`);
+    // console.log(`🎙️ [Transcript] Processing ${unprocessed.length} meeting transcript(s)...`);
 
     for (const meeting of unprocessed) {
       try {
@@ -135,7 +135,7 @@ export const processTranscriptQueue = async () => {
 
         meeting.summary = summary;
         await meeting.save();
-        console.log(`✅ [Transcript] Processed meeting ${meeting._id}: "${meeting.title}"`);
+        // console.log(`✅ [Transcript] Processed meeting ${meeting._id}: "${meeting.title}"`);
 
         // Close the safety-net brain gap: meetings the live path missed still get
         // ingested. The meeting_ended listener handles chunk/embed/upsert.
@@ -184,7 +184,7 @@ export const initTranscriptProcessor = () => {
     await processTranscriptQueue();
   }, 10000); // 10s after boot
 
-  console.log('🎙️ [Transcript] Background processor initialized (runs every 5 min).');
+  // console.log('🎙️ [Transcript] Background processor initialized (runs every 5 min).');
 };
 
 // ─── Task & Goal Reminder Automation ──────────────────────────────────────────
@@ -253,7 +253,7 @@ export const processTaskReminders = async () => {
           (task as any).reminderLevelsSent = levelsStr;
           (task as any).reminderLevelsSent.push(newLevel);
           await task.save();
-          console.log(`✅ [TaskReminders] ${newLevel} email sent for Task ${task._id}`);
+          // console.log(`✅ [TaskReminders] ${newLevel} email sent for Task ${task._id}`);
         } else {
           // Prevent infinite loop if no email mapped
           (task as any).reminderLevelsSent = levelsStr;
@@ -275,7 +275,7 @@ export const initTaskReminderScheduler = () => {
     await processTaskReminders();
   });
 
-  console.log('⏰ [TaskReminders] Background auto-reminder initialized (runs every 30 min).');
+  // console.log('⏰ [TaskReminders] Background auto-reminder initialized (runs every 30 min).');
 };
 
 /**
@@ -346,7 +346,7 @@ export const processMeetingStartRings = async () => {
 
         (task as any).startRingSentAt = new Date();
         await task.save();
-        console.log(`🔔 [MeetingRing] Rang ${attendees.size} attendee(s) for meeting "${task.title}" (${task._id}).`);
+        // console.log(`🔔 [MeetingRing] Rang ${attendees.size} attendee(s) for meeting "${task.title}" (${task._id}).`);
       } catch (err) {
         console.error(`❌ [MeetingRing] Failed ringing meeting ${task._id}:`, err);
       }
@@ -360,7 +360,7 @@ export const initMeetingStartRingScheduler = () => {
   cron.schedule('* * * * *', async () => {
     await processMeetingStartRings();
   });
-  console.log('🔔 [MeetingRing] Meeting-start ringer initialized (runs every minute).');
+  // console.log('🔔 [MeetingRing] Meeting-start ringer initialized (runs every minute).');
 };
 
 // ─── Action-Item Follow-Up Loop ───────────────────────────────────────────────
@@ -452,7 +452,7 @@ export const processActionItemFollowUps = async () => {
 
         task.followUpSentAt = now;
         await task.save();
-        console.log(`✅ [ActionItemFollowUp] Nudged assignee for task ${task._id}`);
+        // console.log(`✅ [ActionItemFollowUp] Nudged assignee for task ${task._id}`);
       } catch (err) {
         console.error(`❌ [ActionItemFollowUp] Failed for task ${task._id}:`, err);
       }
@@ -467,7 +467,7 @@ export const initActionItemFollowUpScheduler = () => {
   cron.schedule('0 */6 * * *', async () => {
     await processActionItemFollowUps();
   });
-  console.log('⏰ [ActionItemFollowUp] Action-item follow-up loop initialized (runs every 6h).');
+  // console.log('⏰ [ActionItemFollowUp] Action-item follow-up loop initialized (runs every 6h).');
 };
 
 // ─── Daily Digest Generator ────────────────────────────────────────────────────
@@ -502,7 +502,7 @@ export const runDailyDigestJob = async (forHourUtc?: number) => {
     });
     if (users.length === 0) return;
 
-    console.log(`📅 [DailyDigest] Generating briefs for ${users.length} users...`);
+    // console.log(`📅 [DailyDigest] Generating briefs for ${users.length} users...`);
 
     let successCount = 0;
     const today = new Date();
@@ -564,7 +564,7 @@ export const runDailyDigestJob = async (forHourUtc?: number) => {
       }
     }
 
-    console.log(`✅ [DailyDigest] Completed: ${successCount}/${users.length} briefs generated.`);
+    // console.log(`✅ [DailyDigest] Completed: ${successCount}/${users.length} briefs generated.`);
   } catch (err) {
     console.error('❌ [DailyDigest] Job failed:', err);
   }
@@ -579,7 +579,7 @@ export const initDailyDigestScheduler = () => {
     await runDailyDigestJob(hour);
   });
 
-  console.log('📅 [DailyDigest] Scheduler initialized (hourly, honoring digestPreferences.notifyTime).');
+  // console.log('📅 [DailyDigest] Scheduler initialized (hourly, honoring digestPreferences.notifyTime).');
 };
 
 // ─── Weekly Digest Generator ────────────────────────────────────────────────────
@@ -602,7 +602,7 @@ export const runWeeklyDigestJob = async () => {
       ],
     }).select('_id full_name username email').limit(500);
 
-    console.log(`🗓️ [WeeklyDigest] Generating weekly recaps for ${users.length} users...`);
+    // console.log(`🗓️ [WeeklyDigest] Generating weekly recaps for ${users.length} users...`);
 
     let successCount = 0;
     const today = new Date();
@@ -639,7 +639,7 @@ export const runWeeklyDigestJob = async () => {
       }
     }
 
-    console.log(`✅ [WeeklyDigest] Completed: ${successCount}/${users.length} recaps sent.`);
+    // console.log(`✅ [WeeklyDigest] Completed: ${successCount}/${users.length} recaps sent.`);
   } catch (err) {
     console.error('❌ [WeeklyDigest] Job failed:', err);
   }
@@ -648,11 +648,11 @@ export const runWeeklyDigestJob = async () => {
 export const initWeeklyDigestScheduler = () => {
   // Run Mondays at 08:00 UTC
   cron.schedule('0 8 * * 1', async () => {
-    console.log('🗓️ [WeeklyDigest] Monday 08:00 UTC — Running weekly digest job...');
+    // console.log('🗓️ [WeeklyDigest] Monday 08:00 UTC — Running weekly digest job...');
     await runWeeklyDigestJob();
   });
 
-  console.log('🗓️ [WeeklyDigest] Scheduler initialized (runs Mondays at 08:00 UTC).');
+  // console.log('🗓️ [WeeklyDigest] Scheduler initialized (runs Mondays at 08:00 UTC).');
 };
 
 // ─── Holiday reminders ────────────────────────────────────────────────────────
@@ -714,7 +714,7 @@ export const processHolidayReminders = async () => {
         }
       }
     }
-    console.log(`🎉 [HolidayReminder] Notified members of ${holidays.length} holiday(s) for tomorrow.`);
+    // console.log(`🎉 [HolidayReminder] Notified members of ${holidays.length} holiday(s) for tomorrow.`);
   } catch (err) {
     console.error('[HolidayReminder] job failed:', err);
   }
@@ -726,6 +726,6 @@ export const initHolidayReminderScheduler = () => {
     await processHolidayReminders();
   });
 
-  console.log('🗓️ [HolidayReminder] Scheduler initialized (runs daily at 08:30 UTC).');
+  // console.log('🗓️ [HolidayReminder] Scheduler initialized (runs daily at 08:30 UTC).');
 };
 

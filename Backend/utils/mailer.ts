@@ -42,7 +42,7 @@ export const sendMail = async (to: string, subject: string, html: string, attach
       throw new Error(error.message);
     }
 
-    console.log(`✅ Email successfully queued for transmission to ${to}. Tracking ID: ${data?.id}`);
+    // console.log(`✅ Email successfully queued for transmission to ${to}. Tracking ID: ${data?.id}`);
     return data;
   } catch (err: any) {
     console.error(`❌ Mailer critical failure for ${to}:`, err.message);

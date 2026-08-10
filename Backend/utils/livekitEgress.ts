@@ -79,7 +79,7 @@ export const startRoomAudioEgress = async (
       { audioOnly: true }
     );
 
-    console.log(`[Egress] Started audio egress ${info.egressId} for room ${roomName} → ${recordingKey}`);
+    // console.log(`[Egress] Started audio egress ${info.egressId} for room ${roomName} → ${recordingKey}`);
     return { egressId: info.egressId, recordingKey };
   } catch (err) {
     console.error('[Egress] startRoomAudioEgress failed:', err);
@@ -97,7 +97,7 @@ export const stopRoomAudioEgress = async (egressId?: string): Promise<void> => {
   if (!client) return;
   try {
     await client.stopEgress(egressId);
-    console.log(`[Egress] Stopped egress ${egressId}`);
+    // console.log(`[Egress] Stopped egress ${egressId}`);
   } catch (err) {
     console.error('[Egress] stopRoomAudioEgress failed:', err);
   }
