@@ -329,10 +329,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *     summary: Health check endpoint
  *     responses:
  *       200:
- *         description: API i// Favicon handler for browser/Vercel icon probes
+ *         description: API is healthy
+ */
 app.get(['/favicon.ico', '/favicon.png'], (_req: Request, res: Response) => {
   res.status(204).end();
 });
+
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', message: 'Server is running smooth' });
