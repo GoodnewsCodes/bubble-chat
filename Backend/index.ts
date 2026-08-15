@@ -329,8 +329,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *     summary: Health check endpoint
  *     responses:
  *       200:
- *         description: API is healthy
- */
+ *         description: API i// Favicon handler for browser/Vercel icon probes
+app.get(['/favicon.ico', '/favicon.png'], (_req: Request, res: Response) => {
+  res.status(204).end();
+});
+
 app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', message: 'Server is running smooth' });
 });
@@ -347,7 +350,7 @@ app.get('/', (req: Request, res: Response) => {
  * /status:
  *   get:
  *     summary: System status endpoint for frontend status page
- */
+ *  */
 app.get('/status', (req: Request, res: Response) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
   const overallStatus = dbStatus === 'connected' ? 'operational' : 'degraded';
@@ -360,6 +363,29 @@ app.get('/status', (req: Request, res: Response) => {
       database: dbStatus
     }
   });
+});
+
+const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-chat';
+
+let dbConnectingPromise: Promise<typeof mongoose> | null = null;
+export const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  if (!dbConnectingPromise) {
+    dbConnectingPromise = mongoose.connect(mongoURI, { family: 4 });
+  }
+  await dbConnectingPromise;
+};
+
+// Middleware to ensure DB connection in serverless / per-request environment
+app.use(async (req, res, next) => {
+  if (req.path === '/favicon.ico' || req.path === '/favicon.png') return next();
+  try {
+    await connectDB();
+    next();
+  } catch (err: any) {
+    console.error('MongoDB connection error:', err);
+    res.status(500).json({ message: 'Database connection failed', error: err?.message });
+  }
 });
 
 // Static upload folder bypass
@@ -408,76 +434,73 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
   res.status(err?.status || 500).json({ message: err?.message || 'Internal server error.' });
 });
 
-// FIX 4: Create the HTTP server BEFORE connecting to MongoDB
+// Create HTTP server
 const server = http.createServer(app);
 
-// FIX 5: initSocket is now called RIGHT HERE before the DB connection,
-// so it's attached to the server early. Socket.io attaches to the HTTP
-// server object itself — it doesn't need the server to be listening yet.
 initSocket(server);
 
-const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-chat';
+// Only listen and start persistent schedulers when running as a standalone server (not on Vercel)
+if (!process.env.VERCEL) {
+  server.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log(`📄 Swagger docs available at http://localhost:${PORT}/api-docs`);
 
-// Start listening immediately so the server is accessible even while DB/background initialization completes
-server.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📄 Swagger docs available at http://localhost:${PORT}/api-docs`);
+    processQueue(async (payload) => {
+      try {
+        const io = getIO();
+        if (payload.type === 'new_message') {
+          const { chatId, message } = payload;
+          io.to(chatId).emit('new_message', message);
 
-  // Start Message Queue Worker
-  processQueue(async (payload) => {
-    try {
-      const io = getIO();
-      if (payload.type === 'new_message') {
-        const { chatId, message } = payload;
-        io.to(chatId).emit('new_message', message);
-
-        const chatDoc = await Conversation.findById(chatId);
-        if (chatDoc && chatDoc.users) {
-          chatDoc.users.forEach((u: any) => {
-            io.to(u.toString()).emit('new_message', message);
-          });
+          const chatDoc = await Conversation.findById(chatId);
+          if (chatDoc && chatDoc.users) {
+            chatDoc.users.forEach((u: any) => {
+              io.to(u.toString()).emit('new_message', message);
+            });
+          }
         }
+      } catch (err) {
+        console.error('Queue Worker Processing Error:', err);
       }
-    } catch (err) {
-      console.error('Queue Worker Processing Error:', err);
-    }
+    });
   });
-});
 
-mongoose.connect(mongoURI, { family: 4 })
-  .then(async () => {
-    console.log('✅ MongoDB connected successfully.');
+  connectDB()
+    .then(async () => {
+      console.log('✅ MongoDB connected successfully.');
 
-    // One-time self-heal: drop stale indexes if present
-    try {
-      const digestCol = mongoose.connection.collection('dailydigests');
-      const existing = await digestCol.indexes();
-      for (const stale of ['userId_1_generatedDate_-1', 'generatedDate_1']) {
-        if (existing.some((i: any) => i.name === stale)) {
-          await digestCol.dropIndex(stale).catch(() => undefined);
+      try {
+        const digestCol = mongoose.connection.collection('dailydigests');
+        const existing = await digestCol.indexes();
+        for (const stale of ['userId_1_generatedDate_-1', 'generatedDate_1']) {
+          if (existing.some((i: any) => i.name === stale)) {
+            await digestCol.dropIndex(stale).catch(() => undefined);
+          }
         }
+      } catch (err: any) {
+        console.warn('Daily-digest index cleanup skipped:', err?.message || err);
       }
-    } catch (err: any) {
-      console.warn('Daily-digest index cleanup skipped:', err?.message || err);
-    }
 
-    initSecurityScheduler();
-    initTranscriptProcessor();
-    initTaskReminderScheduler();
-    initMeetingStartRingScheduler();
-    initActionItemFollowUpScheduler();
-    initDailyDigestScheduler();
-    initWeeklyDigestScheduler();
-    initHolidayReminderScheduler();
-    initBrainEventListener();
-    warmEmbeddings();
+      initSecurityScheduler();
+      initTranscriptProcessor();
+      initTaskReminderScheduler();
+      initMeetingStartRingScheduler();
+      initActionItemFollowUpScheduler();
+      initDailyDigestScheduler();
+      initWeeklyDigestScheduler();
+      initHolidayReminderScheduler();
+      initBrainEventListener();
+      warmEmbeddings();
 
-    const systemUser = await import('./models/users').then(m => m.User.findOne({ is_bot: true }));
-    if (systemUser) await seedDefaultTemplates(String(systemUser._id));
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
-    // FIX 7: Log the full error so Railway's deploy logs show exactly what failed
-    console.error('💡 Check your MONGODB_URI environment variable in Railway Variables tab');
-    process.exit(1);
-  });
+      const systemUser = await import('./models/users').then(m => m.User.findOne({ is_bot: true }));
+      if (systemUser) await seedDefaultTemplates(String(systemUser._id));
+    })
+    .catch((err) => {
+      console.error('❌ MongoDB connection error:', err);
+      console.error('💡 Check your MONGODB_URI environment variable in Railway/Vercel Variables tab');
+      process.exit(1);
+    });
+}
+
+export default app;
+

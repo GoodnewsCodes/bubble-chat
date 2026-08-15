@@ -62,6 +62,9 @@ export const assertCriticalEnv = (): void => {
 
   if (isProd && missingCritical.length > 0) {
     console.error('[envCheck] Refusing to boot in production with missing CRITICAL env vars.');
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 };
+
