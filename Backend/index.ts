@@ -418,23 +418,43 @@ app.use('/api/v1/brain', brainRoutes);
 app.use('/api/v1/events', calendarRoutes);
 app.use('/api/v1/keys', keyRoutes);
 
-// Catch-all error handler. Without this, errors passed to next(err) by route handlers
-// or multer (e.g. fileFilter rejections, LIMIT_FILE_SIZE) fall through to Express's
-// default handler, which returns a raw HTML page instead of JSON — the client's
-// res.json().catch(() => ({})) then silently swallows it into a generic, unhelpful
-// "Request failed: 500" with no indication of what actually went wrong.
-app.use((err: any, _req: Request, res: Response, _next: any) => {
+// Global process exception logging for production debugging
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [UNCAUGHT EXCEPTION]:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('🔥 [UNHANDLED REJECTION]:', reason);
+});
+
+// Middleware to log incoming HTTP requests in production logs
+app.use((req: Request, _res: Response, next: any) => {
+  console.log(`[HTTP Request] ${req.method} ${req.url}`);
+  next();
+});
+
+// Catch-all error handler with full stack trace & error detail logging for production debugging
+app.use((err: any, req: Request, res: Response, _next: any) => {
+  console.error(`🔥 [EXPRESS ERROR] ${req.method} ${req.url}:`, err);
   if (err?.name === 'MulterError') {
     const messages: Record<string, string> = {
       LIMIT_FILE_SIZE: 'File is too large.',
       LIMIT_UNEXPECTED_FILE: 'Unexpected file field.',
     };
-    res.status(400).json({ message: messages[err.code] || err.message || 'Upload failed.' });
+    res.status(400).json({
+      message: messages[err.code] || err.message || 'Upload failed.',
+      error: err.message,
+      stack: err.stack,
+    });
     return;
   }
-  console.error('[Unhandled error]', err);
-  res.status(err?.status || 500).json({ message: err?.message || 'Internal server error.' });
+  res.status(err?.status || 500).json({
+    message: err?.message || 'Internal server error.',
+    error: err?.message || String(err),
+    stack: err?.stack,
+    path: req.url,
+  });
 });
+
 
 // Create HTTP server
 const server = http.createServer(app);
