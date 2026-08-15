@@ -27,7 +27,7 @@ export const getRefreshKey = (): string => {
 
 const generateAccessToken = (userId: string) => {
   if (!process.env.JWT_KEY) throw new Error('JWT_KEY is not set — refusing to use a default secret');
-  return jwt.sign({ id: userId }, process.env.JWT_KEY, { expiresIn: '7d' });
+  return jwt.sign({ id: userId }, process.env.JWT_KEY, { expiresIn: '2d' });
 };
 
 const generateRefreshToken = (userId: string) =>
@@ -41,7 +41,7 @@ export const setAuthCookies = (res: Response, accessToken: string, refreshToken?
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 15 * 60 * 1000, // 15 minutes
   };
 
   res.cookie('access_token', accessToken, cookieOptions);
