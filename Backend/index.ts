@@ -60,6 +60,7 @@ const PORT = process.env.PORT || 3000;
 // No Railway host is hardcoded — production origins come from env or the line below.
 const PRODUCTION_ORIGINS = [
   'https://bubblespace.xyz',
+  'https://bubblespace.netlify.app',
 ];
 
 const allowedOrigins: string[] = process.env.CORS_ORIGINS
