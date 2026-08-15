@@ -8,10 +8,17 @@ import { Readable } from 'stream';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = process.env.VERCEL
+  ? path.join('/tmp', 'uploads')
+  : path.join(__dirname, '..', 'uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch {
+  // Vercel / read-only filesystem — uploads go to S3 anyway
 }
+
 
 const BUCKET = process.env.FILEBASE_BUCKET as string;
 
