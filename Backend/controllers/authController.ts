@@ -981,7 +981,7 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
     } else {
       // Web: always redirect to the React frontend's /auth/google/callback page
       res.redirect(
-        `${FRONTEND}/auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
+        `${FRONTEND}auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
       );
     }
   } catch (err: any) {

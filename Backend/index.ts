@@ -418,22 +418,43 @@ initSocket(server);
 
 const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bubble-chat';
 
+// Start listening immediately so the server is accessible even while DB/background initialization completes
+server.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`📄 Swagger docs available at http://localhost:${PORT}/api-docs`);
+
+  // Start Message Queue Worker
+  processQueue(async (payload) => {
+    try {
+      const io = getIO();
+      if (payload.type === 'new_message') {
+        const { chatId, message } = payload;
+        io.to(chatId).emit('new_message', message);
+
+        const chatDoc = await Conversation.findById(chatId);
+        if (chatDoc && chatDoc.users) {
+          chatDoc.users.forEach((u: any) => {
+            io.to(u.toString()).emit('new_message', message);
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Queue Worker Processing Error:', err);
+    }
+  });
+});
+
 mongoose.connect(mongoURI, { family: 4 })
   .then(async () => {
-    // console.log('✅ MongoDB connected successfully.');
+    console.log('✅ MongoDB connected successfully.');
 
-    // One-time self-heal: an earlier schema named the digest date field
-    // `generatedDate`; it's now `date`. The old unique index
-    // (userId_1_generatedDate_-1) lingers in existing databases and makes every
-    // user's 2nd daily digest fail with E11000 (dup key on generatedDate: null).
-    // Drop the orphaned indexes if present — harmless once they're gone.
+    // One-time self-heal: drop stale indexes if present
     try {
       const digestCol = mongoose.connection.collection('dailydigests');
       const existing = await digestCol.indexes();
       for (const stale of ['userId_1_generatedDate_-1', 'generatedDate_1']) {
         if (existing.some((i: any) => i.name === stale)) {
           await digestCol.dropIndex(stale).catch(() => undefined);
-          // console.log(`🧹 Dropped stale dailydigests index: ${stale}`);
         }
       }
     } catch (err: any) {
@@ -449,41 +470,10 @@ mongoose.connect(mongoURI, { family: 4 })
     initWeeklyDigestScheduler();
     initHolidayReminderScheduler();
     initBrainEventListener();
-    // Warm the local embedding model in the background so the first brain ingest
-    // isn't blocked on the one-time model download/load.
     warmEmbeddings();
 
     const systemUser = await import('./models/users').then(m => m.User.findOne({ is_bot: true }));
     if (systemUser) await seedDefaultTemplates(String(systemUser._id));
-
-    // FIX 6: server.listen is now INSIDE the .then() which is correct —
-    // but we also pass a hostname of '0.0.0.0' so Railway's proxy can
-    // reach the container. Without this, Node may only bind to localhost
-    // inside the container, making it unreachable from outside → 502.
-    server.listen(Number(PORT), '0.0.0.0', () => {
-      // console.log(`🚀 Server is running on port ${PORT}`);
-      // console.log(`📄 Swagger docs available at /api-docs`);
-
-      // Start Message Queue Worker
-      processQueue(async (payload) => {
-        try {
-          const io = getIO();
-          if (payload.type === 'new_message') {
-            const { chatId, message } = payload;
-            io.to(chatId).emit('new_message', message);
-
-            const chatDoc = await Conversation.findById(chatId);
-            if (chatDoc && chatDoc.users) {
-              chatDoc.users.forEach((u: any) => {
-                io.to(u.toString()).emit('new_message', message);
-              });
-            }
-          }
-        } catch (err) {
-          console.error('Queue Worker Processing Error:', err);
-        }
-      });
-    });
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err);
