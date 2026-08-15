@@ -456,14 +456,15 @@ app.use((err: any, req: Request, res: Response, _next: any) => {
 });
 
 
-// Create HTTP server
-const server = http.createServer(app);
-
-initSocket(server);
-
-// Only listen and start persistent schedulers when running as a standalone server (not on Vercel)
+// Only create HTTP server, Socket.io, and persistent schedulers when running as
+// a standalone server (Railway / local dev). On Vercel the Express app is
+// imported directly by the serverless handler — no listener, no sockets.
 if (!process.env.VERCEL) {
+  const server = http.createServer(app);
+  initSocket(server);
+
   server.listen(Number(PORT), '0.0.0.0', () => {
+
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📄 Swagger docs available at http://localhost:${PORT}/api-docs`);
 
