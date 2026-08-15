@@ -18,9 +18,9 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 import { generateEmbedding, embeddingsConfigured, EMBEDDING_DIMENSIONS } from '../utils/embeddings';
 import { getPinecone, hasPinecone, upsertVectors, queryVectors, deleteVectors } from '../utils/pinecone';
 
-const ok = (s: string) => // console.log(`  ✅ ${s}`);
-const bad = (s: string) => // console.log(`  ❌ ${s}`);
-const info = (s: string) => // console.log(`  •  ${s}`);
+const ok = (s: string) => { /* console.log(`  ✅ ${s}`); */ };
+const bad = (s: string) => { /* console.log(`  ❌ ${s}`); */ };
+const info = (s: string) => { /* console.log(`  •  ${s}`); */ };
 
     async function run() {
         let failures = 0;
