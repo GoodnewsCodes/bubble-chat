@@ -1,4 +1,2 @@
-allowBuilds:
-  '@scarf/scarf': true
-  protobufjs: true
-  sharp: true
+packages:
+  - '.'
