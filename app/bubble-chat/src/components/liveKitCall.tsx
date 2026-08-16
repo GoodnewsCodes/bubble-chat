@@ -697,7 +697,7 @@ export default function LiveKitCallRoom({
       serverUrl={serverUrl}
       token={token}
       connect={true}
-      audio={true}
+      audio={false}
       video={isVideo}
       onConnected={onConnected}
       onDisconnected={onDisconnected}

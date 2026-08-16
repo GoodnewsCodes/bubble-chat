@@ -69,7 +69,7 @@ const PILL_H = 184;
 
 function GlobalCallOverlay() {
   const [callState, setCallState] = useState<CallState>({ status: 'idle' });
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -202,7 +202,7 @@ function GlobalCallOverlay() {
     const unsubscribe = subscribeCallState((state) => {
       setCallState(state);
       if (state.status === 'calling_out' || state.status === 'calling_in') {
-        setIsMuted(false);
+        setIsMuted(true);
         setIsSpeaker(false);
         setIsCameraActive(state.type === 'video');
         setIsMinimized(false);

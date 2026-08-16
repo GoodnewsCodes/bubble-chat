@@ -1490,6 +1490,36 @@ export default function ChatScreen() {
     return d.toLocaleDateString('en-US', options);
   };
 
+  const isSameSenderMobile = (a: any, b: any) => {
+    if (!a || !b) return false;
+    const aMe = a.sender === 'me';
+    const bMe = b.sender === 'me';
+    if (aMe !== bMe) return false;
+    if (aMe) return true;
+    const aSender = String(a.senderId || a.sender?._id || a.sender?.id || a.senderName || a.sender || '');
+    const bSender = String(b.senderId || b.sender?._id || b.sender?.id || b.senderName || b.sender || '');
+    return aSender && bSender ? aSender === bSender : true;
+  };
+
+  const getMsgTimestampMobile = (m: any): number => {
+    const d = m?.timestamp || m?.createdAt || m?.created_at;
+    if (!d) return 0;
+    const t = new Date(d).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const isWithinSameMinuteMobile = (a: any, b: any): boolean => {
+    if (!a || !b) return false;
+    const tA = getMsgTimestampMobile(a);
+    const tB = getMsgTimestampMobile(b);
+    if (!tA || !tB) return false;
+    const diff = Math.abs(tA - tB);
+    if (diff >= 60000) return false;
+    const dA = new Date(tA);
+    const dB = new Date(tB);
+    return dA.getMinutes() === dB.getMinutes() && dA.getHours() === dB.getHours() && dA.toDateString() === dB.toDateString();
+  };
+
   filteredMessages.forEach(msg => {
     const msgDate = msg.timestamp ? new Date(msg.timestamp) : new Date();
     const dateText = formatDividerDate(msgDate);
@@ -2494,7 +2524,7 @@ export default function ChatScreen() {
               </Text>
             </View>
           ) : (
-            renderedItems.map(item => {
+            renderedItems.map((item, itemIdx) => {
               if (item.type === 'divider') {
                 return (
                   <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 18, paddingHorizontal: 10 }}>
@@ -2519,6 +2549,40 @@ export default function ChatScreen() {
               const isCall = msg.isCall || msg.message_type === 'call' || isLegacyCallLog;
               const isSystem = !isCall && (msg.sender === 'system' || msg.isSystem || msg.is_announcement);
               const isSelected = selectedMessageIds.includes(msg.id);
+
+              const prevItem = itemIdx > 0 ? renderedItems[itemIdx - 1] : null;
+              const nextItem = itemIdx < renderedItems.length - 1 ? renderedItems[itemIdx + 1] : null;
+
+              const prevMsg = prevItem?.type === 'message' ? prevItem.data as any : null;
+              const nextMsg = nextItem?.type === 'message' ? nextItem.data as any : null;
+
+              const isPrevCallOrSystem = prevMsg ? (prevMsg.isCall || prevMsg.message_type === 'call' || prevMsg.sender === 'system' || prevMsg.isSystem || prevMsg.is_announcement) : false;
+              const isNextCallOrSystem = nextMsg ? (nextMsg.isCall || nextMsg.message_type === 'call' || nextMsg.sender === 'system' || nextMsg.isSystem || nextMsg.is_announcement) : false;
+
+              const sameSenderPrev = prevMsg && !isPrevCallOrSystem && isSameSenderMobile(prevMsg, msg);
+              const sameSenderNext = nextMsg && !isNextCallOrSystem && isSameSenderMobile(msg, nextMsg);
+
+              const sameMinutePrev = sameSenderPrev && isWithinSameMinuteMobile(prevMsg, msg);
+              const sameMinuteNext = sameSenderNext && isWithinSameMinuteMobile(msg, nextMsg);
+
+              // Dynamic gap space:
+              // 1) same sender & same minute (< 60s) -> reduced gap (2px)
+              // 2) same sender & <= 5 mins (<= 300s) -> slightly wider gap (6px)
+              // 3) same sender & > 5 mins OR different sender -> current gap space (14px)
+              let rowMarginBottom = 14;
+              if (sameSenderNext) {
+                const diffNext = getMsgTimestampMobile(nextMsg) - getMsgTimestampMobile(msg);
+                if (sameMinuteNext) {
+                  rowMarginBottom = 2;
+                } else if (diffNext >= 0 && diffNext <= 5 * 60 * 1000) {
+                  rowMarginBottom = 6;
+                } else {
+                  rowMarginBottom = 14;
+                }
+              }
+
+              // Profile avatar: only show on the LAST message of a same-minute run
+              const showAvatar = !sameMinuteNext;
 
               // ── Call log entry ─ WhatsApp/Signal-style: icon + type + time ──
               if (isCall) {
@@ -2596,7 +2660,7 @@ export default function ChatScreen() {
               }
 
               return (
-                <View key={msg.id} style={{ marginBottom: 14, position: 'relative' }}>
+                <View key={msg.id} style={{ marginBottom: rowMarginBottom, position: 'relative' }}>
                   {/* Swipe-to-reply hint icon, revealed behind the row as it's dragged right */}
                   <Animated.View
                     pointerEvents="none"
@@ -2649,14 +2713,16 @@ export default function ChatScreen() {
 
                   {/* Left (Received) message avatar */}
                   {!isMe && (
-                    <View style={{ marginRight: 8, marginBottom: 2, alignSelf: 'flex-end', flexShrink: 0 }}>
-                      <Avatar
-                        url={chat.avatar}
-                        userId={!chat.isGroupChat ? chat.otherUserId : undefined}
-                        name={chat.isGroupChat && msg.senderName ? msg.senderName : chat.name}
-                        size={28}
-                        isGroup={chat.isGroupChat ? false : !!chat.organization}
-                      />
+                    <View style={{ width: 28, marginRight: 8, marginBottom: 2, alignSelf: 'flex-end', flexShrink: 0 }}>
+                      {showAvatar && (
+                        <Avatar
+                          url={chat.avatar}
+                          userId={!chat.isGroupChat ? chat.otherUserId : undefined}
+                          name={chat.isGroupChat && msg.senderName ? msg.senderName : chat.name}
+                          size={28}
+                          isGroup={chat.isGroupChat ? false : !!chat.organization}
+                        />
+                      )}
                     </View>
                   )}
 
@@ -2702,7 +2768,7 @@ export default function ChatScreen() {
                         elevation: 1,
                       }}
                     >
-                      {!isMe && chat.isGroupChat && msg.senderName && (
+                      {!isMe && chat.isGroupChat && msg.senderName && !sameMinutePrev && (
                         <Text style={{ fontSize: 10, fontFamily: 'Poppins_700Bold', color: PURPLE, marginBottom: 3 }}>
                           {msg.senderName}
                         </Text>
@@ -2807,40 +2873,46 @@ export default function ChatScreen() {
                     </TouchableOpacity>
 
                     {/* Time and checkmarks outside/under the bubble */}
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginTop: msg.reactions && msg.reactions.length > 0 ? 12 : 4,
-                      paddingHorizontal: 6,
-                    }}>
-                      {msg.isPinned && <Pin size={10} color={INK_SOFT} style={{ marginRight: 4 }} />}
-                      <Text style={{ fontSize: 9.5, fontFamily: 'Poppins_400Regular', color: INK_SOFT }}>
-                        {msg.time}
-                      </Text>
-                      {isMe && (
-                        msg.status === 'queued' ? (
-                          <Clock size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
-                        ) : (msg.isRead && viewerReadReceipts) ? (
-                          <CheckCheck size={11} color="#38bdf8" style={{ marginLeft: 4 }} />
-                        ) : ((msg as any).isDelivered || msg.isRead) ? (
-                          <CheckCheck size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
-                        ) : (
-                          <Check size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
-                        )
-                      )}
-                    </View>
+                    {(!sameMinuteNext || msg.isPinned) && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: msg.reactions && msg.reactions.length > 0 ? 12 : 4,
+                        paddingHorizontal: 6,
+                      }}>
+                        {msg.isPinned && <Pin size={10} color={INK_SOFT} style={{ marginRight: 4 }} />}
+                        {!sameMinuteNext && (
+                          <Text style={{ fontSize: 9.5, fontFamily: 'Poppins_400Regular', color: INK_SOFT }}>
+                            {msg.time}
+                          </Text>
+                        )}
+                        {!sameMinuteNext && isMe && (
+                          msg.status === 'queued' ? (
+                            <Clock size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
+                          ) : (msg.isRead && viewerReadReceipts) ? (
+                            <CheckCheck size={11} color="#38bdf8" style={{ marginLeft: 4 }} />
+                          ) : ((msg as any).isDelivered || msg.isRead) ? (
+                            <CheckCheck size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
+                          ) : (
+                            <Check size={11} color={INK_SOFT} style={{ marginLeft: 4 }} />
+                          )
+                        )}
+                      </View>
+                    )}
                   </View>
 
                   {/* Right (Sent) message avatar */}
                   {isMe && (
-                    <View style={{ marginLeft: 8, marginBottom: 2, alignSelf: 'flex-end', flexShrink: 0 }}>
-                      <Avatar
-                        url={ownUser?.avatar || null}
-                        userId={ownUser?.id || ownUser?._id}
-                        name={ownUser?.name || 'Me'}
-                        size={28}
-                        isGroup={false}
-                      />
+                    <View style={{ width: 28, marginLeft: 8, marginBottom: 2, alignSelf: 'flex-end', flexShrink: 0 }}>
+                      {showAvatar && (
+                        <Avatar
+                          url={ownUser?.avatar || null}
+                          userId={ownUser?.id || ownUser?._id}
+                          name={ownUser?.name || 'Me'}
+                          size={28}
+                          isGroup={false}
+                        />
+                      )}
                     </View>
                   )}
                   </Animated.View>

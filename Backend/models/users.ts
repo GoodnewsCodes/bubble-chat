@@ -89,6 +89,7 @@ export interface IUser extends Document {
     muted?: boolean;
     preview?: boolean;
     sounds?: boolean;
+    ai_suggestions_enabled?: boolean;
   };
   privacy_settings?: {
     profile_photo?: 'everyone' | 'contacts' | 'nobody';
@@ -174,6 +175,7 @@ const UserSchema: Schema<IUser> = new Schema(
       muted: { type: Boolean, default: false },
       preview: { type: Boolean, default: true },
       sounds: { type: Boolean, default: true },
+      ai_suggestions_enabled: { type: Boolean, default: true },
     },
     privacy_settings: {
       profile_photo: { type: String, enum: ['everyone', 'contacts', 'nobody'], default: 'everyone' },

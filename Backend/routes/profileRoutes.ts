@@ -130,6 +130,7 @@ router.patch('/setup', jwtAuth, setupProfile);
  *                   muted: { type: boolean }
  *                   preview: { type: boolean }
  *                   sounds: { type: boolean }
+ *                   ai_suggestions_enabled: { type: boolean }
  *               privacy_settings:
  *                 type: object
  *                 properties:
