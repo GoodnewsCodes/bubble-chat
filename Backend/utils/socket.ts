@@ -183,23 +183,24 @@ export const initSocket = (server: HttpServer) => {
     }
     jwt.verify(token, secret, async (err: any, decoded: any) => {
       if (err) return next(new Error('Authentication error: Invalid token'));
-      (socket as any).userId = decoded.id;
+      const uid = String(decoded.id || decoded._id || '').trim();
+      (socket as any).userId = uid;
       // ALSO store on socket.data — custom props set directly on the socket are NOT
       // carried by the RemoteSocket objects returned from io.fetchSockets(); only
       // socket.data survives. emitToConversation relies on this to detect who is in
       // a room (without it, every in-room user gets a duplicate delivery).
-      socket.data.userId = decoded.id;
+      socket.data.userId = uid;
       try {
-        const user = await User.findById(decoded.id).select('username full_name privacy_settings');
+        const user = await User.findById(decoded.id || decoded._id).select('username full_name privacy_settings');
         if (user) {
           (socket as any).username = user.username;
           (socket as any).fullName = user.full_name;
           // Presence privacy: remember opted-out users so connection handling
           // below can keep them invisible to everyone else.
           if ((user as any).privacy_settings?.show_online_status === false) {
-            hiddenStatusUsers.add(String(decoded.id));
+            hiddenStatusUsers.add(uid);
           } else {
-            hiddenStatusUsers.delete(String(decoded.id));
+            hiddenStatusUsers.delete(uid);
           }
         }
       } catch (dbErr) {
@@ -429,21 +430,27 @@ export const initSocket = (server: HttpServer) => {
 
     // ─── Call Signaling ───────────────────────────────────────────────────────
     socket.on('call_offer', async (data: { toUserId: string; roomId: string; callerName?: string; callerAvatar?: string; type?: 'voice' | 'video' }) => {
-      // Use authenticated socket identity as the authoritative caller name
       const callerName = (socket as any).fullName || (socket as any).username || data.callerName || 'Colleague';
+      const targetId = String(data.toUserId || '').trim();
+      const callerId = String(userId || '').trim();
+
+      if (!targetId || targetId === callerId) {
+        console.warn(`[Call] Invalid call offer targetId: "${targetId}", callerId: "${callerId}"`);
+        return;
+      }
 
       // Busy gate: if the target is already in a different call, don't ring or
       // push them at all — tell the caller immediately instead.
-      const targetBusy = getActiveCall(data.toUserId);
+      const targetBusy = getActiveCall(targetId);
       if (targetBusy && targetBusy.roomId !== data.roomId) {
-        socket.emit('call_busy', { toUserId: data.toUserId, roomId: data.roomId, type: data.type || 'voice' });
+        socket.emit('call_busy', { toUserId: targetId, roomId: data.roomId, type: data.type || 'voice' });
         logActivity({
-          actor: userId,
+          actor: callerId,
           action: 'call_busy',
-          entityId: data.toUserId,
+          entityId: targetId,
           entityType: 'Call',
           entityLabel: callerName,
-          metadata: { roomId: data.roomId, callType: data.type || 'voice', to: data.toUserId },
+          metadata: { roomId: data.roomId, callType: data.type || 'voice', to: targetId },
         });
         return;
       }
@@ -451,28 +458,28 @@ export const initSocket = (server: HttpServer) => {
       // Caller joins the room immediately so hangup events later reach this socket
       socket.join(data.roomId);
       // Ringing out counts as busy — a cross-ring while dialing must not double-book.
-      setActiveCall(userId, data.roomId, data.type || 'voice');
+      setActiveCall(callerId, data.roomId, data.type || 'voice');
 
-      io.to(String(data.toUserId)).emit('incoming_call', {
+      io.to(targetId).emit('incoming_call', {
         ...data,
-        fromUserId: userId,
+        fromUserId: callerId,
         callerName,
       });
 
       // Persist an auditable trace: who called whom, on which room, at what time.
       logActivity({
-        actor: userId,
+        actor: callerId,
         action: 'call_initiated',
-        entityId: data.toUserId,
+        entityId: targetId,
         entityType: 'Call',
         entityLabel: callerName,
-        metadata: { roomId: data.roomId, callType: data.type || 'voice', to: data.toUserId },
+        metadata: { roomId: data.roomId, callType: data.type || 'voice', to: targetId },
       });
 
       // Send push notification for incoming call asynchronously
       const typeStr = data.type === 'video' ? 'video call' : 'voice call';
       sendPushNotification(
-        [data.toUserId],
+        [targetId],
         `Incoming ${typeStr} from ${callerName}`,
         `${callerName} is calling you...`,
         {
