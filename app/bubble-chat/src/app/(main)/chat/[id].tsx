@@ -1503,21 +1503,57 @@ export default function ChatScreen() {
 
   const getMsgTimestampMobile = (m: any): number => {
     const d = m?.timestamp || m?.createdAt || m?.created_at;
-    if (!d) return 0;
-    const t = new Date(d).getTime();
-    return isNaN(t) ? 0 : t;
+    if (d) {
+      const t = new Date(d).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
+  };
+
+  const parseTimeStrToMinutesMobile = (str?: string): number | null => {
+    if (!str || typeof str !== 'string') return null;
+    const match = str.match(/(\d{1,2}):(\d{2})(?:\s*([ap]m))?/i);
+    if (!match) return null;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridian = match[3]?.toLowerCase();
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
   };
 
   const isWithinSameMinuteMobile = (a: any, b: any): boolean => {
     if (!a || !b) return false;
     const tA = getMsgTimestampMobile(a);
     const tB = getMsgTimestampMobile(b);
-    if (!tA || !tB) return false;
-    const diff = Math.abs(tA - tB);
-    if (diff >= 60000) return false;
-    const dA = new Date(tA);
-    const dB = new Date(tB);
-    return dA.getMinutes() === dB.getMinutes() && dA.getHours() === dB.getHours() && dA.toDateString() === dB.toDateString();
+    if (tA && tB) {
+      const diff = Math.abs(tA - tB);
+      if (diff < 60000) return true;
+      const dA = new Date(tA);
+      const dB = new Date(tB);
+      if (dA.getMinutes() === dB.getMinutes() && dA.getHours() === dB.getHours() && dA.toDateString() === dB.toDateString()) {
+        return true;
+      }
+    }
+    if (a.time && b.time && a.time === b.time) return true;
+    const minA = parseTimeStrToMinutesMobile(a.time);
+    const minB = parseTimeStrToMinutesMobile(b.time);
+    if (minA !== null && minB !== null && minA === minB) return true;
+    return false;
+  };
+
+  const getMinuteDifferenceMobile = (a: any, b: any): number => {
+    const tA = getMsgTimestampMobile(a);
+    const tB = getMsgTimestampMobile(b);
+    if (tA && tB) {
+      return (tB - tA) / (1000 * 60);
+    }
+    const minA = parseTimeStrToMinutesMobile(a.time);
+    const minB = parseTimeStrToMinutesMobile(b.time);
+    if (minA !== null && minB !== null) {
+      return minB - minA;
+    }
+    return 999;
   };
 
   filteredMessages.forEach(msg => {
@@ -2566,18 +2602,20 @@ export default function ChatScreen() {
               const sameMinuteNext = sameSenderNext && isWithinSameMinuteMobile(msg, nextMsg);
 
               // Dynamic gap space:
-              // 1) same sender & same minute (< 60s) -> reduced gap (2px)
-              // 2) same sender & <= 5 mins (<= 300s) -> slightly wider gap (6px)
-              // 3) same sender & > 5 mins OR different sender -> current gap space (14px)
-              let rowMarginBottom = 14;
+              // 1) same sender & same minute (< 60s / same time) -> reduced gap (2px)
+              // 2) same sender & <= 5 mins (<= 300s) -> slightly wider gap (8px)
+              // 3) same sender & > 5 mins OR different sender -> current/wide gap space (16px)
+              let rowMarginBottom = 16;
               if (sameSenderNext) {
-                const diffNext = getMsgTimestampMobile(nextMsg) - getMsgTimestampMobile(msg);
                 if (sameMinuteNext) {
                   rowMarginBottom = 2;
-                } else if (diffNext >= 0 && diffNext <= 5 * 60 * 1000) {
-                  rowMarginBottom = 6;
                 } else {
-                  rowMarginBottom = 14;
+                  const minDiff = getMinuteDifferenceMobile(msg, nextMsg);
+                  if (minDiff >= 0 && minDiff <= 5) {
+                    rowMarginBottom = 8;
+                  } else {
+                    rowMarginBottom = 16;
+                  }
                 }
               }
 

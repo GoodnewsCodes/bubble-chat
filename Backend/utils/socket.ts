@@ -74,7 +74,7 @@ interface ActiveUserCall {
 const activeCallByUser = new Map<string, ActiveUserCall>();
 
 // Anything older than this is presumed to be a leaked entry (missed hangup).
-const ACTIVE_CALL_STALE_MS = 4 * 60 * 60 * 1000;
+const ACTIVE_CALL_STALE_MS = 10 * 60 * 1000; // 10 minutes (down from 4h so leaked slots quickly self-heal)
 
 const getActiveCall = (userId: string): ActiveUserCall | undefined => {
   const entry = activeCallByUser.get(String(userId));
@@ -214,7 +214,7 @@ export const initSocket = (server: HttpServer) => {
     // console.log(`✅ Authenticated socket connection: ${socket.id} (User: ${userId})`);
 
     // Automatically register user on connection and join their personal room
-    socket.join(userId); // <-- personal room: guarantees delivery even when no chat is open
+    socket.join(String(userId)); // <-- personal room: guarantees delivery even when no chat is open
 
     // Register this socket; only broadcast "online" on the FIRST socket for the user.
     const existing = onlineSockets.get(userId) || new Set<string>();
@@ -452,7 +452,7 @@ export const initSocket = (server: HttpServer) => {
       // Ringing out counts as busy — a cross-ring while dialing must not double-book.
       setActiveCall(userId, data.roomId, data.type || 'voice');
 
-      io.to(data.toUserId).emit('incoming_call', {
+      io.to(String(data.toUserId)).emit('incoming_call', {
         ...data,
         fromUserId: userId,
         callerName,
@@ -505,7 +505,7 @@ export const initSocket = (server: HttpServer) => {
       // The inviter is mid-call in this room — make sure the registry knows.
       setActiveCall(userId, data.roomId, data.type || 'voice');
 
-      io.to(data.toUserId).emit('incoming_call', {
+      io.to(String(data.toUserId)).emit('incoming_call', {
         ...data,
         fromUserId: userId,
         callerName,
