@@ -216,26 +216,27 @@ export const initSocket = (server: HttpServer) => {
     // Automatically register user on connection and join their personal room
     socket.join(String(userId)); // <-- personal room: guarantees delivery even when no chat is open
 
+    const uid = String(userId);
     // Register this socket; only broadcast "online" on the FIRST socket for the user.
-    const existing = onlineSockets.get(userId) || new Set<string>();
+    const existing = onlineSockets.get(uid) || new Set<string>();
     const wasOffline = existing.size === 0;
     existing.add(socket.id);
-    onlineSockets.set(userId, existing);
+    onlineSockets.set(uid, existing);
 
-    const statusHidden = hiddenStatusUsers.has(String(userId));
+    const statusHidden = hiddenStatusUsers.has(uid);
     if (wasOffline) {
       // Hidden users never flip isOnline in the DB and never broadcast — they
       // stay "offline" to everyone while still fully connected themselves.
-      User.findByIdAndUpdate(userId, { socketId: socket.id, isOnline: !statusHidden, lastSeen: new Date() })
+      User.findByIdAndUpdate(uid, { socketId: socket.id, isOnline: !statusHidden, lastSeen: new Date() })
         .then(() => {
           if (!statusHidden) {
-            socket.broadcast.emit('user_status_change', { userId, isOnline: true });
+            socket.broadcast.emit('user_status_change', { userId: uid, isOnline: true });
           }
         })
         .catch((err) => console.error('Presence online update failed:', err));
     } else {
       // Keep socketId pointing at a live socket for any legacy lookups.
-      User.findByIdAndUpdate(userId, { socketId: socket.id }).catch(() => undefined);
+      User.findByIdAndUpdate(uid, { socketId: socket.id }).catch(() => undefined);
     }
 
     // Seed the connecting client with everyone currently online so its UI starts
@@ -795,30 +796,31 @@ export const initSocket = (server: HttpServer) => {
     socket.on('disconnect', async () => {
       // console.log(`Socket disconnected: ${socket.id}`);
       try {
-        const set = onlineSockets.get(userId);
+        const uid = String(userId);
+        const set = onlineSockets.get(uid);
         if (set) {
           set.delete(socket.id);
           if (set.size > 0) {
             // Other tabs/devices for this user are still connected — stay online.
-            onlineSockets.set(userId, set);
+            onlineSockets.set(uid, set);
             return;
           }
-          onlineSockets.delete(userId);
+          onlineSockets.delete(uid);
         }
 
         // Last socket gone → they can't be in a call anymore; free the busy slot
         // so they can be rung the moment they reconnect.
-        activeCallByUser.delete(String(userId));
+        activeCallByUser.delete(uid);
 
         // Genuine last disconnect → mark offline and broadcast once. Hidden
         // users never appeared online, so no offline broadcast for them either.
-        await User.findByIdAndUpdate(userId, {
+        await User.findByIdAndUpdate(uid, {
           socketId: '',
           isOnline: false,
           lastSeen: new Date(),
         });
-        if (!hiddenStatusUsers.has(String(userId))) {
-          socket.broadcast.emit('user_status_change', { userId, isOnline: false });
+        if (!hiddenStatusUsers.has(uid)) {
+          socket.broadcast.emit('user_status_change', { userId: uid, isOnline: false });
         }
       } catch (err) {
         console.error('Error on disconnect:', err);

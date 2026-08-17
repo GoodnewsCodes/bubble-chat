@@ -69,7 +69,7 @@ export const clearCallLogs = async (req: Request, res: Response) => {
     await CallLog.deleteMany({ user: userId });
 
     const { Meeting } = require('../models/meeting');
-    await Meeting.deleteMany({ host: userId });
+    await Meeting.deleteMany({ $or: [{ host: userId }, { attendees: userId }] });
 
     res.json({ message: 'Call logs cleared successfully.' });
   } catch (err: any) {
