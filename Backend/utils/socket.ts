@@ -572,16 +572,20 @@ export const initSocket = (server: HttpServer) => {
       setActiveCall(data.toUserId, data.roomId, groupCall?.type || 'voice');
 
       // Pull the caller's open sockets into the same room so they can hear the callee's hangup.
-      try {
-        const targetSockets = await io.in(data.toUserId).fetchSockets();
-        for (const s of targetSockets) {
-          await s.join(data.roomId);
+      const targetId = String(data.toUserId || '').trim();
+      if (targetId) {
+        try {
+          const targetSockets = await io.in(targetId).fetchSockets();
+          for (const s of targetSockets) {
+            await s.join(data.roomId);
+          }
+        } catch (err) {
+          console.error('[Call] Failed to join caller socket(s) to room:', err);
         }
-      } catch (err) {
-        console.error('[Call] Failed to join caller socket(s) to room:', err);
-      }
 
-      io.to(data.toUserId).emit('call_accepted', { byUserId: userId, roomId: data.roomId });
+        io.to(targetId).emit('call_accepted', { byUserId: userId, roomId: data.roomId });
+      }
+      io.to(data.roomId).emit('call_accepted', { byUserId: userId, roomId: data.roomId });
 
       logActivity({
         actor: userId,
