@@ -99,11 +99,20 @@ export const clearActiveCallsForRoom = (roomId?: string) => {
   }
 };
 
+export const notifySessionRevoked = (userId: string) => {
+  if (!io) return;
+  const uid = String(userId);
+  io.to(uid).emit('session_expired', {
+    message: 'You have been logged out because your account was logged in on another device.',
+  });
+  io.in(uid).disconnectSockets(true);
+};
+
 const GROUP_REMINDER_INTERVAL_MS = 5 * 60 * 1000;  // re-ring inactive members every 5 min
 const GROUP_CALL_MAX_AGE_MS = 30 * 60 * 1000;      // stop reminding after 30 min
 
-const endGroupCallTracking = (roomId?: string) => {
-  if (roomId) activeGroupCalls.delete(roomId);
+const endGroupCallTracking = (roomId: string) => {
+  activeGroupCalls.delete(roomId);
 };
 
 // ─── Empty-room safeguard ──────────────────────────────────────────────────
@@ -112,10 +121,16 @@ const endGroupCallTracking = (roomId?: string) => {
 // empties out (everyone left or dropped, including the host, without anyone
 // clicking End), the Meeting record would stay 'live' forever. Give it a short
 // grace period for reconnects, then auto-end it.
-const EMPTY_ROOM_GRACE_MS = 45 * 1000;
-const scheduleEmptyRoomCheck = (roomId: string) => {
-  if (!roomId) return;
-  setTimeout(async () => {
+const EMPTY_ROOM_GRACE_MS = 60 * 1000;
+const emptyRoomTimeouts = new Map<string, NodeJS.Timeout>();
+
+export const scheduleEmptyRoomCheck = (roomId: string) => {
+  if (!io || !roomId) return;
+  if (emptyRoomTimeouts.has(roomId)) return;
+
+  const timeout = setTimeout(async () => {
+    emptyRoomTimeouts.delete(roomId);
+    if (!io) return;
     try {
       const stillOccupied = (io.sockets.adapter.rooms.get(roomId)?.size || 0) > 0;
       if (stillOccupied) return;
@@ -125,6 +140,7 @@ const scheduleEmptyRoomCheck = (roomId: string) => {
       console.error('[Meeting] Empty-room check failed:', err);
     }
   }, EMPTY_ROOM_GRACE_MS);
+  emptyRoomTimeouts.set(roomId, timeout);
 };
 
 export const initSocket = (server: HttpServer) => {
@@ -143,6 +159,8 @@ export const initSocket = (server: HttpServer) => {
   setInterval(() => {
     const now = Date.now();
     for (const [roomId, call] of activeGroupCalls) {
+      const GROUP_CALL_MAX_AGE_MS = 30 * 60 * 1000;
+      const GROUP_REMINDER_INTERVAL_MS = 5 * 60 * 1000;
       if (now - call.startedAt > GROUP_CALL_MAX_AGE_MS) { activeGroupCalls.delete(roomId); continue; }
       if (now - call.lastReminder < GROUP_REMINDER_INTERVAL_MS) continue;
       const pending = [...call.invited].filter((u) => !call.joined.has(u));
@@ -191,10 +209,17 @@ export const initSocket = (server: HttpServer) => {
       // a room (without it, every in-room user gets a duplicate delivery).
       socket.data.userId = uid;
       try {
-        const user = await User.findById(decoded.id || decoded._id).select('username full_name privacy_settings');
+        const user = await User.findById(decoded.id || decoded._id).select('username full_name privacy_settings +currentSessionId');
         if (user) {
+          // Verify session ID has not been invalidated by a newer login on another device
+          if (decoded.sessionId && user.currentSessionId && decoded.sessionId !== user.currentSessionId) {
+            return next(new Error('Authentication error: Session expired (logged in on another device)'));
+          }
+
           (socket as any).username = user.username;
           (socket as any).fullName = user.full_name;
+          (socket as any).sessionId = decoded.sessionId;
+          socket.data.sessionId = decoded.sessionId;
           // Presence privacy: remember opted-out users so connection handling
           // below can keep them invisible to everyone else.
           if ((user as any).privacy_settings?.show_online_status === false) {

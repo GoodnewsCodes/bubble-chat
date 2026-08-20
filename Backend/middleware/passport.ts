@@ -73,9 +73,13 @@ if (process.env.JWT_KEY) {
         secretOrKey: process.env.JWT_KEY
     }, async (payload, done) => {
         try {
-            const user = await User.findById(payload.id);
-            if (user) return done(null, user);
-            return done(null, false);
+            const user = await User.findById(payload.id).select('+currentSessionId');
+            if (!user) return done(null, false);
+            // Enforce single active session: invalidate token if user logged in on another device
+            if (payload.sessionId && user.currentSessionId && payload.sessionId !== user.currentSessionId) {
+                return done(null, false, { message: 'Session expired: logged in on another device.' });
+            }
+            return done(null, user);
         } catch (err) {
             return done(err);
         }

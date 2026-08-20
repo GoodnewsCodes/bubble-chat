@@ -25,13 +25,13 @@ export const getRefreshKey = (): string => {
   return key;
 };
 
-const generateAccessToken = (userId: string) => {
+export const generateAccessToken = (userId: string, sessionId?: string) => {
   if (!process.env.JWT_KEY) throw new Error('JWT_KEY is not set — refusing to use a default secret');
-  return jwt.sign({ id: userId }, process.env.JWT_KEY, { expiresIn: '2d' });
+  return jwt.sign({ id: userId, sessionId: sessionId || crypto.randomUUID() }, process.env.JWT_KEY, { expiresIn: '2d' });
 };
 
-const generateRefreshToken = (userId: string) =>
-  jwt.sign({ id: userId }, getRefreshKey(), { expiresIn: '30d' });
+export const generateRefreshToken = (userId: string, sessionId?: string) =>
+  jwt.sign({ id: userId, sessionId: sessionId || crypto.randomUUID() }, getRefreshKey(), { expiresIn: '30d' });
 
 // ─── Cookie Helpers ────────────────────────────────────────────────────────────
 
@@ -433,16 +433,23 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
     otpRecord.isUsed = true;
     await otpRecord.save();
 
-    const refreshToken = generateRefreshToken(String(user._id));
+    const sessionId = crypto.randomUUID();
+    const refreshToken = generateRefreshToken(String(user._id), sessionId);
     await User.findByIdAndUpdate(user._id, {
       isVerified: true,
       isOnline: true,
       lastSeen: new Date(),
       refreshToken,
+      currentSessionId: sessionId,
       onboardingStep: 'awaiting_profile',
     });
 
-    const accessToken = generateAccessToken(String(user._id));
+    const accessToken = generateAccessToken(String(user._id), sessionId);
+
+    try {
+      const { notifySessionRevoked } = await import('../utils/socket');
+      notifySessionRevoked(String(user._id));
+    } catch { }
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -573,14 +580,21 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const accessToken = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const sessionId = crypto.randomUUID();
+    const accessToken = generateAccessToken(String(user._id), sessionId);
+    const refreshToken = generateRefreshToken(String(user._id), sessionId);
 
     await User.findByIdAndUpdate(user._id, {
       refreshToken,
+      currentSessionId: sessionId,
       isOnline: true,
       lastSeen: new Date(),
     });
+
+    try {
+      const { notifySessionRevoked } = await import('../utils/socket');
+      notifySessionRevoked(String(user._id));
+    } catch { }
 
     logActivity({
       actor: user._id,
@@ -612,6 +626,7 @@ export const logout = async (req: any, res: Response): Promise<void> => {
 
     await User.findByIdAndUpdate(req.user._id, {
       refreshToken: '',
+      currentSessionId: '',
       isOnline: false,
       lastSeen: new Date(),
       socketId: '',
@@ -788,16 +803,26 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const user = await User.findById(decoded.id).select('+refreshToken');
+    const user = await User.findById(decoded.id).select('+refreshToken +currentSessionId');
     if (!user || user.refreshToken !== token) {
       res.status(401).json({ message: 'Refresh token is invalid or has been revoked.' });
       return;
     }
 
-    const newAccessToken = generateAccessToken(String(user._id));
-    const newRefreshToken = generateRefreshToken(String(user._id));
+    // If the refresh token has a sessionId, verify it still matches the user's active session
+    if (decoded.sessionId && user.currentSessionId && decoded.sessionId !== user.currentSessionId) {
+      res.status(401).json({ message: 'Session expired: logged in on another device.' });
+      return;
+    }
 
-    await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken });
+    const sessionId = user.currentSessionId || decoded.sessionId || crypto.randomUUID();
+    const newAccessToken = generateAccessToken(String(user._id), sessionId);
+    const newRefreshToken = generateRefreshToken(String(user._id), sessionId);
+
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: newRefreshToken,
+      currentSessionId: sessionId,
+    });
 
     setAuthCookies(res, newAccessToken, newRefreshToken);
 
@@ -912,14 +937,21 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
       return;
     }
 
-    const accessToken  = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const sessionId = crypto.randomUUID();
+    const accessToken  = generateAccessToken(String(user._id), sessionId);
+    const refreshToken = generateRefreshToken(String(user._id), sessionId);
 
     await User.findByIdAndUpdate(user._id, {
       refreshToken,
+      currentSessionId: sessionId,
       isOnline: true,
       lastSeen: new Date(),
     });
+
+    try {
+      const { notifySessionRevoked } = await import('../utils/socket');
+      notifySessionRevoked(String(user._id));
+    } catch { }
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -1085,14 +1117,21 @@ export const googleMobileLogin = async (req: Request, res: Response): Promise<vo
       }
     }
 
-    const accessToken  = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const sessionId = crypto.randomUUID();
+    const accessToken  = generateAccessToken(String(user._id), sessionId);
+    const refreshToken = generateRefreshToken(String(user._id), sessionId);
 
     await User.findByIdAndUpdate(user._id, {
       refreshToken,
+      currentSessionId: sessionId,
       isOnline: true,
       lastSeen: new Date(),
     });
+
+    try {
+      const { notifySessionRevoked } = await import('../utils/socket');
+      notifySessionRevoked(String(user._id));
+    } catch { }
 
     res.status(200).json({
       message: 'Google login successful.',
@@ -1302,9 +1341,20 @@ export const clerkSync = async (req: Request, res: Response): Promise<void> => {
       user = (await User.findById(user._id))!;
     }
 
-    const accessToken = generateAccessToken(String(user._id));
-    const newRefreshToken = generateRefreshToken(String(user._id));
-    await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken, isOnline: true, lastSeen: new Date() });
+    const sessionId = crypto.randomUUID();
+    const accessToken = generateAccessToken(String(user._id), sessionId);
+    const newRefreshToken = generateRefreshToken(String(user._id), sessionId);
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: newRefreshToken,
+      currentSessionId: sessionId,
+      isOnline: true,
+      lastSeen: new Date(),
+    });
+
+    try {
+      const { notifySessionRevoked } = await import('../utils/socket');
+      notifySessionRevoked(String(user._id));
+    } catch { }
 
     res.status(200).json({
       message: 'Clerk sync successful.',

@@ -255,9 +255,12 @@ export const createInviteLink = async (req: Request, res: Response) => {
 
 export const getLiveKitToken = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id?.toString() || 'guest';
+    const rawUserId = (req as any).user?._id?.toString();
+    const identity = rawUserId 
+      ? `${rawUserId}_${Math.random().toString(36).substring(2, 7)}`
+      : `guest_${Math.random().toString(36).substring(2, 9)}`;
     const userName = (req as any).user?.full_name || (req as any).user?.username || 'Colleague';
-    const roomId = req.query.roomId as string || `meet-${Math.random().toString(36).substring(7)}`;
+    const roomId = ((req.query.roomId as string) || '').trim() || `meet-${Math.random().toString(36).substring(7)}`;
     const userAvatar = (req as any).user?.avatar || '';
 
     // When the request carries a signed invite token, verify it matches this room.
@@ -277,8 +280,8 @@ export const getLiveKitToken = async (req: Request, res: Response) => {
     }
 
     const { generateLiveKitToken } = await import('../utils/livekitService');
-    const token = await generateLiveKitToken(roomId, userName, userId, userAvatar);
-    const url = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || '';
+    const token = await generateLiveKitToken(roomId, userName, identity, userAvatar);
+    const url = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || 'wss://bubblespace-5pzmshce.livekit.cloud';
     res.json({ token, url, roomId });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
