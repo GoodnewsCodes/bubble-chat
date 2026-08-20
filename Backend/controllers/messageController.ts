@@ -90,6 +90,7 @@ export const formatMessage = async (m: any) => ({
   mediaType: m.mediaType || null,
   fileSize: m.fileSize || null,
   media_metadata: m.media_metadata || null,
+  duration: m.media_metadata?.duration ?? m.duration ?? null,
   call_metadata: m.call_metadata || null,
   transcript: m.transcript || null,
   location: m.location || null,
