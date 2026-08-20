@@ -1,3 +1,4 @@
+// @ts-ignore
 import webpush from 'web-push';
 
 let vapidInitialized = false;
@@ -56,7 +57,7 @@ export const sendWebPushNotification = async (
 ): Promise<void> => {
   if (!vapidInitialized) return;
 
-  let subscription: webpush.PushSubscription;
+  let subscription: any;
   try {
     subscription = JSON.parse(subscriptionJson);
   } catch {
