@@ -1176,6 +1176,62 @@ export const savePushToken = async (req: any, res: Response): Promise<void> => {
   }
 };
 
+// ─── WEB PUSH (VAPID) ─────────────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/auth/web-push-subscribe
+ * Saves a Web Push PushSubscription object (from the browser's PushManager.subscribe()
+ * call) as a push token for the authenticated user. Subsequent pushes sent by the
+ * server via sendPushNotification() will be routed through VAPID Web Push for this
+ * device. Calling this again with the same subscription is a no-op (upsert on endpoint).
+ */
+export const saveWebPushSubscription = async (req: any, res: Response): Promise<void> => {
+  try {
+    const userId       = req.user?._id;
+    const { subscription } = req.body;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    if (!subscription?.endpoint) {
+      res.status(400).json({ message: 'subscription.endpoint is required' });
+      return;
+    }
+
+    // Store the full subscription JSON as the token; use endpoint as the unique key
+    const tokenStr = JSON.stringify(subscription);
+
+    await PushToken.findOneAndUpdate(
+      { token: tokenStr },
+      { userId, deviceType: 'web', platform: 'web' },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    res.status(200).json({ success: true, message: 'Web push subscription saved.' });
+  } catch (error: any) {
+    console.error('[saveWebPushSubscription] error:', error);
+    res.status(500).json({ message: 'Failed to save web push subscription.' });
+  }
+};
+
+/**
+ * GET /api/v1/auth/vapid-public-key
+ * Returns the VAPID public key so the client can call PushManager.subscribe().
+ * Public endpoint — no auth required (the key itself is not a secret).
+ */
+export const getVapidPublicKey = async (_req: Request, res: Response): Promise<void> => {
+  const { getVapidPublicKey: vapidKey } = await import('../utils/webPush');
+  const publicKey = vapidKey();
+  if (!publicKey) {
+    res.status(503).json({ message: 'Web push not configured on this server.' });
+    return;
+  }
+  res.status(200).json({ publicKey });
+};
+
+
 // ─── CLERK AUTH SYNC ──────────────────────────────────────────────────────────
 // Verifies a Clerk session token (issued by @clerk/clerk-expo on mobile) and
 // exchanges it for our own app JWT.  Finds or creates the user by email so IDs

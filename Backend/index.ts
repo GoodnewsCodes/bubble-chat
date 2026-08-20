@@ -17,6 +17,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { initSocket, getIO } from './utils/socket';
+import { initWebPush } from './utils/webPush';
 import { initSecurityScheduler, initTranscriptProcessor, initTaskReminderScheduler, initActionItemFollowUpScheduler, initDailyDigestScheduler, initWeeklyDigestScheduler, initHolidayReminderScheduler, initMeetingStartRingScheduler } from './utils/scheduler';
 import { initBrainEventListener } from './utils/brainEventListener';
 import { warmEmbeddings } from './utils/embeddings';
@@ -463,6 +464,7 @@ app.use((err: any, req: Request, res: Response, _next: any) => {
 if (!process.env.VERCEL) {
   const server = http.createServer(app);
   initSocket(server);
+  initWebPush();
 
   server.listen(Number(PORT), '0.0.0.0', () => {
 

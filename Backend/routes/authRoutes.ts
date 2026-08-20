@@ -19,6 +19,8 @@ import {
   setup2FA,
   verify2FA,
   savePushToken,
+  saveWebPushSubscription,
+  getVapidPublicKey,
   clerkSync,
 } from '../controllers/authController';
 
@@ -201,8 +203,22 @@ router.get(
  */
 router.post('/google/mobile', googleMobileLogin);
 
-/** POST /api/v1/auth/push-token */
+/** POST /api/v1/auth/push-token — register Expo push token */
 router.post('/push-token', jwtAuth, savePushToken);
+
+/**
+ * POST /api/v1/auth/web-push-subscribe
+ * Saves a browser Web Push subscription (PushSubscription JSON) so the server
+ * can deliver push notifications to this PWA install via VAPID.
+ */
+router.post('/web-push-subscribe', jwtAuth, saveWebPushSubscription);
+
+/**
+ * GET /api/v1/auth/vapid-public-key
+ * Returns the VAPID public key needed by the browser to subscribe to push.
+ * Public — no authentication required.
+ */
+router.get('/vapid-public-key', getVapidPublicKey);
 
 /**
  * POST /api/v1/auth/clerk-sync
