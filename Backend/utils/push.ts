@@ -66,7 +66,7 @@ export const sendPushNotification = async (
     if (pushTokens.length === 0) return;
 
     // ── Split tokens by delivery channel ─────────────────────────────────────
-    const webTokens:  typeof pushTokens = [];
+    const webTokens: typeof pushTokens = [];
     const expoTokens: typeof pushTokens = [];
 
     for (const pt of pushTokens) {
@@ -91,7 +91,7 @@ export const sendPushNotification = async (
             title,
             body: redact ? 'New message' : body,
             icon: '/pwa-192x192.svg',
-            badge: '/icon-light-32x32.png',
+            badge: '/favicon.svg',
             // Calls keep the notification visible and add Answer/Decline buttons
             tag: isCall ? `call-${data?.roomId || 'ring'}` : undefined,
             requireInteraction: isCall,
@@ -105,9 +105,9 @@ export const sendPushNotification = async (
             },
             actions: isCall
               ? [
-                  { action: 'answer', title: '✅ Answer' },
-                  { action: 'decline', title: '❌ Decline' },
-                ]
+                { action: 'answer', title: '✅ Answer' },
+                { action: 'decline', title: '❌ Decline' },
+              ]
               : undefined,
           });
         } catch (err: any) {

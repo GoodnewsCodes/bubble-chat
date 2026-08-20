@@ -198,7 +198,7 @@ const transcribeVoiceNoteAsync = async (
 };
 
 export const sendMessage = async (req: AuthRequest, res: Response): Promise<void> => {
-  let { content, chatId, message_type, mediaUrl, mediaType, parent_message, fileSize, media_metadata, is_encrypted, location, mentions, media_duration, clientId } = req.body;
+  let { content, chatId, message_type, mediaUrl, mediaType, parent_message, fileSize, media_metadata, is_encrypted, location, mentions, media_duration, clientId, is_forwarded, transcript } = req.body;
 
   // Set when a voice note is uploaded: a copy of the audio kept on disk so the
   // async transcription can run after we've already replied to the client.
@@ -308,6 +308,8 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
       parent_message,
       fileSize,
       media_metadata,
+      transcript: transcript || undefined,
+      is_forwarded: is_forwarded ? true : false,
       is_encrypted: false, // E2EE removed — messages are always stored as plaintext
       location,
       mentions: mentions || [],
