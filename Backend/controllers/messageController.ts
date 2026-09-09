@@ -206,9 +206,11 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
 
   if (req.file) {
     try {
+      const safeOrigName = (req.file.originalname || 'upload').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileKey = `messages/${chatId || 'general'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeOrigName}`;
       const result = await uploadToFilebase(
         fs.createReadStream(req.file.path),
-        req.file.originalname,
+        fileKey,
         req.file.mimetype
       );
 
@@ -519,27 +521,111 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    // Incremental sync: with a `since` cursor, return only messages created or
-    // updated after it (new messages, plus edits/reactions that bump updatedAt).
-    // The mobile client passes the timestamp of its newest cached message and
-    // merges the delta by id, so it doesn't refetch the whole thread each sync.
-    // Realtime edits/deletes still arrive over sockets; this is the catch-up net.
+    // Query parameters for pagination and fast lazy-loading:
+    // - since: incremental sync cursor
+    // - before: load older messages prior to this timestamp
+    // - recentOnly: initial fast load (yesterday 00:00:00 to present)
+    // - limit: batch size (default 30)
     const sinceRaw = typeof req.query.since === 'string' ? req.query.since : undefined;
     const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
     const sinceValid = sinceDate && !isNaN(sinceDate.getTime());
 
-    const messages = await Message.find({
-      chat: req.params.chatId,
-      deletedFor: { $ne: req.user._id },
-      ...(sinceValid ? { $or: [{ createdAt: { $gt: sinceDate } }, { updatedAt: { $gt: sinceDate } }] } : {}),
-    })
-      .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
-      .populate('chat')
-      .populate({
-        path: 'parent_message',
-        populate: { path: 'sender', select: 'full_name uniqueTag' }
+    const beforeRaw = typeof req.query.before === 'string' ? req.query.before : undefined;
+    const beforeDate = beforeRaw ? new Date(beforeRaw) : null;
+    const beforeValid = beforeDate && !isNaN(beforeDate.getTime());
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 30, 1), 100);
+    const recentOnly = req.query.recentOnly === 'true';
+
+    let messages: any[] = [];
+
+    if (beforeValid) {
+      // Loading older messages on scroll-up
+      const older = await Message.find({
+        chat: req.params.chatId,
+        deletedFor: { $ne: req.user._id },
+        createdAt: { $lt: beforeDate },
       })
-      .sort({ createdAt: 1 });
+        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+        .populate('chat')
+        .populate({
+          path: 'parent_message',
+          populate: { path: 'sender', select: 'full_name uniqueTag' }
+        })
+        .sort({ createdAt: -1 })
+        .limit(limit);
+
+      messages = older.reverse();
+    } else if (sinceValid) {
+      // Incremental sync
+      messages = await Message.find({
+        chat: req.params.chatId,
+        deletedFor: { $ne: req.user._id },
+        $or: [{ createdAt: { $gt: sinceDate } }, { updatedAt: { $gt: sinceDate } }],
+      })
+        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+        .populate('chat')
+        .populate({
+          path: 'parent_message',
+          populate: { path: 'sender', select: 'full_name uniqueTag' }
+        })
+        .sort({ createdAt: 1 });
+    } else if (recentOnly) {
+      // Initial chat load: load messages from yesterday 00:00:00 to now
+      const now = new Date();
+      const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+
+      const recentMessages = await Message.find({
+        chat: req.params.chatId,
+        deletedFor: { $ne: req.user._id },
+        createdAt: { $gte: startOfYesterday },
+      })
+        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+        .populate('chat')
+        .populate({
+          path: 'parent_message',
+          populate: { path: 'sender', select: 'full_name uniqueTag' }
+        })
+        .sort({ createdAt: 1 });
+
+      // If fewer than 20 messages exist in today+yesterday, fetch the latest 30 messages in total so chat is never blank
+      if (recentMessages.length < 20) {
+        const latestBatch = await Message.find({
+          chat: req.params.chatId,
+          deletedFor: { $ne: req.user._id },
+        })
+          .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+          .populate('chat')
+          .populate({
+            path: 'parent_message',
+            populate: { path: 'sender', select: 'full_name uniqueTag' }
+          })
+          .sort({ createdAt: -1 })
+          .limit(limit);
+
+        messages = latestBatch.reverse();
+      } else {
+        messages = recentMessages;
+      }
+    } else {
+      // Standard fetch (default to all, or latest batch if limit provided)
+      const query = Message.find({
+        chat: req.params.chatId,
+        deletedFor: { $ne: req.user._id },
+      })
+        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+        .populate('chat')
+        .populate({
+          path: 'parent_message',
+          populate: { path: 'sender', select: 'full_name uniqueTag' }
+        })
+        .sort({ createdAt: 1 });
+
+      if (req.query.limit) {
+        query.limit(limit);
+      }
+      messages = await query;
+    }
 
     const formatted = await Promise.all(messages.map(formatMessage));
     res.status(200).json(formatted);
@@ -590,7 +676,9 @@ export const uploadMedia = async (req: AuthRequest, res: Response): Promise<void
   }
 
   try {
-    const result = await uploadToFilebase(fs.createReadStream(req.file.path), req.file.originalname, req.file.mimetype);
+    const safeOrigName = (req.file.originalname || 'upload').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileKey = `uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeOrigName}`;
+    const result = await uploadToFilebase(fs.createReadStream(req.file.path), fileKey, req.file.mimetype);
     fs.unlinkSync(req.file.path);
     res.status(200).json({
       url: result.url,

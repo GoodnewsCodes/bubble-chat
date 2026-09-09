@@ -23,6 +23,7 @@ import { initBrainEventListener } from './utils/brainEventListener';
 import { warmEmbeddings } from './utils/embeddings';
 import { processQueue } from './utils/queue';
 import { Conversation } from './models/conversations';
+import { uploadsDir } from './utils/filebase';
 import './middleware/passport';
 
 import chatRoutes from './routes/chatRoutes';
@@ -393,9 +394,10 @@ app.use(async (req, res, next) => {
 });
 
 // Static upload folder bypass
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
-// API Routes
+// API Routes & Aliases
+app.use('/auth', authRoutes); // Alias /auth -> /api/v1/auth (e.g. /auth/google/callback)
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/message', messageRoutes);
 app.use('/api/v1/user', userRoutes);

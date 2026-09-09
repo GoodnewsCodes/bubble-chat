@@ -924,11 +924,10 @@ export const googleLogin = (req: Request, res: Response): void => {
 //   must set state=mobile_<deeplink> when initiating the flow. Web users always
 //   receive state='web' and are correctly redirected to the frontend.
 export const googleCallback = async (req: any, res: Response): Promise<void> => {
-  // ── Single source of truth for the frontend URL ───────────────────────────
-  // CHANGE THIS: ensure FRONTEND_URL is set in your Railway backend env vars
-  // to https://bubblespace.xyz (or whatever your deployed frontend domain is).
-  // Do NOT rely on ORIGIN — Railway injects that as the backend's own URL.
-  const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
+  const FRONTEND = (process.env.FRONTEND_URL ||
+    (req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1')
+      ? 'http://localhost:5173'
+      : (process.env.ORIGIN || 'https://bubblespace.xyz'))).replace(/\/$/, '');
 
   try {
     const user = req.user;
@@ -1013,13 +1012,16 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
     } else {
       // Web: always redirect to the React frontend's /auth/google/callback page
       res.redirect(
-        `${FRONTEND}auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
+        `${FRONTEND}/auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
       );
     }
   } catch (err: any) {
     console.error('Google callback error:', err);
 
-    const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
+    const FRONTEND = (process.env.FRONTEND_URL ||
+      (req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1')
+        ? 'http://localhost:5173'
+        : (process.env.ORIGIN || 'https://bubblespace.xyz'))).replace(/\/$/, '');
     const rawState = req.query.state as string | undefined;
     const state    = rawState ? decodeURIComponent(rawState) : 'web';
 

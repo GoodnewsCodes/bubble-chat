@@ -8,7 +8,7 @@ import { Readable } from 'stream';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const uploadsDir = process.env.VERCEL
+export const uploadsDir = process.env.VERCEL
   ? path.join('/tmp', 'uploads')
   : path.join(__dirname, '..', 'uploads');
 try {
@@ -40,14 +40,14 @@ export const s3Client = new S3Client({
 export const extractKeyFromUrl = (url: string): string => {
   try {
     const parsed = new URL(url);
-    let path = parsed.pathname;
+    let pathname = decodeURIComponent(parsed.pathname);
     // Remove leading slash
-    if (path.startsWith('/')) path = path.slice(1);
+    if (pathname.startsWith('/')) pathname = pathname.slice(1);
     // Strip bucket prefix for path-style URLs: "bubblle-19/messages/..." -> "messages/..."
-    if (path.startsWith(`${BUCKET}/`)) {
-      path = path.slice(BUCKET.length + 1);
+    if (BUCKET && pathname.startsWith(`${BUCKET}/`)) {
+      pathname = pathname.slice(BUCKET.length + 1);
     }
-    return path;
+    return pathname;
   } catch {
     // If URL parsing fails, assume it's already a key
     return url;
@@ -58,7 +58,7 @@ const saveFileLocally = async (
   fileData: Buffer | fs.ReadStream,
   fileKey: string
 ): Promise<{ url: string; key: string }> => {
-  const safeFilename = fileKey.replace(/\//g, '_');
+  const safeFilename = fileKey.replace(/[\/\\]/g, '_');
   const localPath = path.join(uploadsDir, safeFilename);
 
   if (fileData instanceof fs.ReadStream) {

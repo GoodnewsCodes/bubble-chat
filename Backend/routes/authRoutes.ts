@@ -28,10 +28,7 @@ const router = express.Router();
 const jwtAuth = passport.authenticate('jwt', { session: false });
 
 // ─── FRONTEND URL ─────────────────────────────────────────────────────────────
-// CHANGE THIS: Set FRONTEND_URL in your Railway backend environment variables
-// to your actual frontend domain, e.g. https://bubblespace.xyz
-// Never rely on ORIGIN here — Railway sets ORIGIN to the backend service URL.
-const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
+const FRONTEND = (process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://bubblespace.xyz' : 'http://localhost:5173')).replace(/\/$/, '');
 
 /**
  * @swagger
