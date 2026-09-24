@@ -1,15 +1,52 @@
-# dependencies
+<<<<<<< .gitignore
 node_modules/
+dist/
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.iml
+coverage/
+.nyc_output/
+
+# Media files — never commit raw media
+*.mp4
+*.mov
+*.webm
+*.avi
+*.mkv
+*.mp3
+*.wav
+*.ogg
+*.aac
+*.flac
+*.amv
+*.3gp
+*.wmv
+
+# Uploads and temp files
+uploads/
+tmp/
+temp/
+
+# Security-sensitive files
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+*.crt
+secrets/
 
 # Expo
 .expo/
-dist/
 web-build/
 expo-env.d.ts
 
-# macOS
-.DS_Store
-*.pem
-
-# Local env files
-.env*.local
+>>>>>>> .gitignore
