@@ -233,6 +233,15 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
+    // Allow browsers (and CDN edges) to cache proxied S3 content.
+    // Avatars and media don't change frequently; 1-day cache + 7-day stale-
+    // while-revalidate eliminates redundant backend round-trips on refresh.
+    // Partial (206) responses are not cached to avoid range-mismatch issues.
+    if (!range) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      res.setHeader('Vary', 'Accept-Encoding');
+    }
+
     if (downloadName) {
       res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
     }

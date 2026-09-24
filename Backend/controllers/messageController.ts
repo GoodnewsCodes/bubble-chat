@@ -535,7 +535,6 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
     const beforeValid = beforeDate && !isNaN(beforeDate.getTime());
 
     const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 30, 1), 100);
-    const recentOnly = req.query.recentOnly === 'true';
 
     let messages: any[] = [];
 
@@ -570,26 +569,9 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
           populate: { path: 'sender', select: 'full_name uniqueTag' }
         })
         .sort({ createdAt: 1 });
-    } else if (recentOnly) {
-      // Initial chat load: load messages from yesterday 00:00:00 to now
-      const now = new Date();
-      const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
-
-      const recentMessages = await Message.find({
-        chat: req.params.chatId,
-        deletedFor: { $ne: req.user._id },
-        createdAt: { $gte: startOfYesterday },
-      })
-        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
-        .populate('chat')
-        .populate({
-          path: 'parent_message',
-          populate: { path: 'sender', select: 'full_name uniqueTag' }
-        })
-        .sort({ createdAt: 1 });
-
-      // If fewer than 20 messages exist in today+yesterday, fetch the latest 30 messages in total so chat is never blank
-      if (recentMessages.length < 20) {
+    } else {
+      // Standard / initial chat load: if limit or recentOnly is specified, fetch the latest `limit` messages
+      if (req.query.limit || req.query.recentOnly) {
         const latestBatch = await Message.find({
           chat: req.params.chatId,
           deletedFor: { $ne: req.user._id },
@@ -605,26 +587,18 @@ export const allMessages = async (req: AuthRequest, res: Response): Promise<void
 
         messages = latestBatch.reverse();
       } else {
-        messages = recentMessages;
-      }
-    } else {
-      // Standard fetch (default to all, or latest batch if limit provided)
-      const query = Message.find({
-        chat: req.params.chatId,
-        deletedFor: { $ne: req.user._id },
-      })
-        .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
-        .populate('chat')
-        .populate({
-          path: 'parent_message',
-          populate: { path: 'sender', select: 'full_name uniqueTag' }
+        messages = await Message.find({
+          chat: req.params.chatId,
+          deletedFor: { $ne: req.user._id },
         })
-        .sort({ createdAt: 1 });
-
-      if (req.query.limit) {
-        query.limit(limit);
+          .populate('sender', 'full_name username avatar email uniqueTag isOnline status_message publicKey')
+          .populate('chat')
+          .populate({
+            path: 'parent_message',
+            populate: { path: 'sender', select: 'full_name uniqueTag' }
+          })
+          .sort({ createdAt: 1 });
       }
-      messages = await query;
     }
 
     const formatted = await Promise.all(messages.map(formatMessage));
