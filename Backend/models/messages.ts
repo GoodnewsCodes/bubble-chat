@@ -62,12 +62,15 @@ export interface IMessage extends Document {
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'voice' | 'file'; // Legacy/helper
   fileSize?: number;
+  fileName?: string;
   media_metadata?: {
     width?: number;
     height?: number;
     duration?: number; // for audio/video
     mime_type?: string;
     quality?: 'sd' | 'hd';
+    file_name?: string;
+    original_name?: string;
   };
 
   // Call-log entry metadata (message_type: 'call'). Rendered WhatsApp/Signal-style
@@ -201,12 +204,17 @@ const MessageSchema: Schema<IMessage> = new Schema(
     fileSize: {
       type: Number,
     },
+    fileName: {
+      type: String,
+    },
     media_metadata: {
       width: { type: Number },
       height: { type: Number },
       duration: { type: Number },
       mime_type: { type: String },
       quality: { type: String, enum: ['sd', 'hd'], default: 'sd' },
+      file_name: { type: String },
+      original_name: { type: String },
     },
     call_metadata: {
       callType: { type: String, enum: ['voice', 'video'] },
