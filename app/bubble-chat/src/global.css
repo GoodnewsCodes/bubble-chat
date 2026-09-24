@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 1rem;
+  --background: #f8f7ff;
+  --foreground: #0e0f23;
+  --card: #ffffff;
+  --card-foreground: #0e0f23;
+  --popover: #ffffff;
+  --popover-foreground: #0e0f23;
+  --primary: #6c5ce7;
+  --primary-foreground: #fcfbff;
+  --primary-glow: #b893ff;
+  --secondary: #eae7ff;
+  --secondary-foreground: #1f1946;
+  --muted: #eeecff;
+  --muted-foreground: #605f7f;
+  --accent: #d3beff;
+  --accent-foreground: #141030;
+  --destructive: #f52027;
+  --destructive-foreground: #fcfcfc;
+  --border: #e5e3f5;
+  --input: #e8e6f8;
+  --ring: #6c5ce7;
+
+  --font-poppins: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark {
+  --background: #0f1018;
+  --foreground: #f4f5fb;
+  --card: #1a1b28;
+  --card-foreground: #f4f5fb;
+  --popover: #1a1b28;
+  --popover-foreground: #f4f5fb;
+  --primary: #8b7cf0;
+  --primary-foreground: #0f1018;
+  --primary-glow: #b893ff;
+  --secondary: #23243a;
+  --secondary-foreground: #f4f5fb;
+  --muted: #23243a;
+  --muted-foreground: #9a9bb6;
+  --accent: #2c2a52;
+  --accent-foreground: #f4f5fb;
+  --destructive: #f87171;
+  --destructive-foreground: #0f1018;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #8b7cf0;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-poppins);
+    -webkit-font-smoothing: antialiased;
+  }
+}

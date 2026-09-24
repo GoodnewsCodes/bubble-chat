@@ -1,4 +1,3 @@
-<<<<<<< .gitignore
 node_modules/
 dist/
 *.log
@@ -43,10 +42,3 @@ temp/
 *.cert
 *.crt
 secrets/
-
-# Expo
-.expo/
-web-build/
-expo-env.d.ts
-
->>>>>>> .gitignore

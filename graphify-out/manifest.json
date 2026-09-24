@@ -1,0 +1,2457 @@
+{
+  "BUBBLESPACE/frontend/components.json": {
+    "mtime": 1780257160.1709507,
+    "ast_hash": "1c81abcc00c78e71d3dd38f816c3443d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/eslint.config.js": {
+    "mtime": 1780257160.1712077,
+    "ast_hash": "0355276bc79439afe3c53e3a2470ca1e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/package.json": {
+    "mtime": 1782990690.4947898,
+    "ast_hash": "d318302c12f0195705c7da0e37e375b6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/railway.json": {
+    "mtime": 1782208593.1201918,
+    "ast_hash": "2e237b728af2b9bf247589dd95cbea32",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/LiveKitMeetingModal.tsx": {
+    "mtime": 1782855877.177277,
+    "ast_hash": "1ac7b078a711494ba06e486880b3a8c3",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/MeetingStatsModal.tsx": {
+    "mtime": 1780695365.558925,
+    "ast_hash": "1a48bd03d17e868e58ea093e524b1334",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/bubble-background.tsx": {
+    "mtime": 1780257160.429077,
+    "ast_hash": "aa318cedf651b56c51fa332401581f95",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/chat-avatar.tsx": {
+    "mtime": 1782937053.1526713,
+    "ast_hash": "1a331b154324d0247607452fd13f2f3e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/chat-list.tsx": {
+    "mtime": 1783537423.1201108,
+    "ast_hash": "64414b8874813a7ea1346bfac456e82d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/chat-window.tsx": {
+    "mtime": 1783832675.7036242,
+    "ast_hash": "eff24ed358093df950f21fc0c9537d8a",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/create-group-modal.tsx": {
+    "mtime": 1782348422.55371,
+    "ast_hash": "1409bf2f30dda6190a3fa399cbec0877",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/dashboard.tsx": {
+    "mtime": 1783312272.772907,
+    "ast_hash": "a6d55c9ed3a4c05ac1e69e2ba441c52f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/group-info.tsx": {
+    "mtime": 1782863125.62472,
+    "ast_hash": "db90872d08efd75f4e4ae4f81da2c8f0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/logout-dialog.tsx": {
+    "mtime": 1780257160.4300919,
+    "ast_hash": "862574bbb9dcf067a4057b870d4ebc9f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/message-overlay.tsx": {
+    "mtime": 1783312272.8282306,
+    "ast_hash": "1679fad29f9fc4cd54bfb15ff6eceb7f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/nav-sidebar.tsx": {
+    "mtime": 1782316839.3689363,
+    "ast_hash": "4d98fd941d91ac129e8a3369861915dc",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/setup-profile-view.tsx": {
+    "mtime": 1782247721.8928204,
+    "ast_hash": "cceff3b3df7baedef28356ec0a07d295",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/tab-views.tsx": {
+    "mtime": 1783312272.8170996,
+    "ast_hash": "f7ae18e9201cce48f4bea80833b0dbf0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/BubbleCursor.tsx": {
+    "mtime": 1780257160.4308622,
+    "ast_hash": "1440073448978e1f20b9bd38277f9844",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/CTA.tsx": {
+    "mtime": 1780257160.4310315,
+    "ast_hash": "c047bbccc5659159aebae305becdf044",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/Chrome.tsx": {
+    "mtime": 1782208091.5031292,
+    "ast_hash": "f936050be6190a3d0761ac0f84b4f8b1",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/FAQ.tsx": {
+    "mtime": 1780257160.4314094,
+    "ast_hash": "79c80c947d20e4281b81ec0c977f781a",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/Features.tsx": {
+    "mtime": 1780257160.4315817,
+    "ast_hash": "b21a2511d43ddfb421909d38a4c5eb3e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/FloatingBubbles.tsx": {
+    "mtime": 1780257160.431762,
+    "ast_hash": "963606ffaec2dd3c2354a8733d16a9bf",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/Hero.tsx": {
+    "mtime": 1780257160.4320195,
+    "ast_hash": "6579af5047dd6c77d3ad2a960ec728a9",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/HowItWorks.tsx": {
+    "mtime": 1780257160.4322536,
+    "ast_hash": "ad5312b80a1eb77f1c5d9de7527ff1ce",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/landing/UseCases.tsx": {
+    "mtime": 1780257160.4324913,
+    "ast_hash": "ed4c4a6b132153ea62317901aa6955fc",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/logo.tsx": {
+    "mtime": 1780307220.0054455,
+    "ast_hash": "64b79b3a036efff5a538be427e688431",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/theme-provider.tsx": {
+    "mtime": 1780257160.4328434,
+    "ast_hash": "3cd89febe6ca9cb784ba567481e50b5d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/accordion.tsx": {
+    "mtime": 1780257160.4331007,
+    "ast_hash": "3280ea6d007c8a1a4eb2168853752f9d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/alert-dialog.tsx": {
+    "mtime": 1780257160.4332728,
+    "ast_hash": "f67f220ce30c2d4fc5c7f38f7cad743f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/alert.tsx": {
+    "mtime": 1780257160.4334311,
+    "ast_hash": "0b8a92e185c2b4b4132b39ab9d6bfd36",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/aspect-ratio.tsx": {
+    "mtime": 1780257160.433896,
+    "ast_hash": "54a4035369e138e3e28c8f81f24a3e4e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/avatar.tsx": {
+    "mtime": 1780257160.4341192,
+    "ast_hash": "0b5f08c610364dfb4b439de3072c0a18",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/badge.tsx": {
+    "mtime": 1780257160.4345772,
+    "ast_hash": "c668163ef77ed404525a44bdad8d4149",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/breadcrumb.tsx": {
+    "mtime": 1780257160.435087,
+    "ast_hash": "73c34eacd6610e17fcf10fafc36e5e4f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/button-group.tsx": {
+    "mtime": 1780257160.4355886,
+    "ast_hash": "054671d3035df1fb7d5da3e9cd6672c2",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/button.tsx": {
+    "mtime": 1780257160.4357646,
+    "ast_hash": "299cedf4d416822d5148edb5fac28fe5",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/calendar.tsx": {
+    "mtime": 1780257160.435995,
+    "ast_hash": "849df3f14ce3ae50bf9f0daa48c0d192",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/card.tsx": {
+    "mtime": 1780257160.43647,
+    "ast_hash": "6f194e053b597062d44b57b450728b2c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/carousel.tsx": {
+    "mtime": 1780257160.4367244,
+    "ast_hash": "3ddd9aa0bdb3ce098a2544c0796d7d5c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/chart.tsx": {
+    "mtime": 1780257160.4369485,
+    "ast_hash": "eb9f648ca91b1e676abdfefefe1c865b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/checkbox.tsx": {
+    "mtime": 1780257160.4371185,
+    "ast_hash": "9704a9dc477951f889df4d9fe814e692",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/collapsible.tsx": {
+    "mtime": 1780257160.4375823,
+    "ast_hash": "b72b5773d0bf0c7f037492e24ba87f03",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/command.tsx": {
+    "mtime": 1780257160.4378018,
+    "ast_hash": "05f2f28c4223b32d8496c7f12af5df1d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/context-menu.tsx": {
+    "mtime": 1780257160.4380367,
+    "ast_hash": "cb3dc3f738886fd4d80bdc48cf64d524",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/dialog.tsx": {
+    "mtime": 1780257160.4382238,
+    "ast_hash": "4c0ae830ee9a2accd99d6034ef69d7c2",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/drawer.tsx": {
+    "mtime": 1780257160.4384422,
+    "ast_hash": "8a97d59e7dcbe7fc6f33f099396dc1c7",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/dropdown-menu.tsx": {
+    "mtime": 1780257160.4386756,
+    "ast_hash": "32eae2bb101ddbed92d64ace2936bde9",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/empty.tsx": {
+    "mtime": 1780257160.4392037,
+    "ast_hash": "53263933faf18ad4b65868c84deafec4",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/field.tsx": {
+    "mtime": 1780257160.439451,
+    "ast_hash": "c23eb9872d5da4a9cecd435a3796c326",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/form.tsx": {
+    "mtime": 1780257160.4399004,
+    "ast_hash": "8558308ba44bf5795b21e19316758047",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/hover-card.tsx": {
+    "mtime": 1780257160.4401062,
+    "ast_hash": "efa74c912813e82c46b09404186f50fe",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/input-group.tsx": {
+    "mtime": 1780257160.440325,
+    "ast_hash": "fffe8dfe70b07e97ea24022c57b5e328",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/input-otp.tsx": {
+    "mtime": 1780257160.440782,
+    "ast_hash": "6c6765e5e951ce1c9478c91181f2070f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/input.tsx": {
+    "mtime": 1780257160.4411697,
+    "ast_hash": "02eac2d9f2705426f0c836b3fdc47af6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/item.tsx": {
+    "mtime": 1780257160.4417567,
+    "ast_hash": "f92e1201b65414a10130bc003b98af73",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/kbd.tsx": {
+    "mtime": 1780257160.442219,
+    "ast_hash": "a6533c169d40b559467cc159dfb79ace",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/label.tsx": {
+    "mtime": 1780257160.442384,
+    "ast_hash": "d903b43cea5545736489d68398e9d721",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/menubar.tsx": {
+    "mtime": 1780257160.4426286,
+    "ast_hash": "dce0764df19697910c15e8953f182191",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/navigation-menu.tsx": {
+    "mtime": 1780257160.442842,
+    "ast_hash": "cf43f62575090447c33d2c4ca3a857c2",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/pagination.tsx": {
+    "mtime": 1780694000.1998312,
+    "ast_hash": "3263affcb764e7d476a7ed63f0fab72f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/popover.tsx": {
+    "mtime": 1780257160.4434075,
+    "ast_hash": "2cc3a66dc8b534b07b67166d450bf277",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/progress.tsx": {
+    "mtime": 1780257160.4438503,
+    "ast_hash": "9bceccedd810bcfd115462ac2a49c5f9",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/radio-group.tsx": {
+    "mtime": 1780257160.4440355,
+    "ast_hash": "4f88daf9c5a7e09cf0b7af5af0472441",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/resizable.tsx": {
+    "mtime": 1780257160.4447887,
+    "ast_hash": "346349c424a33f80008d3ad17748c8fb",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/scroll-area.tsx": {
+    "mtime": 1780257160.4449604,
+    "ast_hash": "8e2931c98fa1b2521793d3cdfabc1738",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/select.tsx": {
+    "mtime": 1780257160.4451509,
+    "ast_hash": "73ee5213dbcd25fc5e574c2facda58fd",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/separator.tsx": {
+    "mtime": 1780257160.4453237,
+    "ast_hash": "fa1d6b256d52cabcb4107578b9b6b0a4",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/sheet.tsx": {
+    "mtime": 1780257160.4458127,
+    "ast_hash": "53dcbdaf54edbc8107df654165041fcc",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/sidebar.tsx": {
+    "mtime": 1780257160.4459999,
+    "ast_hash": "2298e8a44ff28f5f335cf7204599ab85",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/skeleton.tsx": {
+    "mtime": 1780257160.4465232,
+    "ast_hash": "2543986774fc345cb3bb7d170bd67647",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/slider.tsx": {
+    "mtime": 1780257160.4467547,
+    "ast_hash": "10c9432b1f32f2dabcda9df12ead549b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/sonner.tsx": {
+    "mtime": 1780257160.4469178,
+    "ast_hash": "ccbedfa7e07db2476c5ce5753c1d2873",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/spinner.tsx": {
+    "mtime": 1780257160.4470704,
+    "ast_hash": "e75f6885c85989def66e3622ffb5b5c6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/switch.tsx": {
+    "mtime": 1780257160.447239,
+    "ast_hash": "5331f90f9f5dc71c2e0fe8d7073d3687",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/table.tsx": {
+    "mtime": 1780257160.4478254,
+    "ast_hash": "f9c4a944e8f63900317a2e34d5749e00",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/tabs.tsx": {
+    "mtime": 1780257160.4480374,
+    "ast_hash": "58aacdaccdedde3bed1fbf686250a620",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/textarea.tsx": {
+    "mtime": 1780257160.4485695,
+    "ast_hash": "6f7f48a37038bd31f680a101da5f1297",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/toast.tsx": {
+    "mtime": 1780257160.4489508,
+    "ast_hash": "5ee7ed62dc695a0ed611a999791189c6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/toaster.tsx": {
+    "mtime": 1780257160.449519,
+    "ast_hash": "81ec599e471d6645e88c84c754ca4969",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/toggle-group.tsx": {
+    "mtime": 1780257160.449757,
+    "ast_hash": "4e81bea74e40ba0c665ce5990ef2291e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/toggle.tsx": {
+    "mtime": 1780257160.4505558,
+    "ast_hash": "5e48c4194c17ede135b2a02181bca0ce",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/tooltip.tsx": {
+    "mtime": 1780257160.4507904,
+    "ast_hash": "c6e1691fd10fa06b4d20471aebd17d4d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/use-mobile.tsx": {
+    "mtime": 1782755635.8852396,
+    "ast_hash": "c77f9b5ebe792e0d22eb3fb053cfaf75",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/ui/use-toast.ts": {
+    "mtime": 1780694041.7355645,
+    "ast_hash": "f3ed3f66842662d521791d35a471983f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/contexts/AppContext.tsx": {
+    "mtime": 1783537451.5566185,
+    "ast_hash": "c5ee4c02c6d2dd2a7fbd74ade952dc3c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/contexts/DashboardContext.tsx": {
+    "mtime": 1781167935.3776138,
+    "ast_hash": "a6d5b3bc2ac6c1e3a7f9fd4243643e13",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/hooks/use-mobile.ts": {
+    "mtime": 1782755635.886858,
+    "ast_hash": "2bce220c1b061c6ef01f43b2c50476f5",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/hooks/use-toast.ts": {
+    "mtime": 1780694035.0169075,
+    "ast_hash": "f3ed3f66842662d521791d35a471983f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/api.ts": {
+    "mtime": 1783537547.273487,
+    "ast_hash": "24cb30f36a11ffa321b8171eab54dfdd",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/chat-data.ts": {
+    "mtime": 1780695830.075194,
+    "ast_hash": "4f87b19a2c81ade3246b6b60b829ee56",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/countries.ts": {
+    "mtime": 1780674191.5387704,
+    "ast_hash": "4cd4ce866b3c1c9f5678f17191364b8c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/lovable-error-reporting.ts": {
+    "mtime": 1780257160.4541988,
+    "ast_hash": "b58d87c6b392bb7c7114226fb6c286b7",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/ringtone.ts": {
+    "mtime": 1783260131.1436417,
+    "ast_hash": "5d948e2f103e858588035e137898358b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/socket.ts": {
+    "mtime": 1780324100.456075,
+    "ast_hash": "d74a9b5d3b02ca2264a47c67972a53a1",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/utils.ts": {
+    "mtime": 1782755635.8907535,
+    "ast_hash": "4d7cf8fe01701ef72e9bf2f8d8ebbb5b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/main.tsx": {
+    "mtime": 1783255581.4502487,
+    "ast_hash": "f73a49ac60407c2f91d21334b58ac4b8",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/root.tsx": {
+    "mtime": 1783255596.8234224,
+    "ast_hash": "f0af314453306f5f48ee72840499eb09",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routeTree.gen.ts": {
+    "mtime": 1782755635.8915248,
+    "ast_hash": "bbd4fbf19063c069d046d1c058416f04",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/router.tsx": {
+    "mtime": 1782315783.1243384,
+    "ast_hash": "59ebc25149164ad52cfd182f4fd9b610",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/404.tsx": {
+    "mtime": 1780257160.4570155,
+    "ast_hash": "978fceae975c1d246fe90e34915830a1",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard.tsx": {
+    "mtime": 1783312379.2317502,
+    "ast_hash": "01be42b794d9a3aab2b9c338e01cab2b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/all.tsx": {
+    "mtime": 1780315052.8084495,
+    "ast_hash": "bd939101148b55f9be14dd0efaf6d609",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/archive.tsx": {
+    "mtime": 1780315115.6944613,
+    "ast_hash": "cd2d32e48bd08d111c7ad75857bf5a4c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/calls.tsx": {
+    "mtime": 1780314979.5418818,
+    "ast_hash": "41ce7e1098e5bd9d4bc6d187ade6d3c6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/chat.$chatId.tsx": {
+    "mtime": 1780674413.7676156,
+    "ast_hash": "f12ec52765fc148c9095a59502cfa10c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/edit-profile.tsx": {
+    "mtime": 1780315180.4211996,
+    "ast_hash": "18f2ff159d470f6ee9a8124fccecef13",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/friends.tsx": {
+    "mtime": 1780315114.1411455,
+    "ast_hash": "b64de358eb0cbcffc377fa8218aea36e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/index.tsx": {
+    "mtime": 1780314988.4592056,
+    "ast_hash": "ae1694d6a2cd7d3d3926677be1b8dff0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/profile.tsx": {
+    "mtime": 1780315128.4081511,
+    "ast_hash": "7fd05e63f47becd38efe2970150ce1dd",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/work.tsx": {
+    "mtime": 1780315112.1180851,
+    "ast_hash": "c686730de2b254f16b615169c5bb79e0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/google-callback.tsx": {
+    "mtime": 1782218284.6754148,
+    "ast_hash": "0f77839b61a850dab3219e8e8c00330a",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/index.tsx": {
+    "mtime": 1782208002.810398,
+    "ast_hash": "cb2d563a6a34bda06fc820c3ad85ac32",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/login.tsx": {
+    "mtime": 1782755635.8935394,
+    "ast_hash": "b84b74fba5eb86956f117bac2fe2d756",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/setup-profile.tsx": {
+    "mtime": 1782382742.4026895,
+    "ast_hash": "767ba359b245507c4a1b3aa046bbea5b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/signup.tsx": {
+    "mtime": 1783537473.956915,
+    "ast_hash": "59e99f7f87023688340ec5d8dd94c519",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/verify-otp.tsx": {
+    "mtime": 1782382681.1638074,
+    "ast_hash": "0f7fbe9dff0a2ef7d98bd8fec0a897fd",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/vite-env.d.ts": {
+    "mtime": 1780493080.418135,
+    "ast_hash": "0352474ba2918efe13895edbc3780d94",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/tsconfig.app.json": {
+    "mtime": 1781076395.3585331,
+    "ast_hash": "a202c186e19587c76b3ba312ecb4f0c0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/tsconfig.json": {
+    "mtime": 1780257160.488312,
+    "ast_hash": "57f1248198c9ecf3c043f5a5f24d67a0",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/tsconfig.node.json": {
+    "mtime": 1780257160.488575,
+    "ast_hash": "70bdd0a673bcfc0e828080b306e7c680",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/vite.config.ts": {
+    "mtime": 1780492952.3264449,
+    "ast_hash": "0bc72e341ccdd53d570408f36e27155a",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/activityLogController.ts": {
+    "mtime": 1781944631.8640687,
+    "ast_hash": "bd02a418642703f057cf373aa0ac2b02",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/aidaController.ts": {
+    "mtime": 1783537210.526334,
+    "ast_hash": "9aa28a4b2b3554b1675b1e29a44368da",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/authController.ts": {
+    "mtime": 1782937141.6121688,
+    "ast_hash": "34caad517f0fc03ff8478b57c077573e",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/chatController.ts": {
+    "mtime": 1783609586.6135175,
+    "ast_hash": "b452df7f53a8b3db56f31e9bc2d94f1a",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/communityController.ts": {
+    "mtime": 1777512827.3004956,
+    "ast_hash": "68f6b37989ef05a71dbe03942606eaaf",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/feedController.ts": {
+    "mtime": 1776300152.4825122,
+    "ast_hash": "b8522ed9e241c42a671b4d85b00cfb78",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/healthController.ts": {
+    "mtime": 1777544464.453418,
+    "ast_hash": "4e971d101f20de6ace4df4d05b1de220",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/invoiceController.ts": {
+    "mtime": 1778043591.1944394,
+    "ast_hash": "267e84c0ee958b7ef2719e0c7aa1eeaf",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/meetController.ts": {
+    "mtime": 1782755651.998826,
+    "ast_hash": "dfb77cda305573e8ca8de9b366387d75",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/meetingController.ts": {
+    "mtime": 1783830784.6701152,
+    "ast_hash": "3645d7a2c46dfdfdb3c2d812a2d0ed2c",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/messageController.ts": {
+    "mtime": 1783609614.2409184,
+    "ast_hash": "c18a9753c4c5779164c3a1261a9aca6e",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/messageRequestController.ts": {
+    "mtime": 1778504094.2235646,
+    "ast_hash": "a5438b201ee2b383ec23c6307350e4b2",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/notificationController.ts": {
+    "mtime": 1781415903.6602533,
+    "ast_hash": "a28f60b385d53223bb0910957924acb9",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/orgController.ts": {
+    "mtime": 1782315638.0851958,
+    "ast_hash": "0024ec31c853a2694774366df31c2e38",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/paymentController.ts": {
+    "mtime": 1775901089.0822175,
+    "ast_hash": "b651b48a9796eb540469a42e73f4716e",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/profileController.ts": {
+    "mtime": 1783537238.9437215,
+    "ast_hash": "f3275a70293f196f0ca16115c41785e0",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/securityController.ts": {
+    "mtime": 1775177298.474663,
+    "ast_hash": "2b29713ab2caeabe6b9486bd033fad4a",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/storiesController.ts": {
+    "mtime": 1780436847.0173922,
+    "ast_hash": "2021126fb9d5f65c87c906dab2fd3300",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/taskController.ts": {
+    "mtime": 1783479167.6860414,
+    "ast_hash": "59b510726a7055e999bbd76311ad5a7b",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/templateController.ts": {
+    "mtime": 1778043591.199187,
+    "ast_hash": "17e35db022d378d0ad56b449435b373f",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/userController.ts": {
+    "mtime": 1782855778.7898107,
+    "ast_hash": "7b7759ba5ff13da8e72cceaa5b82fdb7",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/workspaceController.ts": {
+    "mtime": 1781944486.5888934,
+    "ast_hash": "36b0b05666159b37ee3fb8e5ecbf74c8",
+    "semantic_hash": ""
+  },
+  "Backend/index.ts": {
+    "mtime": 1783684017.3614702,
+    "ast_hash": "bd2b5ed0c57c16d351dda56c09b49ff9",
+    "semantic_hash": ""
+  },
+  "Backend/middleware/passport.ts": {
+    "mtime": 1782794399.6397862,
+    "ast_hash": "907e6e26bb1932dd421a5537e31e1cdf",
+    "semantic_hash": ""
+  },
+  "Backend/middleware/upload.ts": {
+    "mtime": 1775610821.9612558,
+    "ast_hash": "36dbaf881d2cdd477c683fa8a2eda91b",
+    "semantic_hash": ""
+  },
+  "Backend/models/activityLog.ts": {
+    "mtime": 1783123898.9737551,
+    "ast_hash": "0cdb57fd9c6ec7ba5644b86e93c2a35a",
+    "semantic_hash": ""
+  },
+  "Backend/models/callLog.ts": {
+    "mtime": 1782755652.0048192,
+    "ast_hash": "3b704d8c137c69b63800424dac5ae175",
+    "semantic_hash": ""
+  },
+  "Backend/models/conversations.ts": {
+    "mtime": 1783683858.8506777,
+    "ast_hash": "1d239e1ec22e20db6d3e310948c3b768",
+    "semantic_hash": ""
+  },
+  "Backend/models/feed.ts": {
+    "mtime": 1777889213.1120265,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "Backend/models/goal.ts": {
+    "mtime": 1775901070.591251,
+    "ast_hash": "60270f8491209109d368c7593ead4606",
+    "semantic_hash": ""
+  },
+  "Backend/models/invoice.ts": {
+    "mtime": 1776135248.732762,
+    "ast_hash": "6b630bfa6f36f8c1d1037f107f024ddf",
+    "semantic_hash": ""
+  },
+  "Backend/models/meeting.ts": {
+    "mtime": 1783827269.360884,
+    "ast_hash": "b6c2ed89c20ad3fc4879f19a76dfcf49",
+    "semantic_hash": ""
+  },
+  "Backend/models/messageRequest.ts": {
+    "mtime": 1778152582.0334547,
+    "ast_hash": "fbffdb4213f771e257c5d2c30379d7c2",
+    "semantic_hash": ""
+  },
+  "Backend/models/messages.ts": {
+    "mtime": 1783683842.161668,
+    "ast_hash": "22e6df4fd1b366bce477a9b0104e3861",
+    "semantic_hash": ""
+  },
+  "Backend/models/network.ts": {
+    "mtime": 1775734754.212352,
+    "ast_hash": "fed4d86a8aeaf7292c017f1748f0ddd3",
+    "semantic_hash": ""
+  },
+  "Backend/models/notification.ts": {
+    "mtime": 1782523170.6230962,
+    "ast_hash": "5da1d1d44d0ee04365517653619552dc",
+    "semantic_hash": ""
+  },
+  "Backend/models/orgDocument.ts": {
+    "mtime": 1782969972.1662183,
+    "ast_hash": "e45418f7314b1e2ec5dc31931b51a928",
+    "semantic_hash": ""
+  },
+  "Backend/models/organizations.ts": {
+    "mtime": 1782164178.5902534,
+    "ast_hash": "e273ddb8eac1e67477f52cab330c308e",
+    "semantic_hash": ""
+  },
+  "Backend/models/otp.ts": {
+    "mtime": 1775247707.9425535,
+    "ast_hash": "f72e3f41c4d5bf04996b5dc7a3c8893d",
+    "semantic_hash": ""
+  },
+  "Backend/models/post.ts": {
+    "mtime": 1775745727.1646287,
+    "ast_hash": "927742914bbaf9cd21bfc5a8a0018d3e",
+    "semantic_hash": ""
+  },
+  "Backend/models/security.ts": {
+    "mtime": 1774827985.115208,
+    "ast_hash": "9c6e25c3f9c61991977f0e3752aa0ce6",
+    "semantic_hash": ""
+  },
+  "Backend/models/stories.ts": {
+    "mtime": 1775624259.2556362,
+    "ast_hash": "47c126a233c2bb3746965132ab5bfdab",
+    "semantic_hash": ""
+  },
+  "Backend/models/task.ts": {
+    "mtime": 1783548964.9671876,
+    "ast_hash": "7029db43069c8bd89c6ee6d40b52c743",
+    "semantic_hash": ""
+  },
+  "Backend/models/template.ts": {
+    "mtime": 1776135238.6251628,
+    "ast_hash": "7d5d0786ce96e0b2f6fa13ad9f74f261",
+    "semantic_hash": ""
+  },
+  "Backend/models/transaction.ts": {
+    "mtime": 1775747694.9837117,
+    "ast_hash": "a8a2cf80e83a4266740c41f1603beee9",
+    "semantic_hash": ""
+  },
+  "Backend/models/userImage.ts": {
+    "mtime": 1780386467.6096163,
+    "ast_hash": "6deefa54119dd2d080bdc5864c7aca73",
+    "semantic_hash": ""
+  },
+  "Backend/models/users.ts": {
+    "mtime": 1783683875.6498835,
+    "ast_hash": "338ff19cca5ee93ea8c9b4cbe570c029",
+    "semantic_hash": ""
+  },
+  "Backend/models/workspaceFile.ts": {
+    "mtime": 1775705315.5759985,
+    "ast_hash": "1c72f7df8c6a0d6a0d828657aa04905c",
+    "semantic_hash": ""
+  },
+  "Backend/package.json": {
+    "mtime": 1783607313.2751184,
+    "ast_hash": "30e84bb3fbb61fb5bc83dc0cbb46f40f",
+    "semantic_hash": ""
+  },
+  "Backend/routes/activityRoutes.ts": {
+    "mtime": 1776135444.77969,
+    "ast_hash": "793c7edc845690aa2fb5b75a8be1bb0f",
+    "semantic_hash": ""
+  },
+  "Backend/routes/aidaRoutes.ts": {
+    "mtime": 1783059055.7617157,
+    "ast_hash": "c30863aa5b11626252cf9bf51d5527c3",
+    "semantic_hash": ""
+  },
+  "Backend/routes/authRoutes.ts": {
+    "mtime": 1782887593.272923,
+    "ast_hash": "35b7c7ba24c8544d81ad7eb9f330e55d",
+    "semantic_hash": ""
+  },
+  "Backend/routes/chatRoutes.ts": {
+    "mtime": 1783537141.0722735,
+    "ast_hash": "d3a5c63a6c389c5b15bad84382393c2d",
+    "semantic_hash": ""
+  },
+  "Backend/routes/communityRoutes.ts": {
+    "mtime": 1777512843.0252128,
+    "ast_hash": "38ecbf72baa2c7dbf6c4f5ad910d5d9b",
+    "semantic_hash": ""
+  },
+  "Backend/routes/feedRoutes.ts": {
+    "mtime": 1776300164.9854753,
+    "ast_hash": "f800e5a0ab5b522aabb1150df5210ddb",
+    "semantic_hash": ""
+  },
+  "Backend/routes/healthRoutes.ts": {
+    "mtime": 1774989309.9194024,
+    "ast_hash": "3483d1f6f16c158b45eebf3210979646",
+    "semantic_hash": ""
+  },
+  "Backend/routes/meetRoutes.ts": {
+    "mtime": 1782755652.009344,
+    "ast_hash": "4acc6a9fcabe960ad79068fdd3cdefbd",
+    "semantic_hash": ""
+  },
+  "Backend/routes/meetingRoutes.ts": {
+    "mtime": 1782901037.943307,
+    "ast_hash": "7c6b44558a77728f06e0ea5b79754410",
+    "semantic_hash": ""
+  },
+  "Backend/routes/messageRoutes.ts": {
+    "mtime": 1782476100.5858698,
+    "ast_hash": "eecaae46c9652f8bf484b41688c31210",
+    "semantic_hash": ""
+  },
+  "Backend/routes/notificationRoutes.ts": {
+    "mtime": 1776135439.0273402,
+    "ast_hash": "ae256b8920c1326c6085fdb783ae60a6",
+    "semantic_hash": ""
+  },
+  "Backend/routes/orgRoutes.ts": {
+    "mtime": 1781985373.8607776,
+    "ast_hash": "7ea091c31597c209cf1ed3e19b6d8e4f",
+    "semantic_hash": ""
+  },
+  "Backend/routes/paymentRoutes.ts": {
+    "mtime": 1776135461.556261,
+    "ast_hash": "28abd6c07a863e9e5ead1c85c857b724",
+    "semantic_hash": ""
+  },
+  "Backend/routes/profileRoutes.ts": {
+    "mtime": 1782341872.2245052,
+    "ast_hash": "4f31720ba0b7845cbe54f3a70ff826d3",
+    "semantic_hash": ""
+  },
+  "Backend/routes/securityRoutes.ts": {
+    "mtime": 1775177828.4471092,
+    "ast_hash": "b513c923503e9fc18057c288d23dc723",
+    "semantic_hash": ""
+  },
+  "Backend/routes/storiesRoutes.ts": {
+    "mtime": 1775622487.2010405,
+    "ast_hash": "300db96fabb146d3bdab6cae0c56a73c",
+    "semantic_hash": ""
+  },
+  "Backend/routes/taskRoutes.ts": {
+    "mtime": 1782055870.3644505,
+    "ast_hash": "e1928d644f455c28bd6a02be5687c19e",
+    "semantic_hash": ""
+  },
+  "Backend/routes/templateRoutes.ts": {
+    "mtime": 1776135443.432173,
+    "ast_hash": "55775c095d49f7c2c9461dad58dd3de4",
+    "semantic_hash": ""
+  },
+  "Backend/routes/userRoutes.ts": {
+    "mtime": 1783444112.5454392,
+    "ast_hash": "a4355e5e5612896dd0d1268a96ba583c",
+    "semantic_hash": ""
+  },
+  "Backend/routes/workspaceRoutes.ts": {
+    "mtime": 1776300315.4165993,
+    "ast_hash": "4d3a3eac6a202dcf639e386a37cb2b39",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/diagnose-db.ts": {
+    "mtime": 1780513021.2707326,
+    "ast_hash": "a977a21eb7db44f4f089da63a3e80f13",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/initAida.ts": {
+    "mtime": 1778159619.914538,
+    "ast_hash": "0ad00df5201e7f1af1122ac7b2146127",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/seed-community.ts": {
+    "mtime": 1775748340.1147716,
+    "ast_hash": "bef2944d924123538175a4c7c98948ac",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/seed-feed.ts": {
+    "mtime": 1775811363.429122,
+    "ast_hash": "3374c5bcbb4280e92fca375c3c7655e6",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/seed.ts": {
+    "mtime": 1777889249.7631714,
+    "ast_hash": "1b72d6484a859f81fdda858872c3ee1a",
+    "semantic_hash": ""
+  },
+  "Backend/test_avatar.js": {
+    "mtime": 1777718725.149489,
+    "ast_hash": "8d21e47815295cacdb07f24c5489462f",
+    "semantic_hash": ""
+  },
+  "Backend/tsconfig.json": {
+    "mtime": 1774601092.7834885,
+    "ast_hash": "57ee4340074ebbe8d5797b56e32a8ad2",
+    "semantic_hash": ""
+  },
+  "Backend/utils/embeddings.ts": {
+    "mtime": 1782019699.2841613,
+    "ast_hash": "271c33e782ac06d29bdf8627781f3b6b",
+    "semantic_hash": ""
+  },
+  "Backend/utils/env.ts": {
+    "mtime": 1774536661.6291685,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "Backend/utils/filebase.ts": {
+    "mtime": 1783286962.303752,
+    "ast_hash": "f59b0a0c6f8cd79e6906a9d823ead01d",
+    "semantic_hash": ""
+  },
+  "Backend/utils/livekitService.ts": {
+    "mtime": 1780650877.631511,
+    "ast_hash": "13775659982630da4c3f45e3f905247f",
+    "semantic_hash": ""
+  },
+  "Backend/utils/mailer.ts": {
+    "mtime": 1783124682.1963098,
+    "ast_hash": "37eb6d8a5a6df48b3893c2a59f606769",
+    "semantic_hash": ""
+  },
+  "Backend/utils/pinecone.ts": {
+    "mtime": 1781852875.2558303,
+    "ast_hash": "12698b43044ec41a24f7998a2d8f1d37",
+    "semantic_hash": ""
+  },
+  "Backend/utils/queue.ts": {
+    "mtime": 1782347174.9814332,
+    "ast_hash": "104b32f7385ca3aedc4d28ac43fe6071",
+    "semantic_hash": ""
+  },
+  "Backend/utils/redis.ts": {
+    "mtime": 1782347164.866056,
+    "ast_hash": "93f3ed42fd49a8e3b9c9d26d2e58f9fc",
+    "semantic_hash": ""
+  },
+  "Backend/utils/scheduler.ts": {
+    "mtime": 1783549413.957788,
+    "ast_hash": "644a29c6806b2abe98e2f96dee6682f8",
+    "semantic_hash": ""
+  },
+  "Backend/utils/socket.ts": {
+    "mtime": 1783827289.90399,
+    "ast_hash": "3d9232a5306d0467a6b1eaec5b251877",
+    "semantic_hash": ""
+  },
+  "Backend/utils/whisperService.ts": {
+    "mtime": 1782540740.9660218,
+    "ast_hash": "d72f420ff3b8457dc9f8c2017a73b790",
+    "semantic_hash": ""
+  },
+  "Backend/utils/zego.ts": {
+    "mtime": 1780430300.8331494,
+    "ast_hash": "14986368038bcb90131ef54ccef69551",
+    "semantic_hash": ""
+  },
+  "Backend/verify-security.ts": {
+    "mtime": 1774988494.2473564,
+    "ast_hash": "02dca4aaf838baa50ea6f4f83e2f9043",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.claude/settings.json": {
+    "mtime": 1781031240.650926,
+    "ast_hash": "dc580fca35a0e98ed20777ede5e545a1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.vscode/extensions.json": {
+    "mtime": 1781031176.879112,
+    "ast_hash": "b2354ba0225f5689d13651ec0fac0de0",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.vscode/settings.json": {
+    "mtime": 1781031176.8816822,
+    "ast_hash": "6b9302c1f72c315e90233c7539c48c9f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/app.json": {
+    "mtime": 1783828414.9607856,
+    "ast_hash": "b504aa49f7c0594719c7a63adcbcd370",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/expo.icon/icon.json": {
+    "mtime": 1781031176.8800466,
+    "ast_hash": "35cb915a0bebbebbe69cf7815e174462",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/scripts/reset-project.js": {
+    "mtime": 1781031176.875105,
+    "ast_hash": "ca9d75cf60f51e7a2d67fd08ddfb8275",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/app/_layout.tsx": {
+    "mtime": 1781031176.9160078,
+    "ast_hash": "3283bb4852fbf4fd8d378fe5f6858df1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/app/explore.tsx": {
+    "mtime": 1781031176.9192297,
+    "ast_hash": "42adf91e47cfe6b5d4ede54a35db24d0",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/app/index.tsx": {
+    "mtime": 1781031176.9216294,
+    "ast_hash": "c6dba393a45b6d4e24d2f0bb62d6c0bf",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/animated-icon.tsx": {
+    "mtime": 1781031176.9164274,
+    "ast_hash": "72e8849faa65fa5446521b02e54e5106",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/animated-icon.web.tsx": {
+    "mtime": 1781031176.9168742,
+    "ast_hash": "2defa175163e104a6e2232436fa77e30",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/app-tabs.tsx": {
+    "mtime": 1781031176.9173584,
+    "ast_hash": "7f9ddbb00991d090e67f4eeff23f89e8",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/app-tabs.web.tsx": {
+    "mtime": 1781031176.9179006,
+    "ast_hash": "d197b6fde1ead811d986e454f2e27064",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/external-link.tsx": {
+    "mtime": 1781031176.9206207,
+    "ast_hash": "a71bdc8e0bd55812a1e97662ade442d1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/hint-row.tsx": {
+    "mtime": 1781031176.9210768,
+    "ast_hash": "1ac80baf6b0a5c3d8c1ea371d5a0dbc5",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/themed-text.tsx": {
+    "mtime": 1781031176.92208,
+    "ast_hash": "41869b896e1e9f3472f5c2183af58918",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/themed-view.tsx": {
+    "mtime": 1781031176.922485,
+    "ast_hash": "f935dbbcf5a5067a417ea7b329727653",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/ui/collapsible.tsx": {
+    "mtime": 1781031176.9185352,
+    "ast_hash": "24105f00e6631a1cb1daeaef9d4aa808",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/components/web-badge.tsx": {
+    "mtime": 1781031176.9228637,
+    "ast_hash": "6d02b3c146c2ed6a3d3b7b8764e17602",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/constants/theme.ts": {
+    "mtime": 1781031176.9136984,
+    "ast_hash": "9507bd7aa3ee042af2ad8a99ebbaa8b6",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/hooks/use-color-scheme.ts": {
+    "mtime": 1781031176.9143548,
+    "ast_hash": "6f3444fcb9c7013a839a7832be518831",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/hooks/use-color-scheme.web.ts": {
+    "mtime": 1781031176.91478,
+    "ast_hash": "071fbb9a1a05ffb8af4b7d3b1ffa72d6",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/example/src/hooks/use-theme.ts": {
+    "mtime": 1781031176.9152956,
+    "ast_hash": "e058af4f5801bcaa97dad62f12085a27",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/package.json": {
+    "mtime": 1783828709.14348,
+    "ast_hash": "128f5d4b6417b23805a0a6e90f926108",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/_layout.tsx": {
+    "mtime": 1783682408.6874356,
+    "ast_hash": "ef28e7d5078facfb958ac2471d56c982",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/index.tsx": {
+    "mtime": 1781852875.2741256,
+    "ast_hash": "8953e2476127ceb3f688042b8f156356",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/tailwind.config.js": {
+    "mtime": 1781218861.3532004,
+    "ast_hash": "9e9fea9d14f9897de5dc29b0a7fde866",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/tsconfig.json": {
+    "mtime": 1781122199.626313,
+    "ast_hash": "5c4d9ccf693f041d030e391f8d772b99",
+    "semantic_hash": ""
+  },
+  ".agents/rules/graphify.md": {
+    "mtime": 1781028630.709994,
+    "ast_hash": "f1e53ecc9194573d3c28fc116c743a2e",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/SKILL.md": {
+    "mtime": 1781075788.948783,
+    "ast_hash": "41f700d6535cc2f2b6b6d0a9eecc7525",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/add-watch.md": {
+    "mtime": 1781028400.7849586,
+    "ast_hash": "0df0589623217ca38a12bdcabfb42f4c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/exports.md": {
+    "mtime": 1781028400.7851999,
+    "ast_hash": "7fb1a81aca17a462db70684a324fcfb0",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1781028400.7858195,
+    "ast_hash": "24808b03abfeaf5f6435bb69c0125b2c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1781028400.786413,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/hooks.md": {
+    "mtime": 1781028400.7868767,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/query.md": {
+    "mtime": 1781028400.7875206,
+    "ast_hash": "8b40ed8c9e9060fc215219a8fc964091",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/transcribe.md": {
+    "mtime": 1781028400.787778,
+    "ast_hash": "70f6aa30d6211f3a2c7e9fc45479f50c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/graphify/references/update.md": {
+    "mtime": 1781028400.788371,
+    "ast_hash": "0dad167a95bdb389f02fecffb60b1bc8",
+    "semantic_hash": ""
+  },
+  ".agents/workflows/graphify.md": {
+    "mtime": 1781028630.7106786,
+    "ast_hash": "0bc020d491fca99550c1ea3de0a5f862",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/README.md": {
+    "mtime": 1780257160.1690724,
+    "ast_hash": "b1141067b16599f0c9c86893791ce354",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/README.md": {
+    "mtime": 1780257160.1704206,
+    "ast_hash": "f6e3faf55d738cf2affe1b44195f27cf",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/index.html": {
+    "mtime": 1782756391.6717215,
+    "ast_hash": "0f912853a83974065262d0cce4a1f7d9",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/components/chat/[zsh](terminal;60668) Okay, just a few t.md": {
+    "mtime": 1780508672.2665913,
+    "ast_hash": "1fafa2c177fbbd31bd2a56d9f84bc2ad",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/AGENTS.md": {
+    "mtime": 1781031240.650171,
+    "ast_hash": "0168b78417bf60f34fd1233c69591023",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/CLAUDE.md": {
+    "mtime": 1781031240.6505206,
+    "ast_hash": "5c27369b226fcf2be8a6cfe52224e767",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/README.md": {
+    "mtime": 1781031176.8835013,
+    "ast_hash": "db37e01139db6cec80a338779325d5ae",
+    "semantic_hash": ""
+  },
+  "app/readme.md": {
+    "mtime": 1781031341.5949066,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/apple-icon.png": {
+    "mtime": 1780257160.1743586,
+    "ast_hash": "734ce6c878789fcd5843e8a7963e0756",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/alex.png": {
+    "mtime": 1780257160.1858847,
+    "ast_hash": "e5eca4abbf33bc39b086c960e171ebd4",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/anthony.png": {
+    "mtime": 1780257160.1966264,
+    "ast_hash": "60384e0a22cca45d01ce6c5f2e1c3fee",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/conner.png": {
+    "mtime": 1780257160.2093196,
+    "ast_hash": "42d26552034d79149b7ec2b945f2651b",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/jacob.png": {
+    "mtime": 1780257160.2194695,
+    "ast_hash": "031faea4d70a2fd7ac767b1ec8f03dc6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/jasmin.png": {
+    "mtime": 1780257160.230076,
+    "ast_hash": "9b44583fbf50ab9a3acb671e602bb8de",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/jayden.png": {
+    "mtime": 1780257160.246055,
+    "ast_hash": "fa152abf47d8599e8ca7943fd8564e9d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/jessie.png": {
+    "mtime": 1780257160.25939,
+    "ast_hash": "032e72c8ff843ef74dfb3ddaea780433",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/lukas.png": {
+    "mtime": 1780257160.276461,
+    "ast_hash": "a912ad3213a5742f77e4bb48b8a624f6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/max.png": {
+    "mtime": 1780257160.288851,
+    "ast_hash": "c01244cd08e1259ed95170e81dbd0a91",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/osman.png": {
+    "mtime": 1780257160.3029811,
+    "ast_hash": "4d7e27a5d508795b360ec2aaf6d45f93",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/tanisha.png": {
+    "mtime": 1780257160.316442,
+    "ast_hash": "a09570874426eec85e62924ea3d9f10f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/vanessa.png": {
+    "mtime": 1780257160.3310187,
+    "ast_hash": "9d72ab46bb32f7322a3fa0359a9c8000",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/avatars/zaid.png": {
+    "mtime": 1780257160.3463452,
+    "ast_hash": "546548d96ceaa9ce26c777effec6b296",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/favicon.svg": {
+    "mtime": 1780302132.0161538,
+    "ast_hash": "25c3baeac878d0c94a30d5ab10e34608",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/file-building.png": {
+    "mtime": 1780257160.3612952,
+    "ast_hash": "e0102a4626f7dbba647471cd0cbce13c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/file-desk.png": {
+    "mtime": 1780257160.370142,
+    "ast_hash": "302b33e40df9bc6c85736f6291c952de",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/icon-dark-32x32.png": {
+    "mtime": 1780257160.3704212,
+    "ast_hash": "abd5ebe9e287ca0a89f4fd3da2b5cf9c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/icon-light-32x32.png": {
+    "mtime": 1780257160.3708277,
+    "ast_hash": "53426c910bcab7d3e5213cc64aa1b2c5",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/icon.svg": {
+    "mtime": 1780257160.3713489,
+    "ast_hash": "6e5d88c5f7e97d26ac4ad47e703bf9de",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/icons.svg": {
+    "mtime": 1780257160.371613,
+    "ast_hash": "3b4fcfcf393eca4d264dca4a4663bc37",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/meeting-room.png": {
+    "mtime": 1780257160.3775008,
+    "ast_hash": "eb9085d3ee436d268786e7980656b544",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/placeholder-logo.png": {
+    "mtime": 1780257160.3788457,
+    "ast_hash": "95d8d1a4a9bbcccc875e2c381e74064a",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/placeholder-logo.svg": {
+    "mtime": 1780257160.3794081,
+    "ast_hash": "1e16dc7df824652c5906a2ab44aef78c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/placeholder-user.jpg": {
+    "mtime": 1780257160.3796442,
+    "ast_hash": "7ee6562646feae6d6d77e2c72e204591",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/placeholder.jpg": {
+    "mtime": 1780257160.3798041,
+    "ast_hash": "1e533b7b4545d1d605144ce893afc601",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/placeholder.svg": {
+    "mtime": 1780257160.3799703,
+    "ast_hash": "35707bd9960ba5281c72af927b79291f",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/themes/dark.png": {
+    "mtime": 1780257160.3950517,
+    "ast_hash": "f83fb9cb3175e302ea73a63c7541a159",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/themes/light.png": {
+    "mtime": 1780924525.209607,
+    "ast_hash": "81644e0f4e5db1d9439cfdaa06606f1d",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/public/topographic-bg.png": {
+    "mtime": 1780257160.4148736,
+    "ast_hash": "36e913f785fc0b6a32fe74af29d99fdc",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/assets/chat-preview.png": {
+    "mtime": 1780257160.426572,
+    "ast_hash": "df99055d4ebd1ae1292d220836714b2c",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/assets/hero.png": {
+    "mtime": 1780257160.4279473,
+    "ast_hash": "aead493361b27e7510691c5d7072dfc1",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/assets/react.svg": {
+    "mtime": 1780257160.4281807,
+    "ast_hash": "f0402b67b6ce880f65666bb49e841696",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/assets/vite.svg": {
+    "mtime": 1780257160.4284105,
+    "ast_hash": "9960a24288958394ac50e57ff638b036",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/themes /dark.png": {
+    "mtime": 1780257160.4746294,
+    "ast_hash": "f83fb9cb3175e302ea73a63c7541a159",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/themes /light.png": {
+    "mtime": 1780257160.4872334,
+    "ast_hash": "81644e0f4e5db1d9439cfdaa06606f1d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/expo.icon/Assets/expo-symbol 2.svg": {
+    "mtime": 1781031176.9129117,
+    "ast_hash": "6979b664c1ce82c10426a051082412a7",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/expo.icon/Assets/grid.png": {
+    "mtime": 1781031176.894034,
+    "ast_hash": "37cdeda9d1af5d7432716d9671b098da",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/android-icon-background.png": {
+    "mtime": 1781291622.6391168,
+    "ast_hash": "4219b8bc3d10ff1271da2a0f99326ba2",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/android-icon-foreground.png": {
+    "mtime": 1781291615.7890522,
+    "ast_hash": "c79dd7cf5e92e2570d225fda866d4372",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/android-icon-monochrome.png": {
+    "mtime": 1781291631.1070302,
+    "ast_hash": "50b2b7f2a85d74dfd4681af5026e7b15",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/expo-badge-white.png": {
+    "mtime": 1781031176.8902235,
+    "ast_hash": "02efb8472f161bcf8afc8c8489a28fca",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/expo-badge.png": {
+    "mtime": 1781031176.891204,
+    "ast_hash": "6b0da8ec880685d1bd053c0f5ea9d09d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/expo-logo.png": {
+    "mtime": 1781031176.891969,
+    "ast_hash": "5ee5db91d59518c45ebcc99a2f5afc57",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/favicon.png": {
+    "mtime": 1781291596.3137941,
+    "ast_hash": "fb75cc2560381c547b2aa4b22f533133",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/icon.png": {
+    "mtime": 1781291586.0236733,
+    "ast_hash": "82434d8ad072bfc9be1e298786930faa",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/logo-glow.png": {
+    "mtime": 1781031176.9083712,
+    "ast_hash": "dbca075a49dc45e550c5d2e3e9601039",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/react-logo.png": {
+    "mtime": 1781031176.909183,
+    "ast_hash": "695d5a1c6f29a689130f3aaa573aec6e",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/react-logo@2x.png": {
+    "mtime": 1781031176.9097993,
+    "ast_hash": "b507e7f2c91ebc8fe24dee79ccb3b600",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/react-logo@3x.png": {
+    "mtime": 1781031176.910732,
+    "ast_hash": "8a4d0e5b845044e56e3b2df627d01cfd",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/splash-icon.png": {
+    "mtime": 1781291603.7947881,
+    "ast_hash": "2a60ea232e9f86d2985c0b7bb7ab1fae",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/explore.png": {
+    "mtime": 1781031176.8883443,
+    "ast_hash": "8409922f7d5c981001e3c9b25e4bfae5",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/explore@2x.png": {
+    "mtime": 1781031176.8888845,
+    "ast_hash": "dd40200ba8e8d98061578292d6b73791",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/explore@3x.png": {
+    "mtime": 1781031176.8893962,
+    "ast_hash": "c4278d79298bb11a8b0e68ed3e40da9e",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/home.png": {
+    "mtime": 1781031176.894724,
+    "ast_hash": "eeb5de2ac12ace75b31dfda235208956",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/home@2x.png": {
+    "mtime": 1781031176.8952672,
+    "ast_hash": "456346cfb0b82cc0f39e921e05d082d9",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tabIcons/home@3x.png": {
+    "mtime": 1781031176.895857,
+    "ast_hash": "5d86e963002b3664ab81c128c838559d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/tutorial-web.png": {
+    "mtime": 1781031176.9123883,
+    "ast_hash": "c62d22797f3002396754d8cc55b0ae1a",
+    "semantic_hash": ""
+  },
+  "light.png": {
+    "mtime": 1780257160.4050896,
+    "ast_hash": "81644e0f4e5db1d9439cfdaa06606f1d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/metro.config.js": {
+    "mtime": 1781122090.3287177,
+    "ast_hash": "4a3b14bb2f5a50a568a7c4475b2d1085",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/nativewind-env.d.ts": {
+    "mtime": 1781122212.7467558,
+    "ast_hash": "03c3c986ab8c9f511e0d40fa7a005503",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/_layout.tsx": {
+    "mtime": 1783682471.4713778,
+    "ast_hash": "212b0433c585ee9cd2892962deb242fa",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/calls.tsx": {
+    "mtime": 1783682701.699585,
+    "ast_hash": "0d4ec73c015fdb092d369d96255a66c1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/messages.tsx": {
+    "mtime": 1783608673.1374469,
+    "ast_hash": "df098b589f056e1eef0c5bc27dfd05be",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/profile.tsx": {
+    "mtime": 1783623290.977306,
+    "ast_hash": "c5d099f1ebd9057bd41cd52a7b812171",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/login.tsx": {
+    "mtime": 1783024106.0595684,
+    "ast_hash": "a0877a633951faf6381d7c20ee932b1d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/signup.tsx": {
+    "mtime": 1783682681.1391804,
+    "ast_hash": "568f738af63f0b581f23dd83b5623583",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.expo/devices.json": {
+    "mtime": 1781122285.9079454,
+    "ast_hash": "e5f6eb13c875f326cfd5915d3364614f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.expo/types/router.d.ts": {
+    "mtime": 1781167138.87965,
+    "ast_hash": "c63b3f655d944b421f0bbe0b0b546753",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/babel.config.js": {
+    "mtime": 1781122888.4193852,
+    "ast_hash": "d55d9f8b252c8c5ae6fc1448a83e84b5",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/expo-env.d.ts": {
+    "mtime": 1781166575.6733627,
+    "ast_hash": "0dd9dccdb4b08595bc83df70d6a154d3",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/splash.tsx": {
+    "mtime": 1781284181.1043217,
+    "ast_hash": "a239e76f03a39de804f509b8a1864992",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/.expo/README.md": {
+    "mtime": 1781122285.8952527,
+    "ast_hash": "a7c2b7fea86b2a2559e471f999e478f1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/chat/[id].tsx": {
+    "mtime": 1783827373.4051013,
+    "ast_hash": "e753a9524e98466c56614ea432f04e94",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/updates.tsx": {
+    "mtime": 1783623226.9583113,
+    "ast_hash": "ae0001eb95a9608d7b36eae277c7f3bf",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/api.ts": {
+    "mtime": 1783831009.1224427,
+    "ast_hash": "f2443b5c6a96819b6b237a7b90e4649b",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/people.tsx": {
+    "mtime": 1783623491.9848096,
+    "ast_hash": "9cde634ef900abc51ec72b091f1eea82",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/mockData.ts": {
+    "mtime": 1783124503.576872,
+    "ast_hash": "1a77c607baf62f60eccb48769169e6c0",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/icon.png": {
+    "mtime": 1781217557.74821,
+    "ast_hash": "8d892ef03dbd43e8d899c1d605ad42df",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/profile-setup.tsx": {
+    "mtime": 1782383061.4536774,
+    "ast_hash": "53083f33941522213c3ac2ee0c361454",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/verify-otp.tsx": {
+    "mtime": 1781866112.0938194,
+    "ast_hash": "32ed697b746199fab6f0e7c29490ba00",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/authStorage.ts": {
+    "mtime": 1783536977.9238307,
+    "ast_hash": "eee4c3178eea2e0217acd821b9ee24bb",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/file-building.png": {
+    "mtime": 1781244683.9325054,
+    "ast_hash": "e0102a4626f7dbba647471cd0cbce13c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/file-desk.png": {
+    "mtime": 1781244683.9353163,
+    "ast_hash": "302b33e40df9bc6c85736f6291c952de",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/images/meeting-room.png": {
+    "mtime": 1781244683.9278224,
+    "ast_hash": "eb9085d3ee436d268786e7980656b544",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/chatCache.ts": {
+    "mtime": 1783827387.2086651,
+    "ast_hash": "00c942e5f351fba4b654b602194f3b6c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/socket.ts": {
+    "mtime": 1783749074.764982,
+    "ast_hash": "030443276023c703fa0b24ee9d07206c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/callManager.ts": {
+    "mtime": 1783831030.2315605,
+    "ast_hash": "25797933b730cd49540a29eb19d87ab8",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/ringtone.ts": {
+    "mtime": 1783434977.920513,
+    "ast_hash": "180504305e15cf052cf25f4ade04c401",
+    "semantic_hash": ""
+  },
+  "Backend/models/backup.ts": {
+    "mtime": 1781358216.6143582,
+    "ast_hash": "b03cf3fc872f8147c41b8ca61739980a",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/components/Avatar.tsx": {
+    "mtime": 1783536776.4017346,
+    "ast_hash": "6768cd08f315ba001227b3859b2882f2",
+    "semantic_hash": ""
+  },
+  "Backend/models/pushToken.ts": {
+    "mtime": 1781415764.705115,
+    "ast_hash": "4121762303ae02bb22fa65baeeedbef7",
+    "semantic_hash": ""
+  },
+  "Backend/utils/push.ts": {
+    "mtime": 1783259031.083589,
+    "ast_hash": "a7248333740f049c07536a69aa6f0e72",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/pushNotifications.ts": {
+    "mtime": 1783440943.7429633,
+    "ast_hash": "b7844e15c50dd2d69d87e4055882398e",
+    "semantic_hash": ""
+  },
+  "Backend/fix_system_messages.js": {
+    "mtime": 1781852875.2288914,
+    "ast_hash": "f30d66c116ce0b19cb648277ff04f533",
+    "semantic_hash": ""
+  },
+  "Backend/query_specific.js": {
+    "mtime": 1781852875.2457173,
+    "ast_hash": "6d7d83a45eff7524293550cfcb2d5186",
+    "semantic_hash": ""
+  },
+  "Backend/query_system_msgs.js": {
+    "mtime": 1781852875.246196,
+    "ast_hash": "f3482d1560e1a9a964fd5ab477ee91cd",
+    "semantic_hash": ""
+  },
+  "Backend/query_text_msgs.js": {
+    "mtime": 1781852875.2466812,
+    "ast_hash": "53e1064722909486111aa3b38d0149b5",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/brain.tsx": {
+    "mtime": 1781731841.659988,
+    "ast_hash": "6d926affcf0faa76dea4505cceb766af",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/dashboard/calendar.tsx": {
+    "mtime": 1781731831.209041,
+    "ast_hash": "bd447f3216a25b650d897c842fbc10f1",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/brainController.ts": {
+    "mtime": 1781887746.8831346,
+    "ast_hash": "10782d749973928ad4b08c83a0cd9167",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/calendarController.ts": {
+    "mtime": 1783125449.3071673,
+    "ast_hash": "3cf8dc03f9e4ffef775ca7b4502c296e",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/continuityController.ts": {
+    "mtime": 1782404301.7770598,
+    "ast_hash": "3ee7bd61cce9cca9463aba887296e771",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/digestController.ts": {
+    "mtime": 1782378803.783162,
+    "ast_hash": "7517c46cadab5b1c98b455e7542939c0",
+    "semantic_hash": ""
+  },
+  "Backend/models/calendarEvent.ts": {
+    "mtime": 1781852875.2314615,
+    "ast_hash": "5592c50a5a1eb639bc03ae19e6a10ccb",
+    "semantic_hash": ""
+  },
+  "Backend/models/dailyDigest.ts": {
+    "mtime": 1781852875.233662,
+    "ast_hash": "49d3be002a3b481b50e8619059fc2bbd",
+    "semantic_hash": ""
+  },
+  "Backend/models/expertiseRadar.ts": {
+    "mtime": 1781852875.2341068,
+    "ast_hash": "d6bfbee27e37eea479a8dc80ed408e7b",
+    "semantic_hash": ""
+  },
+  "Backend/models/ingestionJob.ts": {
+    "mtime": 1781852875.2345998,
+    "ast_hash": "f2a0b7cec112ed2866dd390e9d675cab",
+    "semantic_hash": ""
+  },
+  "Backend/routes/brainRoutes.ts": {
+    "mtime": 1781852875.2471716,
+    "ast_hash": "e8415b1d3eab8062e2230cf86ee313df",
+    "semantic_hash": ""
+  },
+  "Backend/routes/calendarRoutes.ts": {
+    "mtime": 1782755652.0079494,
+    "ast_hash": "511498d7b9c448fc3aee66711f21b75d",
+    "semantic_hash": ""
+  },
+  "Backend/utils/brainEventListener.ts": {
+    "mtime": 1783544087.584197,
+    "ast_hash": "c6f8b480bc9180d2b69677825614ce41",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/brain.tsx": {
+    "mtime": 1783682585.1699133,
+    "ast_hash": "1ade7731aa59be4d1a168240aec10402",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/(main)/calendar.tsx": {
+    "mtime": 1782849034.5497327,
+    "ast_hash": "fa3431cdb72ead2c166f2d98812c265d",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1781852875.2154338,
+    "ast_hash": "5122d242c9c6c33bf700051ff784d711",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1781849921.6268706,
+    "ast_hash": "a904dba646f37459aa4c39a83a14f08d",
+    "semantic_hash": ""
+  },
+  "Backend/utils/orgResolver.ts": {
+    "mtime": 1781852875.255003,
+    "ast_hash": "2a22e4ef849a4a192eeca96723a386c0",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/presence.ts": {
+    "mtime": 1783283625.5663543,
+    "ast_hash": "1753c8a51500735f36bafe932c192649",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/sounds/ringtone-incoming.wav": {
+    "mtime": 1783284446.4105365,
+    "ast_hash": "c014afa87717da865608fc3b40061f22",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/assets/sounds/ringtone-outgoing.wav": {
+    "mtime": 1783284446.3958669,
+    "ast_hash": "88bd094270f4cef2ae50cf5757df48f5",
+    "semantic_hash": ""
+  },
+  "Backend/utils/envCheck.ts": {
+    "mtime": 1782937173.7113273,
+    "ast_hash": "e180c409e744294c01b3e9022f9c1a8d",
+    "semantic_hash": ""
+  },
+  "Backend/utils/livekitEgress.ts": {
+    "mtime": 1782021780.622693,
+    "ast_hash": "d4d7922f0d59ee6ebf10b21f399b79fe",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/build.gradle": {
+    "mtime": 1782856852.9932594,
+    "ast_hash": "93ac0ac102023d8467dce8fafa39def7",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/java/com/bubblechat/app/MainActivity.kt": {
+    "mtime": 1781869103.0445454,
+    "ast_hash": "943a6438bbf8ba40ca49736517a43b49",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/java/com/bubblechat/app/MainApplication.kt": {
+    "mtime": 1781869096.2854788,
+    "ast_hash": "41083361292d48c33f6a978d805bc741",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/build.gradle": {
+    "mtime": 1782856847.358228,
+    "ast_hash": "98e76ed0afe69aa0356c3a8d5ff6bdc4",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/gradlew": {
+    "mtime": 1781869094.2557,
+    "ast_hash": "780b1d3e23a3b82154795f73df943a14",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/settings.gradle": {
+    "mtime": 1781869103.079716,
+    "ast_hash": "367d91e612e7304c66a009ba12bc06ce",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/eas.json": {
+    "mtime": 1782903014.8393679,
+    "ast_hash": "12db293f04ab221f62f49860e16d8c19",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/Podfile.properties.json": {
+    "mtime": 1781869103.3583434,
+    "ast_hash": "5b1cf32c46e0a8a44628e5a41840cdaa",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/AppDelegate.swift": {
+    "mtime": 1781869103.3515751,
+    "ast_hash": "7b4732bf9de8da05ae1ebcf616bdb672",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/Images.xcassets/AppIcon.appiconset/Contents.json": {
+    "mtime": 1781869094.2596128,
+    "ast_hash": "a588282d6ad9a445f9389ae222624ca7",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/Images.xcassets/Contents.json": {
+    "mtime": 1781869094.2599053,
+    "ast_hash": "96cbaeb138eab0aceebfdf0022c7d835",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/Images.xcassets/SplashScreenBackground.colorset/Contents.json": {
+    "mtime": 1781869103.1030252,
+    "ast_hash": "38a5bd19f315d19217ae8b8dd6780cef",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/bubblechat-Bridging-Header.h": {
+    "mtime": 1781869094.258498,
+    "ast_hash": "15ff0b9e396e448453a3401293a1ee14",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/expo.icon/icon.json": {
+    "mtime": 1781869103.0948215,
+    "ast_hash": "35cb915a0bebbebbe69cf7815e174462",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/components/liveKitCall.tsx": {
+    "mtime": 1783682652.191647,
+    "ast_hash": "7f3d19ad0d95393a485d00f3302c1dc1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/liveKitInit.ts": {
+    "mtime": 1781868392.225793,
+    "ast_hash": "6bceb9dced7f071502235181c537b2a8",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-hdpi/notification_icon.png": {
+    "mtime": 1781869101.6839662,
+    "ast_hash": "494e9b8198a7787db1d9888db42e765c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-hdpi/splashscreen_logo.png": {
+    "mtime": 1781869103.0332441,
+    "ast_hash": "f8a4bce6b5c1c67dd32ab24699a46355",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-mdpi/notification_icon.png": {
+    "mtime": 1781869101.6878386,
+    "ast_hash": "adf3705546b8f766ea5b987071aeb645",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-mdpi/splashscreen_logo.png": {
+    "mtime": 1781869102.943644,
+    "ast_hash": "1779aa55a9c3a93b8b0436ecdc3323aa",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xhdpi/notification_icon.png": {
+    "mtime": 1781869101.6833227,
+    "ast_hash": "b3443b31460366dbe471cc6cd67088da",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xhdpi/splashscreen_logo.png": {
+    "mtime": 1781869103.033244,
+    "ast_hash": "ba5bb96920bf0034f6fb75cc710397ce",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xxhdpi/notification_icon.png": {
+    "mtime": 1781869101.683685,
+    "ast_hash": "433a11fa1ee8aa2707134d0241628496",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xxhdpi/splashscreen_logo.png": {
+    "mtime": 1781869103.0343933,
+    "ast_hash": "85debf4e6d3d8d64e69241cc815750a1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xxxhdpi/notification_icon.png": {
+    "mtime": 1781869101.6867876,
+    "ast_hash": "dfa0434d3a0306fdf4ea05d9d07367b3",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png": {
+    "mtime": 1781869103.034118,
+    "ast_hash": "f51e0f7260304a861fe21125d315c6e9",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-hdpi/ic_launcher.webp": {
+    "mtime": 1781869098.275438,
+    "ast_hash": "433a11fa1ee8aa2707134d0241628496",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-hdpi/ic_launcher_background.webp": {
+    "mtime": 1781869100.8786743,
+    "ast_hash": "1628e5089ff3bcde0338efa3c8a46acd",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp": {
+    "mtime": 1781869100.8796666,
+    "ast_hash": "3e277512a29c3e0fa41876203fd92bc5",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.webp": {
+    "mtime": 1781869099.6810393,
+    "ast_hash": "722bdab3df6068d2f3a0806684f3ab7f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.webp": {
+    "mtime": 1781869098.7992017,
+    "ast_hash": "57e57f41ec555c47a2c41f0e1bc792b9",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-mdpi/ic_launcher.webp": {
+    "mtime": 1781869098.2751448,
+    "ast_hash": "b3443b31460366dbe471cc6cd67088da",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-mdpi/ic_launcher_background.webp": {
+    "mtime": 1781869100.8787403,
+    "ast_hash": "7d57cd8aee5a6d7833f31a55cee86a02",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp": {
+    "mtime": 1781869100.8795812,
+    "ast_hash": "ff11fdcb70d34a9464f0bc3a1123811f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.webp": {
+    "mtime": 1781869099.6828501,
+    "ast_hash": "917b6dbbc4f10be81142a1aae2354450",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.webp": {
+    "mtime": 1781869098.799809,
+    "ast_hash": "3a643c91a299df1b3018e4206f356950",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xhdpi/ic_launcher.webp": {
+    "mtime": 1781869098.2749155,
+    "ast_hash": "dfa0434d3a0306fdf4ea05d9d07367b3",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xhdpi/ic_launcher_background.webp": {
+    "mtime": 1781869100.8786294,
+    "ast_hash": "80837e9bbb6300ab8d6cc34f276f05cb",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp": {
+    "mtime": 1781869100.88014,
+    "ast_hash": "e142c30d2c8fc260fdbc0cde491d8f11",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.webp": {
+    "mtime": 1781869099.6809194,
+    "ast_hash": "98daa267ab84ff2d6f7458ec7cef8348",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp": {
+    "mtime": 1781869098.8007383,
+    "ast_hash": "069905115d85d330e11765244f4791d3",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.webp": {
+    "mtime": 1781869098.2750635,
+    "ast_hash": "efd9fb798d8fd98b6fa5aa433033169c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_background.webp": {
+    "mtime": 1781869100.8789022,
+    "ast_hash": "c8c6f74a651130da0d757837404dc71c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp": {
+    "mtime": 1781869100.880137,
+    "ast_hash": "fcda82664beb0cb4c45cf0be0a56ae21",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.webp": {
+    "mtime": 1781869099.6819077,
+    "ast_hash": "ab67bfb288b3378570cd4ab1c0aa702f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp": {
+    "mtime": 1781869098.7999997,
+    "ast_hash": "02e17eaef2db0c091a02aa37e90c6fc7",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp": {
+    "mtime": 1781869098.2751038,
+    "ast_hash": "5f1336eff61c3182f05b20ca1518a63c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.webp": {
+    "mtime": 1781869100.8790028,
+    "ast_hash": "e37a049a72795b69403d92f26c7e2e86",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp": {
+    "mtime": 1781869100.8798904,
+    "ast_hash": "62445bf2e25c3c14b792b45667eeaa23",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.webp": {
+    "mtime": 1781869099.6832843,
+    "ast_hash": "729ac1bcb436d5668bc85d73d00f821c",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp": {
+    "mtime": 1781869098.7991724,
+    "ast_hash": "29ac30a3c382bf6b43ed6e7eeb6ca322",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/expo.icon/Assets/expo-symbol 2.svg": {
+    "mtime": 1781869103.099303,
+    "ast_hash": "6979b664c1ce82c10426a051082412a7",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/ios/bubblechat/expo.icon/Assets/grid.png": {
+    "mtime": 1781869103.0981746,
+    "ast_hash": "37cdeda9d1af5d7432716d9671b098da",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/verify-brain-ingest.ts": {
+    "mtime": 1782019458.5788858,
+    "ast_hash": "26932f264da7d0473e2c7043f1f65625",
+    "semantic_hash": ""
+  },
+  "Backend/utils/brainIngest.ts": {
+    "mtime": 1782969963.6578963,
+    "ast_hash": "769c89545448bd157f4417c5a5500963",
+    "semantic_hash": ""
+  },
+  "Backend/utils/fileText.ts": {
+    "mtime": 1782019145.7268498,
+    "ast_hash": "14021da4c6930668bd09b7efa3f8bd4d",
+    "semantic_hash": ""
+  },
+  "Backend/utils/nigeriaHolidays.ts": {
+    "mtime": 1782130673.709334,
+    "ast_hash": "c10fa5c5197ff7d5bf15cac31bf737f2",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/theme.tsx": {
+    "mtime": 1782056114.3869717,
+    "ast_hash": "d43d4e6cb843d8b0c2ed7e57151ca5a9",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/design-system/MASTER.md": {
+    "mtime": 1782159259.2089,
+    "ast_hash": "759f18525cee6a27f3b551b87ed5929a",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/design-system/MASTER.md": {
+    "mtime": 1782159280.394488,
+    "ast_hash": "b5be2d7d23738895f81772d4047e435a",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/dedupe-direct-conversations.ts": {
+    "mtime": 1782195121.4353714,
+    "ast_hash": "1b6bf02f0f8c57effec745a58072ff15",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/inspect-transcripts.ts": {
+    "mtime": 1782202274.975889,
+    "ast_hash": "1956501e4d89de9632eee2a4333167bc",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/privacy.tsx": {
+    "mtime": 1782208004.8390982,
+    "ast_hash": "9c3dcdf8c86e678d88e59f0b390692fd",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/security.tsx": {
+    "mtime": 1782208008.912194,
+    "ast_hash": "db968f9c7f9bf52a17adaea56f825351",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/status.tsx": {
+    "mtime": 1782210366.6094642,
+    "ast_hash": "7f5642d83ac14af4f822740916086ca6",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/terms.tsx": {
+    "mtime": 1782208006.861947,
+    "ast_hash": "1b3bafbd296438359d202523c153608d",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-06-23-google-org-accounts-web-design.md": {
+    "mtime": 1782217460.4420052,
+    "ast_hash": "996a6b1c73f8ce34ad78f65b4771db78",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/webCache.ts": {
+    "mtime": 1782342002.3263822,
+    "ast_hash": "bdbefec14d5b2b86918edc57d2f37ee1",
+    "semantic_hash": ""
+  },
+  "Backend/utils/googleAuth.ts": {
+    "mtime": 1782970248.3606217,
+    "ast_hash": "faacc522a9687e0c9f1a4963bfefc303",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/lib/onboarding.ts": {
+    "mtime": 1782382613.3911471,
+    "ast_hash": "d288b7e17f32f0260fd029ef9968000e",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/nicknames.tsx": {
+    "mtime": 1782503890.9825995,
+    "ast_hash": "4cbb45d980cbb090ba2a0aa93781cd14",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/taskListeners.ts": {
+    "mtime": 1782523999.6915736,
+    "ast_hash": "5abfdb9349300cc54b15427812652723",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-06-27-calling-mobile-web-invites-design.md": {
+    "mtime": 1782755652.0370753,
+    "ast_hash": "fee3980c2623dffb72b4ad2b1e51d9b7",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-06-27-calling-mobile-web-invites.md": {
+    "mtime": 1782755652.0354352,
+    "ast_hash": "12d4cd30a3918cf21dc6ee473ea8c497",
+    "semantic_hash": ""
+  },
+  "BUBBLESPACE/frontend/src/routes/call-join.tsx": {
+    "mtime": 1782755635.8920963,
+    "ast_hash": "29445a4c0707dbc0a28f072717934536",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/app/call/join.tsx": {
+    "mtime": 1782755652.024237,
+    "ast_hash": "cd45a468451758183e97f92d606b9b97",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/recurringPatternController.ts": {
+    "mtime": 1783284183.8587265,
+    "ast_hash": "1433d224d0488efa0fc0ac48a0abdaba",
+    "semantic_hash": ""
+  },
+  "Backend/models/recurringPattern.ts": {
+    "mtime": 1782755652.0067778,
+    "ast_hash": "fa119a6929d7f81c7588a6efafa10989",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/calendarUtils.ts": {
+    "mtime": 1782755652.0275164,
+    "ast_hash": "e779f014730b33d9fd40aa0dec191ad1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/activeChatRef.ts": {
+    "mtime": 1782855097.5000856,
+    "ast_hash": "960016ef1c5485aa2ce8ea981655a42d",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/android/app/google-services.json": {
+    "mtime": 1782856831.2099142,
+    "ast_hash": "0679c9a11e0b908dc5d5593eb758c131",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/components/MeetingDetailModal.tsx": {
+    "mtime": 1783290074.8433678,
+    "ast_hash": "1730e9bc0940cf39aa60e8e6657a78bb",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/references/render_excalidraw.py": {
+    "mtime": 1782994513.668088,
+    "ast_hash": "6e4303ef722694d36728e4355c323481",
+    "semantic_hash": ""
+  },
+  "Backend/controllers/keyController.ts": {
+    "mtime": 1783684074.8256838,
+    "ast_hash": "63212411ef877b4b455dda44b1a922da",
+    "semantic_hash": ""
+  },
+  "Backend/tests/actionItemMerge.test.ts": {
+    "mtime": 1783001803.4814384,
+    "ast_hash": "0fd94ff6142558d48019dcb61d0e5ec6",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/README.md": {
+    "mtime": 1782994513.6689665,
+    "ast_hash": "2acfb3d1610182bad8558d5bb93c0d65",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/SKILL.md": {
+    "mtime": 1782994513.6711922,
+    "ast_hash": "1b69d72e17d463772c2a9baf64d0cff2",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/references/color-palette.md": {
+    "mtime": 1782994513.6672018,
+    "ast_hash": "501a56fe8a3ef41d604eee7b60e80d47",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/references/element-templates.md": {
+    "mtime": 1782994513.664676,
+    "ast_hash": "d3849addabddc00e953b7587b7fc17a6",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/references/json-schema.md": {
+    "mtime": 1782994513.6637368,
+    "ast_hash": "36d566264640ac8761236768fb9709cc",
+    "semantic_hash": ""
+  },
+  ".claude/skills/excalidraw-diagram/references/render_template.html": {
+    "mtime": 1783003219.455208,
+    "ast_hash": "8847e6add4869b3c1c3c18c7e424d44e",
+    "semantic_hash": ""
+  },
+  "PRODUCTION_READINESS.md": {
+    "mtime": 1783003201.0523715,
+    "ast_hash": "54098d20e72c8ee6e8bb28afdc30d9a4",
+    "semantic_hash": ""
+  },
+  "docs/IMPLEMENTATION.md": {
+    "mtime": 1782990879.3129163,
+    "ast_hash": "504396fa16bddc3a2f8168e8c3f11aaa",
+    "semantic_hash": ""
+  },
+  "docs/TESTING.md": {
+    "mtime": 1782992304.0847807,
+    "ast_hash": "7046cb8f3ca46d19020e0ef3645677d8",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-07-05-notification-privacy-settings-design.md": {
+    "mtime": 1783259397.9056897,
+    "ast_hash": "62ba81fdd91f19893cc9a667334cf0fe",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/syncScheduler.ts": {
+    "mtime": 1783682415.5837297,
+    "ast_hash": "5684bf58939ff17000017ec16365de46",
+    "semantic_hash": ""
+  },
+  "Backend/models/device.ts": {
+    "mtime": 1783683749.447239,
+    "ast_hash": "a57475ac504521c696450af52858039a",
+    "semantic_hash": ""
+  },
+  "Backend/models/keyBackup.ts": {
+    "mtime": 1783683802.643745,
+    "ast_hash": "f22a4b34458df03f13a60db06476a679",
+    "semantic_hash": ""
+  },
+  "Backend/models/preKeyBundle.ts": {
+    "mtime": 1783683762.9710145,
+    "ast_hash": "4df2128dd347d161b8cafa8c3ea6cd43",
+    "semantic_hash": ""
+  },
+  "Backend/models/senderKeyDistribution.ts": {
+    "mtime": 1783683782.1744406,
+    "ast_hash": "ab22e2d8b27e6d5fcb51439217c32252",
+    "semantic_hash": ""
+  },
+  "Backend/routes/keyRoutes.ts": {
+    "mtime": 1783683992.9081578,
+    "ast_hash": "6a9d661c37b54d52b3bcaa07b52b5cbf",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/dedup-live-meetings.ts": {
+    "mtime": 1783607305.8782384,
+    "ast_hash": "765fa2c1cab13ebf9545895cb0d4e748",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/end-stale-meetings.ts": {
+    "mtime": 1783543862.1569889,
+    "ast_hash": "f3b2fbf2e7e31be494145eca107ffb8e",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/purge-phantom-chats.ts": {
+    "mtime": 1783536724.1338525,
+    "ast_hash": "adca51f63b75398c0b376d4f91e77e73",
+    "semantic_hash": ""
+  },
+  "Backend/scripts/seed-test.ts": {
+    "mtime": 1783479069.07472,
+    "ast_hash": "4fe7f418f02124d7cb2538a5bf7f8d75",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/components/OfflineBanner.tsx": {
+    "mtime": 1783608467.1761236,
+    "ast_hash": "b34952b4fde91f3970ce5acdb9e0dbd2",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/apiBase.ts": {
+    "mtime": 1783748851.1787899,
+    "ast_hash": "cbd2f800f861f420df1e22d9d49cbbd1",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/badge.ts": {
+    "mtime": 1783476869.7474918,
+    "ast_hash": "855d154af221c45f539b5c22b7d5f27f",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/liveTranscription.ts": {
+    "mtime": 1783550163.1085982,
+    "ast_hash": "aa42b16f228c5d4aa01d51ee801ddeb9",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/network.ts": {
+    "mtime": 1783687432.749965,
+    "ast_hash": "3a6f521cf8b501668b5520240b44c00b",
+    "semantic_hash": ""
+  },
+  "app/bubble-chat/src/lib/storage.ts": {
+    "mtime": 1783686921.0768118,
+    "ast_hash": "2e402d3cae146186fe27cce28751569c",
+    "semantic_hash": ""
+  }
+}

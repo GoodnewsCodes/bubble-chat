@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://bubble-backend-production-96a0.up.railway.app/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "113687136587-nou8vi2vnf3gjsus0359m99f75b3r4aj.apps.googleusercontent.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c21vb3RoLW1hbmF0ZWUtOTEuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://bubble-backend-production-96a0.up.railway.app/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "113687136587-nou8vi2vnf3gjsus0359m99f75b3r4aj.apps.googleusercontent.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c21vb3RoLW1hbmF0ZWUtOTEuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://bubble-backend-production-96a0.up.railway.app/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "113687136587-nou8vi2vnf3gjsus0359m99f75b3r4aj.apps.googleusercontent.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "REPLACE_WITH_YOUR_REAL_pk_live_KEY"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
