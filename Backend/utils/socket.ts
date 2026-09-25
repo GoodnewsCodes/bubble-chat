@@ -682,10 +682,16 @@ export const initSocket = (server: HttpServer) => {
         // must stay classified as "missed", not "declined". No-ops when the caller
         // never created a meeting (no live record to mark).
         if (data.roomId) {
-          Meeting.updateOne(
-            { roomId: data.roomId, status: 'live', host: { $ne: userId }, answeredAt: { $exists: false } },
-            { $set: { declinedAt: new Date() } }
-          ).catch(err => console.error('[Meeting] Failed to mark declinedAt on call_reject:', err));
+          try {
+            await Meeting.updateOne(
+              { roomId: data.roomId, status: 'live', host: { $ne: userId }, answeredAt: { $exists: false } },
+              { $set: { declinedAt: new Date() } }
+            );
+            const { autoEndMeetingByRoomId } = await import('../controllers/meetingController');
+            await autoEndMeetingByRoomId(data.roomId);
+          } catch (err) {
+            console.error('[Meeting] Failed to handle call_reject auto-end:', err);
+          }
         }
       }
 

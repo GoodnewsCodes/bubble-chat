@@ -197,6 +197,17 @@ export const createMeeting = async (
     const { roomId, title, type, attendees, attendeeNames, chatId, agenda, startEgress } = req.body;
     const wantsEgress = startEgress !== false;
 
+    let resolvedChatId = chatId || undefined;
+    if (!resolvedChatId && attendees && attendees.length === 1) {
+      try {
+        const directConv = await Conversation.findOne({
+          isGroupChat: false,
+          users: { $all: [userId, attendees[0]], $size: 2 },
+        }).select('_id').lean();
+        if (directConv) resolvedChatId = directConv._id;
+      } catch (_) { /* ignore */ }
+    }
+
     // Every participant's client calls this when joining a call (caller AND callee),
     // near-simultaneously. Without atomicity each created their own Meeting for the
     // same roomId (two "Voice Call" rows, doubled minutes messages/dots). Join the
@@ -206,6 +217,7 @@ export const createMeeting = async (
       const joinExisting = async () => {
         const existing = await Meeting.findOne({ roomId, status: 'live' });
         if (!existing) return null;
+        let modified = false;
         const alreadyIn =
           String(existing.host) === String(userId) ||
           existing.attendees.some((a: any) => String(a) === String(userId));
@@ -216,8 +228,13 @@ export const createMeeting = async (
               new Set([...(existing.attendeeNames || []), ...attendeeNames])
             );
           }
-          await existing.save();
+          modified = true;
         }
+        if (!existing.chatId && resolvedChatId) {
+          existing.chatId = resolvedChatId;
+          modified = true;
+        }
+        if (modified) await existing.save();
         return existing;
       };
       const joined = await joinExisting();
@@ -237,7 +254,7 @@ export const createMeeting = async (
         agenda: agenda || '',
         attendees: attendees || [],
         attendeeNames: attendeeNames || [],
-        chatId: chatId || undefined,
+        chatId: resolvedChatId,
         startedAt: new Date(),
         status: 'live',
       });
@@ -247,10 +264,16 @@ export const createMeeting = async (
       if (createErr?.code === 11000 && roomId) {
         const winner = await Meeting.findOne({ roomId, status: 'live' });
         if (winner) {
+          let modified = false;
           if (!winner.attendees.some((a: any) => String(a) === String(userId)) && String(winner.host) !== String(userId)) {
             winner.attendees.push(userId);
-            await winner.save();
+            modified = true;
           }
+          if (!winner.chatId && resolvedChatId) {
+            winner.chatId = resolvedChatId;
+            modified = true;
+          }
+          if (modified) await winner.save();
           if (wantsEgress) await startEgressIfNeeded(winner);
           return res.status(200).json({ message: 'Joined existing meeting', meeting: winner });
         }
@@ -1046,20 +1069,36 @@ export const runBackgroundMeetingAI = async (
       }
     }
 
-    // ── Non-successful 1:1 call short-circuit ───────────────────────────────────
-    // A declined or never-answered voice/video call has nothing to transcribe or
+    // ── Non-successful call short-circuit (1:1 & Group) ────────────────────────
+    // If meeting.chatId is missing, attempt to auto-resolve it (e.g. from 1:1 attendees)
+    if (!meeting.chatId) {
+      try {
+        const otherId = meeting.attendees?.find((a: any) => String(a) !== String(meeting.host));
+        if (otherId) {
+          const directConv = await Conversation.findOne({
+            isGroupChat: false,
+            users: { $all: [meeting.host, otherId], $size: 2 },
+          }).select('_id').lean();
+          if (directConv) {
+            meeting.chatId = directConv._id;
+            await Meeting.findByIdAndUpdate(meeting._id, { chatId: directConv._id });
+          }
+        }
+      } catch (findChatErr) {
+        console.warn('[Meeting] Failed to resolve missing chatId:', findChatErr);
+      }
+    }
+
+    // A declined or never-answered voice/video call/meeting has nothing to transcribe or
     // summarize. Post a clean "Declined"/"Missed" call-log entry into the chat and
-    // skip the entire AI pipeline (Whisper, intelligence, tasks, brain ingestion,
-    // "action items extracted" notifications) — that pipeline is what used to leave
-    // the "📝 Meeting minutes ready … 0 action items" clutter on empty calls.
+    // skip the entire AI pipeline.
     const wasAnswered = !!meeting.answeredAt;
     const wasDeclined = !!meeting.declinedAt;
-    const isOneToOneCall = meeting.type === 'voice' || meeting.type === 'video';
     const nobodyElseJoined =
       (meeting.attendees?.length || 0) === 0 ||
       (meeting.attendees.length === 1 && String(meeting.attendees[0]) === String(meeting.host));
     const noTranscript = (rawTranscript || '').trim().length < 40;
-    const unansweredCall = isOneToOneCall && !wasAnswered && nobodyElseJoined && noTranscript;
+    const unansweredCall = !wasAnswered && nobodyElseJoined && noTranscript;
 
     if (meeting.chatId && (wasDeclined || unansweredCall)) {
       try {
@@ -1070,12 +1109,26 @@ export const runBackgroundMeetingAI = async (
         }).select('_id').lean();
 
         if (!already) {
+          const chatDoc = await Conversation.findById(meeting.chatId).select('isGroupChat users').lean();
+          const isGroup = !!chatDoc?.isGroupChat || (meeting.attendees && meeting.attendees.length > 1);
           const callType = meeting.type === 'video' ? 'video' : 'voice';
           const status = wasDeclined ? 'declined' : 'missed';
+
+          let content = '';
+          if (isGroup) {
+            content = wasDeclined
+              ? `Declined group ${callType === 'video' ? 'video call' : 'voice call'}`
+              : `Missed group ${callType === 'video' ? 'video call' : 'voice call'}`;
+          } else {
+            content = wasDeclined
+              ? `Declined ${callType === 'video' ? 'video call' : 'voice call'}`
+              : `Missed ${callType === 'video' ? 'video call' : 'voice call'}`;
+          }
+
           const callMessage = await Message.create({
             chat: meeting.chatId,
             sender: meeting.host,
-            content: callType === 'video' ? 'Video call' : 'Voice call',
+            content,
             message_type: 'call',
             call_metadata: {
               callType,
@@ -1083,11 +1136,12 @@ export const runBackgroundMeetingAI = async (
               status,
               hasMinutes: false,
               meetingId: String(meeting._id),
+              isGroup,
             },
             is_announcement: true,
           });
 
-          const chatDoc = await Conversation.findByIdAndUpdate(meeting.chatId, {
+          await Conversation.findByIdAndUpdate(meeting.chatId, {
             latestMessage: callMessage._id,
           });
 
@@ -1353,7 +1407,11 @@ export const runBackgroundMeetingAI = async (
           const baseUrl = process.env.API_PUBLIC_URL || process.env.BASE_URL || '';
           const transcriptUrl = `${baseUrl}/api/v1/meetings/${meeting._id}/transcript.md`;
           const callType = meeting.type === 'video' ? 'video' : 'voice';
-          const label = callType === 'video' ? 'Video call' : 'Voice call';
+          const chatDoc = await Conversation.findById(meeting.chatId).select('isGroupChat users').lean();
+          const isGroup = !!chatDoc?.isGroupChat || (meeting.attendees && meeting.attendees.length > 1);
+          const label = isGroup
+            ? `Group ${callType === 'video' ? 'video call' : 'voice call'}`
+            : `${callType === 'video' ? 'Video call' : 'Voice call'}`;
 
           // Talk time counts from pickup (answeredAt) to end, not from the ring —
           // falls back to the full meeting duration for group/scheduled meetings
@@ -1374,11 +1432,12 @@ export const runBackgroundMeetingAI = async (
               status: 'completed',
               hasMinutes: hasContent,
               meetingId: String(meeting._id),
+              isGroup,
             },
             is_announcement: true,
           });
 
-          const chatDoc = await Conversation.findByIdAndUpdate(meeting.chatId, {
+          await Conversation.findByIdAndUpdate(meeting.chatId, {
             latestMessage: callMessage._id,
           });
 
