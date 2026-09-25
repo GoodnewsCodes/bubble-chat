@@ -20,17 +20,21 @@ try {
 }
 
 
-const BUCKET = process.env.FILEBASE_BUCKET as string;
+export const getBucket = () => (process.env.FILEBASE_BUCKET || 'bubblle-19').trim();
 
-export const s3Client = new S3Client({
-  endpoint: 'https://s3.filebase.com',
-  region: 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.FILEBASE_ACCESS_KEY as string,
-    secretAccessKey: process.env.FILEBASE_SECRET_KEY as string,
-  },
-  forcePathStyle: true, // Required for Filebase/S3-compatible
-});
+export const getS3Client = () => {
+  return new S3Client({
+    endpoint: 'https://s3.filebase.com',
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: (process.env.FILEBASE_ACCESS_KEY || '').trim(),
+      secretAccessKey: (process.env.FILEBASE_SECRET_KEY || '').trim(),
+    },
+    forcePathStyle: true, // Required for Filebase/S3-compatible
+  });
+};
+
+export const s3Client = getS3Client();
 
 /**
  * Extract the storage KEY from a previously stored Filebase URL.
@@ -44,8 +48,9 @@ export const extractKeyFromUrl = (url: string): string => {
     // Remove leading slash
     if (pathname.startsWith('/')) pathname = pathname.slice(1);
     // Strip bucket prefix for path-style URLs: "bubblle-19/messages/..." -> "messages/..."
-    if (BUCKET && pathname.startsWith(`${BUCKET}/`)) {
-      pathname = pathname.slice(BUCKET.length + 1);
+    const bucket = getBucket();
+    if (bucket && pathname.startsWith(`${bucket}/`)) {
+      pathname = pathname.slice(bucket.length + 1);
     }
     return pathname;
   } catch {
@@ -86,35 +91,36 @@ export const uploadToFilebase = async (
   fileKey: string,
   contentType: string
 ): Promise<{ url: string; key: string }> => {
-  const accessKey = process.env.FILEBASE_ACCESS_KEY;
-  const secretKey = process.env.FILEBASE_SECRET_KEY;
+  const accessKey = process.env.FILEBASE_ACCESS_KEY?.trim();
+  const secretKey = process.env.FILEBASE_SECRET_KEY?.trim();
+  const bucket = getBucket();
   const bypassFilebase = process.env.BYPASS_FILEBASE === 'true' || !accessKey || !secretKey;
 
   if (bypassFilebase) {
-    // console.log('ℹ️ Bypassing Filebase, saving file locally.');
+    if (process.env.VERCEL) {
+      console.warn('⚠️ [Filebase] BYPASS_FILEBASE is true or FILEBASE_ACCESS_KEY/SECRET_KEY missing in Vercel environment. Files saved locally will not persist across serverless invocations!');
+    }
     return saveFileLocally(fileData, fileKey);
   }
 
   try {
+    const client = getS3Client();
     const upload = new Upload({
-      client: s3Client,
+      client,
       params: {
-        Bucket: BUCKET,
+        Bucket: bucket,
         Key: fileKey,
         Body: fileData,
         ContentType: contentType,
-        // NOTE: No ACL — bucket is private. All access via presigned URLs.
       },
     });
 
     await upload.done();
 
-    // Build a legacy URL for backward-compat with old DB records.
-    // Use path-style so extractKeyFromUrl can always recover the key.
-    const url = `https://s3.filebase.com/${BUCKET}/${fileKey}`;
+    const url = `https://s3.filebase.com/${bucket}/${fileKey}`;
     return { url, key: fileKey };
   } catch (error) {
-    console.warn('⚠️ S3 Upload failed, falling back to local storage:', error);
+    console.error('⚠️ [Filebase] S3 Upload failed, falling back to local storage:', error);
     if (fileData instanceof fs.ReadStream) {
       const filePath = (fileData as any).path;
       if (filePath && typeof filePath === 'string' && fs.existsSync(filePath)) {
@@ -136,12 +142,14 @@ export const getSignedMediaUrl = async (keyOrUrl: string, downloadName?: string)
     return keyOrUrl;
   }
   const key = keyOrUrl.startsWith('http') ? extractKeyFromUrl(keyOrUrl) : keyOrUrl;
+  const client = getS3Client();
+  const bucket = getBucket();
   const command = new GetObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucket,
     Key: key,
     ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` })
   });
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  return await getSignedUrl(client, command, { expiresIn: 3600 });
 };
 
 /**
@@ -201,8 +209,10 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
   }
 
   try {
+    const client = getS3Client();
+    const bucket = getBucket();
     const command = new GetObjectCommand({
-      Bucket: BUCKET,
+      Bucket: bucket,
       Key: key,
       // Forward the client's Range header. iOS AVPlayer (voice notes / video on
       // the mobile app) probes with `Range: bytes=0-1` and REQUIRES a 206
@@ -212,7 +222,7 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
       ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` })
     });
 
-    const response = await s3Client.send(command);
+    const response = await client.send(command);
 
     if (range && response.ContentRange) {
       res.status(206);
