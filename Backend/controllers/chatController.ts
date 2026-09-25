@@ -5,6 +5,7 @@ import { Message } from '../models/messages';
 import { getSignedMediaUrl } from '../utils/filebase';
 import mongoose from 'mongoose';
 import { getIO } from '../utils/socket';
+import { getUserIdString } from './messageController';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -524,10 +525,12 @@ export const addToGroup = async (req: AuthRequest, res: Response): Promise<void>
     try {
       const io = req.io || getIO();
       updated.users.forEach((u: any) => {
-        io.to(String(u._id || u)).emit('chat_updated', formattedConv);
+        const uid = getUserIdString(u);
+        if (uid) io.to(uid).emit('chat_updated', formattedConv);
       });
       // The newly-added user may not have the conversation yet.
-      io.to(String(userId)).emit('new_chat', formattedConv);
+      const targetUid = getUserIdString(userId);
+      if (targetUid) io.to(targetUid).emit('new_chat', formattedConv);
     } catch (socketErr) {
       console.error('Socket emit chat_updated (addToGroup) failed:', socketErr);
     }
@@ -536,7 +539,7 @@ export const addToGroup = async (req: AuthRequest, res: Response): Promise<void>
     if (systemMessageSaved) {
       try {
         const io = req.io || getIO();
-        const joinedUser = updated?.users.find((u: any) => String(u._id || u) === String(userId)) as any;
+        const joinedUser = updated?.users.find((u: any) => getUserIdString(u) === getUserIdString(userId)) as any;
         const formattedMsg = {
           _id: systemMessageSaved._id,
           id: systemMessageSaved._id.toString(),
@@ -555,7 +558,8 @@ export const addToGroup = async (req: AuthRequest, res: Response): Promise<void>
         io.to(chatId.toString()).emit('new_message', formattedMsg);
         // Also emit to all members directly
         updated.users.forEach((u: any) => {
-          io.to(String(u._id || u)).emit('new_message', formattedMsg);
+          const uid = getUserIdString(u);
+          if (uid) io.to(uid).emit('new_message', formattedMsg);
         });
       } catch (socketErr) {
         console.error('Socket emit new member message failed:', socketErr);
@@ -951,14 +955,16 @@ export const joinGroupChatByInvite = async (req: AuthRequest, res: Response): Pr
     // Broadcast socket event
     try {
       const io = req.io || getIO();
-      io.to(userId.toString()).emit('new_chat', formatted);
+      const userUid = getUserIdString(userId);
+      if (userUid) io.to(userUid).emit('new_chat', formatted);
       // Emit to existing group members that a new user joined
       updated?.users.forEach((u: any) => {
-        io.to(String(u._id || u)).emit('member_added', { chatId: group._id, member: formatted.users.find((x: any) => String(x.id) === String(userId)) });
+        const uid = getUserIdString(u);
+        if (uid) io.to(uid).emit('member_added', { chatId: group._id, member: formatted.users.find((x: any) => String(x.id) === String(userId)) });
       });
 
       if (systemMessageSaved) {
-        const joinedUser = updated?.users.find((u: any) => String(u._id || u) === String(userId)) as any;
+        const joinedUser = updated?.users.find((u: any) => getUserIdString(u) === getUserIdString(userId)) as any;
         const formattedMsg = {
           _id: systemMessageSaved._id,
           id: systemMessageSaved._id.toString(),
@@ -974,7 +980,8 @@ export const joinGroupChatByInvite = async (req: AuthRequest, res: Response): Pr
           createdAt: systemMessageSaved.createdAt.toISOString(),
         };
         updated?.users.forEach((u: any) => {
-          io.to(String(u._id || u)).emit('new_message', formattedMsg);
+          const uid = getUserIdString(u);
+          if (uid) io.to(uid).emit('new_message', formattedMsg);
         });
       }
     } catch (socketErr) {
@@ -1056,7 +1063,8 @@ export const updateGroupSettings = async (req: AuthRequest, res: Response): Prom
     try {
       const io = req.io || getIO();
       updated.users.forEach((u: any) => {
-        io.to(String(u._id || u)).emit('chat_updated', formatted);
+        const uid = getUserIdString(u);
+        if (uid) io.to(uid).emit('chat_updated', formatted);
       });
     } catch (socketErr) {
       console.error('Socket emit chat_updated failed:', socketErr);

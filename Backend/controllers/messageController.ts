@@ -141,43 +141,44 @@ export const formatMessage = async (m: any) => {
    * Send a new Message
    * POST /api/v1/message
    */
-  /**
-   * Deliver a socket event to every member of a conversation EXACTLY ONCE.
-   *
-   * Previously we emitted to the chat room AND to each member's personal room, so a
-   * member who had the chat open (joined the room) received the event twice — the
-   * "sender sees the message twice, receiver sees it once" bug. We now emit to the
-   * room once, then only to the personal rooms of members who are NOT currently in
-   * the room, guaranteeing single delivery while still reaching offline-to-chat
-   * recipients via their personal room.
-   */
-  export const emitToConversation = async (
-    io: any,
-    chatId: string,
-    users: any[],
-    event: string,
-    payload: any,
-  ): Promise<void> => {
-    const usersInRoom = new Set<string>();
-    try {
-      const roomSockets = await io.in(String(chatId)).fetchSockets();
-      for (const s of roomSockets) {
-        // RemoteSocket only carries socket.data (not custom props), so read userId
-        // from data first; fall back to the legacy direct prop for safety.
-        const uid = (s as any).data?.userId ?? (s as any).userId;
-        if (uid) usersInRoom.add(String(uid));
-      }
-    } catch {
-      // fetchSockets can fail in some adapters; fall back to personal-room only.
-    }
+export const getUserIdString = (u: any): string => {
+  if (!u) return '';
+  if (typeof u === 'string') return u.trim();
+  if (u._id) {
+    return typeof u._id === 'string' ? u._id.trim() : (typeof u._id.toString === 'function' ? u._id.toString().trim() : String(u._id));
+  }
+  if (typeof u.toString === 'function') {
+    const s = u.toString();
+    if (s && s !== '[object Object]') return s.trim();
+  }
+  return '';
+};
 
-    const fanoutUsers = users.filter((u) => !usersInRoom.has(String(u)));
-    // console.log(`[msg-debug] emit '${event}' chat=${String(chatId)} roomUsers=${usersInRoom.size} fanout=${fanoutUsers.length}`);
-    io.to(String(chatId)).emit(event, payload);
-    for (const u of fanoutUsers) {
-      io.to(String(u)).emit(event, payload);
-    }
-  };
+/**
+ * Deliver a socket event to every member of a conversation EXACTLY ONCE.
+ * Broadcasting to the union of the conversation room and each member's personal room
+ * ensures immediate delivery whether the chat is currently open or in the background,
+ * while Socket.IO automatically deduplicates per connected socket.
+ */
+export const emitToConversation = async (
+  io: any,
+  chatId: string,
+  users: any[],
+  event: string,
+  payload: any,
+): Promise<void> => {
+  if (!io) return;
+  const rooms = new Set<string>();
+  const cid = String(chatId || '').trim();
+  if (cid) rooms.add(cid);
+  for (const u of users || []) {
+    const uid = getUserIdString(u);
+    if (uid) rooms.add(uid);
+  }
+  if (rooms.size > 0) {
+    io.to(Array.from(rooms)).emit(event, payload);
+  }
+};
 
   /**
    * Transcribe a voice note off the request path. Reuses the same Whisper/Groq
@@ -386,8 +387,9 @@ export const formatMessage = async (m: any) => {
             .populate('groupAdmin', '-password -refreshToken -privateKey -zegoToken')
             .populate({ path: 'latestMessage', populate: { path: 'sender', select: 'full_name username avatar email uniqueTag isOnline is_bot' } });
           for (const u of convo.users as any[]) {
+            const uid = getUserIdString(u);
             const convoForUser = await formatConversation(fullConvo, u);
-            io.to(String(u)).emit('new_chat', convoForUser);
+            if (uid) io.to(uid).emit('new_chat', convoForUser);
           }
         }
 
@@ -395,11 +397,14 @@ export const formatMessage = async (m: any) => {
         // and push it to their personal room. Skip system messages (they don't
         // bump latestMessage above either).
         if (!isSystem) {
-          const recipients = convo.users.filter((u: any) => String(u) !== String(req.user._id));
+          const myUid = getUserIdString(req.user._id || req.user.id || req.user);
+          const recipients = convo.users.filter((u: any) => getUserIdString(u) !== myUid);
           await Promise.all(
             recipients.map(async (u: any) => {
+              const uid = getUserIdString(u);
+              if (!uid) return;
               const unreadCount = await countUnreadForUser(chatId, u, !!convo.isGroupChat);
-              io.to(u.toString()).emit('unread_count_updated', { chatId, unreadCount });
+              io.to(uid).emit('unread_count_updated', { chatId, unreadCount });
             })
           );
         }

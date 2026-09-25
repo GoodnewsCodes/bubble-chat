@@ -11,6 +11,7 @@ import { Conversation } from '../models/conversations';
 import { Message } from '../models/messages';
 import { sendWelcomeNewMemberEmail } from '../utils/mailer';
 import { getAidaBotUser } from './aidaController';
+import { getUserIdString } from './messageController';
 import { Meeting } from '../models/meeting';
 import OpenAI from 'openai';
 
@@ -574,7 +575,8 @@ export const joinOrganizationByInvite = async (req: AuthRequest, res: Response):
           io.to(defaultChat._id.toString()).emit('new_message', formattedMsg);
           // Also broadcast to each user specifically
           defaultChat.users.forEach((u: any) => {
-            io.to(String(u)).emit('new_message', formattedMsg);
+            const uid = getUserIdString(u);
+            if (uid) io.to(uid).emit('new_message', formattedMsg);
           });
         } catch (msgErr) {
           console.error('Failed to create/broadcast system message for org default chat join:', msgErr);

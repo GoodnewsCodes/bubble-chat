@@ -1087,13 +1087,17 @@ export const runBackgroundMeetingAI = async (
             is_announcement: true,
           });
 
-          await Conversation.findByIdAndUpdate(meeting.chatId, {
+          const chatDoc = await Conversation.findByIdAndUpdate(meeting.chatId, {
             latestMessage: callMessage._id,
           });
 
           try {
             const { getIO } = await import('../utils/socket');
-            getIO().to(String(meeting.chatId)).emit('new_message', callMessage);
+            const { emitToConversation, formatMessage } = await import('./messageController');
+            const io = getIO();
+            const formattedCallMsg = await formatMessage(callMessage);
+            (formattedCallMsg as any).chatId = String(meeting.chatId);
+            await emitToConversation(io, String(meeting.chatId), (chatDoc?.users as any[]) || [], 'new_message', formattedCallMsg);
           } catch (_) { /* silent */ }
         }
       } catch (chatErr) {
@@ -1374,14 +1378,17 @@ export const runBackgroundMeetingAI = async (
             is_announcement: true,
           });
 
-          await Conversation.findByIdAndUpdate(meeting.chatId, {
+          const chatDoc = await Conversation.findByIdAndUpdate(meeting.chatId, {
             latestMessage: callMessage._id,
           });
 
           try {
             const { getIO } = await import('../utils/socket');
+            const { emitToConversation, formatMessage } = await import('./messageController');
             const io = getIO();
-            io.to(String(meeting.chatId)).emit('new_message', callMessage);
+            const formattedCallMsg = await formatMessage(callMessage);
+            (formattedCallMsg as any).chatId = String(meeting.chatId);
+            await emitToConversation(io, String(meeting.chatId), (chatDoc?.users as any[]) || [], 'new_message', formattedCallMsg);
           } catch (_) { /* silent */ }
         }
       } catch (chatErr) {

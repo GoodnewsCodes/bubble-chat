@@ -94,13 +94,15 @@ export const uploadToFilebase = async (
   const accessKey = process.env.FILEBASE_ACCESS_KEY?.trim();
   const secretKey = process.env.FILEBASE_SECRET_KEY?.trim();
   const bucket = getBucket();
-  const bypassFilebase = process.env.BYPASS_FILEBASE === 'true' || !accessKey || !secretKey;
 
-  if (bypassFilebase) {
-    if (process.env.VERCEL) {
-      console.warn('⚠️ [Filebase] BYPASS_FILEBASE is true or FILEBASE_ACCESS_KEY/SECRET_KEY missing in Vercel environment. Files saved locally will not persist across serverless invocations!');
-    }
-    return saveFileLocally(fileData, fileKey);
+  if (!accessKey || !secretKey || !bucket) {
+    const missing: string[] = [];
+    if (!accessKey) missing.push('FILEBASE_ACCESS_KEY');
+    if (!secretKey) missing.push('FILEBASE_SECRET_KEY');
+    if (!bucket) missing.push('FILEBASE_BUCKET');
+    const errMsg = `Filebase upload failed: Missing required storage credentials (${missing.join(', ')}). Please verify your environment configuration on the backend service.`;
+    console.error(`❌ [Filebase] ${errMsg}`);
+    throw new Error(errMsg);
   }
 
   try {
@@ -119,16 +121,10 @@ export const uploadToFilebase = async (
 
     const url = `https://s3.filebase.com/${bucket}/${fileKey}`;
     return { url, key: fileKey };
-  } catch (error) {
-    console.error('⚠️ [Filebase] S3 Upload failed, falling back to local storage:', error);
-    if (fileData instanceof fs.ReadStream) {
-      const filePath = (fileData as any).path;
-      if (filePath && typeof filePath === 'string' && fs.existsSync(filePath)) {
-        const newStream = fs.createReadStream(filePath);
-        return saveFileLocally(newStream, fileKey);
-      }
-    }
-    return saveFileLocally(fileData, fileKey);
+  } catch (error: any) {
+    const errMsg = error?.message || (typeof error === 'string' ? error : 'Unknown S3 error');
+    console.error(`❌ [Filebase] S3 Upload failed for key "${fileKey}":`, error);
+    throw new Error(`Filebase S3 upload failed: ${errMsg}`);
   }
 };
 
