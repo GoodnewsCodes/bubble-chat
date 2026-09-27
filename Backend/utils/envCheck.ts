@@ -42,7 +42,12 @@ export const assertCriticalEnv = (): void => {
   }
   const isProd = process.env.NODE_ENV === 'production';
   const missingCritical = CRITICAL.filter(s => isMissing(s.name));
-  const missingFeature = FEATURE.filter(s => isMissing(s.name));
+  const missingFeature = FEATURE.filter(s => {
+    if (s.name === 'FILEBASE_BUCKET') {
+      return isMissing('FILEBASE_BUCKET') && isMissing('FILEBASE_FALLBACK_BUCKETS');
+    }
+    return isMissing(s.name);
+  });
 
   if (missingCritical.length === 0 && missingFeature.length === 0) {
     // console.log('[envCheck] All critical + feature env vars present ✓');

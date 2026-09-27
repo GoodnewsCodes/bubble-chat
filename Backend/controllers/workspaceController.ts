@@ -1,16 +1,12 @@
 import { Request, Response } from 'express';
 import { WorkspaceFile } from '../models/workspaceFile';
-import { uploadToFilebase, getSignedMediaUrl, extractKeyFromUrl, streamS3Object } from '../utils/filebase';
-import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client } from '../utils/filebase';
+import { uploadToFilebase, getSignedMediaUrl, extractKeyFromUrl, streamS3Object, deleteFromFilebase } from '../utils/filebase';
 import * as fs from 'fs';
 import { logActivity } from './activityLogController';
 
 export interface AuthRequest extends Request {
   user?: any;
 }
-
-const BUCKET = process.env.FILEBASE_BUCKET as string;
 
 /**
  * Resolve file type from mime string
@@ -287,7 +283,7 @@ export const deleteWorkspaceFile = async (req: AuthRequest, res: Response): Prom
     // Delete from Filebase if it's a real file
     try {
       if (!file.isFolder && file.fileKey) {
-        await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: file.fileKey }));
+        await deleteFromFilebase(file.fileKey);
       }
     } catch (e) {
       console.error('[Workspace] Filebase delete failed, removing DB record anyway:', e);

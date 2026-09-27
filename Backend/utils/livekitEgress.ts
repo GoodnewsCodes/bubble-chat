@@ -1,18 +1,12 @@
 import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { Readable } from 'stream';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 import {
   EgressClient,
   EncodedFileOutput,
   EncodedFileType,
   S3Upload,
 } from 'livekit-server-sdk';
-import { s3Client, extractKeyFromUrl } from './filebase';
+import { s3Client, extractKeyFromUrl, getBucket, downloadS3ObjectToTempFile } from './filebase';
 import { transcribeAudio } from './whisperService';
-
-const BUCKET = process.env.FILEBASE_BUCKET as string;
 
 /**
  * LiveKit Egress is the room-recording feature that composites a call's audio and
@@ -65,7 +59,7 @@ export const startRoomAudioEgress = async (
         value: new S3Upload({
           accessKey: process.env.FILEBASE_ACCESS_KEY as string,
           secret: process.env.FILEBASE_SECRET_KEY as string,
-          bucket: BUCKET,
+          bucket: getBucket(),
           endpoint: 'https://s3.filebase.com',
           region: 'us-east-1',
           forcePathStyle: true,
@@ -105,23 +99,7 @@ export const stopRoomAudioEgress = async (egressId?: string): Promise<void> => {
 
 /** Download a Filebase/S3 object to a temp file and return the local path. */
 const downloadToTempFile = async (keyOrUrl: string): Promise<string> => {
-  const key = keyOrUrl.startsWith('http') ? extractKeyFromUrl(keyOrUrl) : keyOrUrl;
-  const ext = path.extname(key) || '.ogg';
-  const tmpPath = path.join(os.tmpdir(), `egress-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-  const response = await s3Client.send(command);
-  const body = response.Body as Readable;
-
-  await new Promise<void>((resolve, reject) => {
-    const out = fs.createWriteStream(tmpPath);
-    body.pipe(out);
-    body.on('error', reject);
-    out.on('error', reject);
-    out.on('finish', () => resolve());
-  });
-
-  return tmpPath;
+  return downloadS3ObjectToTempFile(keyOrUrl);
 };
 
 /**
