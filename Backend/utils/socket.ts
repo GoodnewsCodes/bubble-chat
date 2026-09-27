@@ -274,28 +274,36 @@ export const initSocket = (server: HttpServer) => {
 
     socket.on('join_room', async (chatId: string) => {
       try {
-        const { Conversation } = await import('../models/conversations');
-        const convo = await Conversation.findById(chatId);
-        if (convo && convo.users.map((id: any) => id.toString()).includes(userId)) {
+        if (!chatId || typeof chatId !== 'string') return;
+
+        // Fast-path: meeting rooms with standard prefixes join immediately without DB roundtrips
+        if (chatId.startsWith('meet-') || chatId.startsWith('bubble-')) {
           socket.join(chatId);
-          // console.log(`[Room] User ${userId} joined conversation room: ${chatId}`);
           return;
         }
 
-        // Allow meeting rooms starting with meet- or matching a live meeting user is associated with
-        const { Meeting } = await import('../models/meeting');
         const isObjectId = mongoose.Types.ObjectId.isValid(chatId);
+        if (isObjectId) {
+          const { Conversation } = await import('../models/conversations');
+          const convo = await Conversation.findById(chatId).select('users').lean();
+          if (convo && (convo as any).users?.map((id: any) => id.toString()).includes(userId)) {
+            socket.join(chatId);
+            return;
+          }
+        }
+
+        // Check if matching a meeting record user is associated with
+        const { Meeting } = await import('../models/meeting');
         const meeting = await Meeting.findOne({
           $or: [
             ...(isObjectId ? [{ _id: chatId }] : []),
             { roomId: chatId },
           ],
           $and: [{ $or: [{ host: userId }, { attendees: userId }] }],
-        });
+        }).select('_id').lean();
 
-        if (meeting || chatId.startsWith('meet-') || chatId.startsWith('bubble-')) {
+        if (meeting) {
           socket.join(chatId);
-          // console.log(`[Room] User ${userId} joined meeting room: ${chatId}`);
         } else {
           console.warn(`[Room Security] User ${userId} attempted to join unauthorized room: ${chatId}`);
         }

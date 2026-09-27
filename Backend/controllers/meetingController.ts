@@ -287,30 +287,32 @@ export const createMeeting = async (
     if (wantsEgress) await startEgressIfNeeded(meeting);
 
     if (attendees && attendees.length > 0) {
-      const hostUser = await User.findById(userId).select('full_name username');
+      const hostUser = await User.findById(userId).select('full_name username').lean();
       const hostName =
-        hostUser?.full_name || hostUser?.username || 'Someone';
+        (hostUser as any)?.full_name || (hostUser as any)?.username || 'Someone';
 
-      for (const attendeeId of attendees) {
-        await createNotification({
-          recipient: attendeeId,
-          sender: userId,
-          type: 'meeting_started',
-          title: `Meeting started: ${meeting.title}`,
-          body: `${hostName} has started a meeting. Join now!`,
-          entityId: String(meeting._id),
-          entityType: 'Meeting',
-        });
-      }
+      await Promise.all(
+        attendees.map((attendeeId: any) =>
+          createNotification({
+            recipient: attendeeId,
+            sender: userId,
+            type: 'meeting_started',
+            title: `Meeting started: ${meeting.title}`,
+            body: `${hostName} has started a meeting. Join now!`,
+            entityId: String(meeting._id),
+            entityType: 'Meeting',
+          }).catch((err) => console.error('[Meeting] createNotification failed:', err))
+        )
+      );
     }
 
-    await logActivity({
+    logActivity({
       actor: userId,
       action: 'meeting_started',
       entityId: String(meeting._id),
       entityType: 'Meeting',
       entityLabel: meeting.title,
-    });
+    }).catch(() => undefined);
 
     // Broadcast to all org members so their "Active Rooms" list refreshes instantly.
     try {
