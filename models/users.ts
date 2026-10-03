@@ -76,7 +76,8 @@ export interface IUser extends Document {
 
   // Auth
   password?: string;
-  refreshToken?: string;
+  refreshToken?: string; // legacy single-token field (migrated into `sessions` on next refresh)
+  sessions?: { sid: string; tokenHash: string; createdAt: Date; expiresAt: Date; lastUsedAt: Date; userAgent?: string; ip?: string }[];
 
   // E2EE — legacy account-level public key (retained only for back-compat reads;
   // Signal identity keys now live per-device on the Device model). Private keys
@@ -129,6 +130,23 @@ const UserSchema: Schema<IUser> = new Schema(
 
     password: { type: String, select: false },
     refreshToken: { type: String, select: false },
+    // One entry per signed-in device (see utils/sessions.ts). Hidden from normal reads.
+    sessions: {
+      type: [
+        {
+          _id: false,
+          sid: { type: String, required: true },
+          tokenHash: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now },
+          expiresAt: { type: Date, required: true },
+          lastUsedAt: { type: Date, default: Date.now },
+          userAgent: String,
+          ip: String,
+        },
+      ],
+      select: false,
+      default: undefined,
+    },
 
     isVerified: { type: Boolean, default: false },
 

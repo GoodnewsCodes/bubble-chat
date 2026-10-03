@@ -13,6 +13,7 @@ import { Conversation } from '../models/conversations';
 import { Message } from '../models/messages';
 import { getAidaBotUser } from './aidaController';
 import { logActivity } from './activityLogController';
+import { SESSION_TTL_SECONDS, ACCESS_TOKEN_TTL, ACCESS_TOKEN_TTL_MS, MAX_SESSIONS, newSessionRecord, findValidSession } from '../utils/sessions';
 
 // ─── Token Helpers ────────────────────────────────────────────────────────────
 
@@ -25,23 +26,41 @@ export const getRefreshKey = (): string => {
   return key;
 };
 
-const generateAccessToken = (userId: string) => {
+const signAccessToken = (userId: string, sid: string) => {
   if (!process.env.JWT_KEY) throw new Error('JWT_KEY is not set — refusing to use a default secret');
-  return jwt.sign({ id: userId }, process.env.JWT_KEY, { expiresIn: '2d' });
+  return jwt.sign({ id: userId, sid }, process.env.JWT_KEY, { expiresIn: ACCESS_TOKEN_TTL });
 };
 
-const generateRefreshToken = (userId: string) =>
-  jwt.sign({ id: userId }, getRefreshKey(), { expiresIn: '30d' });
+// Starts a new 30-day session for this device and returns its tokens. Every sign-in path
+// (password, OTP, Google web/mobile, Clerk) goes through here.
+const startSession = async (
+  user: any,
+  req: Request,
+): Promise<{ accessToken: string; refreshToken: string; sid: string; expiresAt: Date }> => {
+  const sid = crypto.randomUUID();
+  const refreshToken = jwt.sign({ id: String(user._id), sid }, getRefreshKey(), { expiresIn: SESSION_TTL_SECONDS });
+  const record = newSessionRecord(sid, refreshToken, {
+    userAgent: req.headers['user-agent'] as string | undefined,
+    ip: req.ip,
+  });
+  // Drop finished sessions, then append and cap to the newest MAX_SESSIONS.
+  await User.updateOne({ _id: user._id }, { $pull: { sessions: { expiresAt: { $lte: new Date() } } } });
+  await User.updateOne(
+    { _id: user._id },
+    { $push: { sessions: { $each: [record], $slice: -MAX_SESSIONS } }, $unset: { refreshToken: 1 } },
+  );
+  return { accessToken: signAccessToken(String(user._id), sid), refreshToken, sid, expiresAt: record.expiresAt };
+};
 
 // ─── Cookie Helpers ────────────────────────────────────────────────────────────
 
-export const setAuthCookies = (res: Response, accessToken: string, refreshToken?: string) => {
+export const setAuthCookies = (res: Response, accessToken: string, refreshToken?: string, refreshMaxAgeMs: number = SESSION_TTL_SECONDS * 1000) => {
   const isProd = process.env.NODE_ENV === 'production';
   const cookieOptions: any = {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: ACCESS_TOKEN_TTL_MS, // matches the access JWT's own lifetime
   };
 
   res.cookie('access_token', accessToken, cookieOptions);
@@ -49,7 +68,7 @@ export const setAuthCookies = (res: Response, accessToken: string, refreshToken?
   if (refreshToken) {
     res.cookie('refresh_token', refreshToken, {
       ...cookieOptions,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: refreshMaxAgeMs,
     });
   }
 };
@@ -433,16 +452,13 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
     otpRecord.isUsed = true;
     await otpRecord.save();
 
-    const refreshToken = generateRefreshToken(String(user._id));
     await User.findByIdAndUpdate(user._id, {
       isVerified: true,
       isOnline: true,
       lastSeen: new Date(),
-      refreshToken,
       onboardingStep: 'awaiting_profile',
     });
-
-    const accessToken = generateAccessToken(String(user._id));
+    const { accessToken, refreshToken } = await startSession(user, req);
 
     setAuthCookies(res, accessToken, refreshToken);
 
@@ -573,11 +589,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const accessToken = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const { accessToken, refreshToken } = await startSession(user, req);
 
     await User.findByIdAndUpdate(user._id, {
-      refreshToken,
       isOnline: true,
       lastSeen: new Date(),
     });
@@ -608,6 +622,17 @@ export const logout = async (req: any, res: Response): Promise<void> => {
     if (!req.user?._id) {
       res.status(401).json({ message: 'Unauthorized.' });
       return;
+    }
+
+    // Sign out THIS device only: other devices keep their sessions. Legacy tokens
+    // without a sid fall back to clearing everything.
+    const presented = req.body?.refreshToken || req.cookies?.refresh_token ||
+      (req.headers?.authorization || '').replace(/^Bearer\s+/i, '') || req.cookies?.access_token;
+    const sid = (jwt.decode(presented || '') as any)?.sid as string | undefined;
+    if (sid) {
+      await User.updateOne({ _id: req.user._id }, { $pull: { sessions: { sid } } });
+    } else {
+      await User.updateOne({ _id: req.user._id }, { $set: { sessions: [] } });
     }
 
     await User.findByIdAndUpdate(req.user._id, {
@@ -714,7 +739,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     await otpRecord.save();
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await User.findByIdAndUpdate(user._id, { password: hashedPassword, refreshToken: '' });
+    await User.findByIdAndUpdate(user._id, { password: hashedPassword, refreshToken: '', sessions: [] });
 
     res
       .status(200)
@@ -788,22 +813,55 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const user = await User.findById(decoded.id).select('+refreshToken');
-    if (!user || user.refreshToken !== token) {
-      res.status(401).json({ message: 'Refresh token is invalid or has been revoked.' });
+    const user = await User.findById(decoded.id).select('+refreshToken +sessions');
+    if (!user) {
+      res.status(401).json({ message: 'Session is no longer valid.', code: 'SESSION_REVOKED' });
       return;
     }
 
-    const newAccessToken = generateAccessToken(String(user._id));
-    const newRefreshToken = generateRefreshToken(String(user._id));
+    let sid: string | undefined = decoded.sid;
+    let sessionExpiresAt: Date;
 
-    await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken });
+    if (sid) {
+      const check = findValidSession(user.sessions as any, sid, token);
+      if (!check.ok) {
+        res.status(401).json({
+          message: check.reason === 'expired' ? 'Your session has expired. Please sign in again.' : 'Session was signed out.',
+          code: check.reason === 'expired' ? 'SESSION_EXPIRED' : 'SESSION_REVOKED',
+        });
+        return;
+      }
+      sessionExpiresAt = new Date(check.session.expiresAt);
+      // Record activity at most hourly — avoids a write on every refresh.
+      if (Date.now() - new Date(check.session.lastUsedAt).getTime() > 60 * 60 * 1000) {
+        await User.updateOne(
+          { _id: user._id, 'sessions.sid': sid },
+          { $set: { 'sessions.$.lastUsedAt': new Date() } },
+        );
+      }
+    } else if (user.refreshToken && user.refreshToken === token) {
+      // Pre-sessions login: upgrade it once. Starts a fresh 30-day session so nobody
+      // already signed in gets bounced by this rollout.
+      const started = await startSession(user, req);
+      setAuthCookies(res, started.accessToken, started.refreshToken);
+      res.status(200).json({
+        message: 'Tokens refreshed successfully.',
+        data: { accessToken: started.accessToken, refreshToken: started.refreshToken, sessionExpiresAt: started.expiresAt },
+      });
+      return;
+    } else {
+      res.status(401).json({ message: 'Refresh token is invalid or has been revoked.', code: 'SESSION_REVOKED' });
+      return;
+    }
 
-    setAuthCookies(res, newAccessToken, newRefreshToken);
+    // The refresh token is intentionally returned unchanged (no rotation) so concurrent
+    // tabs / retried requests can never invalidate each other.
+    const newAccessToken = signAccessToken(String(user._id), sid);
+    setAuthCookies(res, newAccessToken, token, Math.max(0, sessionExpiresAt.getTime() - Date.now()));
 
     res.status(200).json({
       message: 'Tokens refreshed successfully.',
-      data: { accessToken: newAccessToken, refreshToken: newRefreshToken },
+      data: { accessToken: newAccessToken, refreshToken: token, sessionExpiresAt },
     });
   } catch (err: any) {
     res.status(500).json({ message: 'Token refresh failed: ' + err.message });
@@ -912,11 +970,9 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
       return;
     }
 
-    const accessToken  = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const { accessToken, refreshToken } = await startSession(user, req);
 
     await User.findByIdAndUpdate(user._id, {
-      refreshToken,
       isOnline: true,
       lastSeen: new Date(),
     });
@@ -1085,11 +1141,9 @@ export const googleMobileLogin = async (req: Request, res: Response): Promise<vo
       }
     }
 
-    const accessToken  = generateAccessToken(String(user._id));
-    const refreshToken = generateRefreshToken(String(user._id));
+    const { accessToken, refreshToken } = await startSession(user, req);
 
     await User.findByIdAndUpdate(user._id, {
-      refreshToken,
       isOnline: true,
       lastSeen: new Date(),
     });
@@ -1302,9 +1356,8 @@ export const clerkSync = async (req: Request, res: Response): Promise<void> => {
       user = (await User.findById(user._id))!;
     }
 
-    const accessToken = generateAccessToken(String(user._id));
-    const newRefreshToken = generateRefreshToken(String(user._id));
-    await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken, isOnline: true, lastSeen: new Date() });
+    const { accessToken, refreshToken: newRefreshToken } = await startSession(user, req);
+    await User.findByIdAndUpdate(user._id, { isOnline: true, lastSeen: new Date() });
 
     res.status(200).json({
       message: 'Clerk sync successful.',
