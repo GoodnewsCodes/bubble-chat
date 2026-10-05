@@ -73,7 +73,12 @@ if (process.env.JWT_KEY) {
         secretOrKey: process.env.JWT_KEY
     }, async (payload, done) => {
         try {
-            const user = await User.findById(payload.id);
+            // Tokens carry the session id: a signed-out / revoked session stops working
+            // immediately instead of living out the access token's lifetime. Older
+            // tokens (no sid) are still accepted until they expire.
+            const user = payload.sid
+                ? await User.findOne({ _id: payload.id, 'sessions.sid': payload.sid })
+                : await User.findById(payload.id);
             if (user) return done(null, user);
             return done(null, false);
         } catch (err) {

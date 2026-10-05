@@ -825,7 +825,7 @@ export const deleteForEveryone = async (req: AuthRequest, res: Response): Promis
  * Proxy media requests to get signed URLs
  */
 export const proxyMedia = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { url } = req.query;
+  const { url, filename } = req.query;
   if (!url) {
     res.status(400).json({ message: 'URL query parameter is required' });
     return;
@@ -833,7 +833,9 @@ export const proxyMedia = async (req: AuthRequest, res: Response): Promise<void>
   try {
     // Forward Range so mobile AV players (voice notes, video) can stream with
     // 206 partial responses — required by iOS AVPlayer.
-    await streamS3Object(url as string, res, undefined, req.headers.range as string | undefined);
+    // `filename` makes this a real download (Content-Disposition: attachment) with the
+    // file's original name, instead of the browser just opening it in a tab.
+    await streamS3Object(url as string, res, typeof filename === 'string' ? filename : undefined, req.headers.range as string | undefined);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

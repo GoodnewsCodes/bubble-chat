@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as fs from 'fs';
@@ -32,6 +32,76 @@ export const s3Client = new S3Client({
   forcePathStyle: true, // Required for Filebase/S3-compatible
 });
 
+// ── Fallback (previous) bucket ───────────────────────────────────────────────
+// After a bucket switch, files uploaded earlier still live in the old bucket. When
+// FILEBASE_FALLBACK_* is configured, reads look in the current bucket first and fall back
+// to the old one. Writes ALWAYS go to the current bucket.
+const FALLBACK_BUCKET = process.env.FILEBASE_FALLBACK_BUCKET || '';
+export const fallbackS3Client: S3Client | null =
+  FALLBACK_BUCKET && process.env.FILEBASE_FALLBACK_ACCESS_KEY && process.env.FILEBASE_FALLBACK_SECRET_KEY
+    ? new S3Client({
+        endpoint: 'https://s3.filebase.com',
+        region: 'us-east-1',
+        credentials: {
+          accessKeyId: process.env.FILEBASE_FALLBACK_ACCESS_KEY,
+          secretAccessKey: process.env.FILEBASE_FALLBACK_SECRET_KEY,
+        },
+        forcePathStyle: true,
+      })
+    : null;
+
+interface StorageTarget { client: S3Client; bucket: string }
+const primaryTarget = (): StorageTarget => ({ client: s3Client, bucket: BUCKET });
+const fallbackTarget = (): StorageTarget | null =>
+  fallbackS3Client ? { client: fallbackS3Client, bucket: FALLBACK_BUCKET } : null;
+
+const isMissingObject = (err: any): boolean =>
+  err?.name === 'NoSuchKey' || err?.name === 'NoSuchBucket' || err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404 ||
+  err?.name === 'AccessDenied' || err?.$metadata?.httpStatusCode === 403;
+
+// Legacy URLs name their bucket, so we can route them straight to the right one.
+const urlNamesFallbackBucket = (url: string): boolean => {
+  if (!FALLBACK_BUCKET || !url.startsWith('http')) return false;
+  try {
+    const u = new URL(url);
+    return u.hostname.startsWith(`${FALLBACK_BUCKET}.`) || u.pathname.replace(/^\//, '').startsWith(`${FALLBACK_BUCKET}/`);
+  } catch { return false; }
+};
+
+// Which bucket holds this key? Remembered briefly so presigning stays cheap.
+const locationCache = new Map<string, { fallback: boolean; at: number }>();
+const LOCATION_TTL_MS = 10 * 60 * 1000;
+const resolveTarget = async (key: string, hintFallback: boolean): Promise<StorageTarget> => {
+  const fb = fallbackTarget();
+  if (!fb) return primaryTarget();
+  if (hintFallback) return fb;
+  const hit = locationCache.get(key);
+  if (hit && Date.now() - hit.at < LOCATION_TTL_MS) return hit.fallback ? fb : primaryTarget();
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    locationCache.set(key, { fallback: false, at: Date.now() });
+    return primaryTarget();
+  } catch (err: any) {
+    if (!isMissingObject(err)) return primaryTarget(); // transient — don't cache a wrong answer
+    try {
+      await fb.client.send(new HeadObjectCommand({ Bucket: fb.bucket, Key: key }));
+      locationCache.set(key, { fallback: true, at: Date.now() });
+      return fb;
+    } catch {
+      return primaryTarget();
+    }
+  }
+};
+
+// Header-safe download names: no quotes / CR / LF / path separators.
+const safeDownloadName = (name?: string): string | undefined => {
+  if (!name) return undefined;
+  const cleaned = name.replace(/[\u0000-\u001f\u007f"\\/]+/g, '_').trim().slice(0, 200);
+  return cleaned || undefined;
+};
+const contentDisposition = (name: string): string =>
+  `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+
 /**
  * Extract the storage KEY from a previously stored Filebase URL.
  * Handles both virtual-hosted style (bubblle-19.s3.filebase.com/KEY)
@@ -46,6 +116,8 @@ export const extractKeyFromUrl = (url: string): string => {
     // Strip bucket prefix for path-style URLs: "bubblle-19/messages/..." -> "messages/..."
     if (path.startsWith(`${BUCKET}/`)) {
       path = path.slice(BUCKET.length + 1);
+    } else if (FALLBACK_BUCKET && path.startsWith(`${FALLBACK_BUCKET}/`)) {
+      path = path.slice(FALLBACK_BUCKET.length + 1);
     }
     return path;
   } catch {
@@ -136,12 +208,14 @@ export const getSignedMediaUrl = async (keyOrUrl: string, downloadName?: string)
     return keyOrUrl;
   }
   const key = keyOrUrl.startsWith('http') ? extractKeyFromUrl(keyOrUrl) : keyOrUrl;
+  const target = await resolveTarget(key, urlNamesFallbackBucket(keyOrUrl));
+  const name = safeDownloadName(downloadName);
   const command = new GetObjectCommand({
-    Bucket: BUCKET,
+    Bucket: target.bucket,
     Key: key,
-    ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` })
+    ...(name && { ResponseContentDisposition: contentDisposition(name) })
   });
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  return await getSignedUrl(target.client, command, { expiresIn: 3600 });
 };
 
 /**
@@ -189,8 +263,9 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     if (fs.existsSync(localPath)) {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      if (downloadName) {
-        res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+      const localName = safeDownloadName(downloadName);
+      if (localName) {
+        res.setHeader('Content-Disposition', contentDisposition(localName));
       }
       fs.createReadStream(localPath).pipe(res);
       return;
@@ -201,18 +276,29 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
   }
 
   try {
-    const command = new GetObjectCommand({
-      Bucket: BUCKET,
+    const name = safeDownloadName(downloadName);
+    const buildCommand = (bucket: string) => new GetObjectCommand({
+      Bucket: bucket,
       Key: key,
       // Forward the client's Range header. iOS AVPlayer (voice notes / video on
-      // the mobile app) probes with `Range: bytes=0-1` and REQUIRES a 206
-      // Partial Content response — ignoring Range made audio silently unplayable
-      // on iPhones even though the file stored and downloaded fine.
+      // the mobile app) probes with `Range: bytes=0-1` and REQUIRES a 206 Partial
+      // Content response — ignoring Range made audio silently unplayable on iPhones.
       ...(range && { Range: range }),
-      ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` })
+      ...(name && { ResponseContentDisposition: contentDisposition(name) })
     });
 
-    const response = await s3Client.send(command);
+    // Current bucket first; if the object isn't there, try the previous bucket.
+    const fb = fallbackTarget();
+    const preferFallback = urlNamesFallbackBucket(keyOrUrl);
+    const first = preferFallback && fb ? fb : primaryTarget();
+    const second = preferFallback ? primaryTarget() : fb;
+    let response;
+    try {
+      response = await first.client.send(buildCommand(first.bucket));
+    } catch (err: any) {
+      if (!second || !isMissingObject(err)) throw err;
+      response = await second.client.send(buildCommand(second.bucket));
+    }
 
     if (range && response.ContentRange) {
       res.status(206);
@@ -233,8 +319,9 @@ export const streamS3Object = async (keyOrUrl: string, res: Response, downloadNa
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    if (downloadName) {
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+    if (name) {
+      res.setHeader('Content-Disposition', contentDisposition(name));
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type');
     }
 
     const stream = response.Body as Readable;
