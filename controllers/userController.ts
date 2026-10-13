@@ -37,7 +37,7 @@ const formatUser = (u: any) => ({
   org_role: u.org_role || null,
   org_industry: u.org_industry || null,
   org_size: u.org_size || null,
-  app_background: u.app_background || 'bubbles',
+  app_background: ['topo-white', 'topo-light', 'topo-dark'].includes(u.app_background) ? u.app_background : 'topo-white',
   custom_background: u.custom_background || null,
   onboardingComplete: u.onboardingComplete || false,
   isVerified: u.isVerified ?? false,
@@ -601,4 +601,3 @@ export const getUserFollowing = async (req: AuthRequest, res: Response): Promise
     res.status(200).json({ message: 'Following retrieved.', total: (u.following || []).length, following: (u.following || []).map(formatUser) });
   } catch (err: any) { res.status(500).json({ message: err.message }); }
 };
-

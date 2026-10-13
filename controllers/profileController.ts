@@ -95,7 +95,7 @@ const formatUser = async (u: any, includePrivate = false) => {
     org_role: u.org_role || null,
     org_industry: u.org_industry || null,
     org_size: u.org_size || null,
-    app_background: u.app_background || 'bubbles',
+    app_background: ['topo-white', 'topo-light', 'topo-dark'].includes(u.app_background) ? u.app_background : 'topo-white',
     custom_background: u.custom_background || null,
     onboardingComplete: u.onboardingComplete ?? false,
     isVerified: u.isVerified ?? false,

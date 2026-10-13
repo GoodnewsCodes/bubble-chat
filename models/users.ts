@@ -70,7 +70,7 @@ export interface IUser extends Document {
     enabled: boolean;
     notifyTime: string;             // '07:00' in org timezone
   };
-  app_background?: 'bubbles' | 'light' | 'dark' | 'topo-light' | 'topo-dark' | 'custom' | 'glass';
+  app_background?: 'topo-white' | 'topo-light' | 'topo-dark';
   custom_background?: string;
   unreadCount?: number;
 
@@ -179,8 +179,8 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     app_background: {
       type: String,
-      enum: ['bubbles', 'light', 'dark', 'topo-light', 'topo-dark', 'custom', 'glass'],
-      default: 'bubbles'
+      enum: ['topo-white', 'topo-light', 'topo-dark'],
+      default: 'topo-white'
     },
     custom_background: { type: String, default: '' },
 

@@ -88,7 +88,7 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Postman, Railway health checks)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || origin.endsWith('.ngrok-free.app') || origin.endsWith('.ngrok.io') || origin.includes('ngrok')) {
       return callback(null, true);
     }
     console.warn(`🚫 CORS blocked for origin: ${origin}`);
