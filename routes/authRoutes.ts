@@ -31,7 +31,8 @@ const jwtAuth = passport.authenticate('jwt', { session: false });
 // CHANGE THIS: Set FRONTEND_URL in your Railway backend environment variables
 // to your actual frontend domain, e.g. https://bubblespace.xyz
 // Never rely on ORIGIN here — Railway sets ORIGIN to the backend service URL.
-const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
+let rawFrontend = (process.env.FRONTEND_URL || 'https://bubblespace.xyz').replace(/\/+$/, '');
+const FRONTEND = rawFrontend.includes('bubblespace.netlify.app') ? 'https://bubblespace.xyz' : rawFrontend;
 
 /**
  * @swagger

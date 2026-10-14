@@ -957,16 +957,39 @@ export const googleLogin = (req: Request, res: Response): void => {
 //   must set state=mobile_<deeplink> when initiating the flow. Web users always
 //   receive state='web' and are correctly redirected to the frontend.
 export const googleCallback = async (req: any, res: Response): Promise<void> => {
-  // ── Single source of truth for the frontend URL ───────────────────────────
-  // CHANGE THIS: ensure FRONTEND_URL is set in your Railway backend env vars
-  // to https://bubblespace.xyz (or whatever your deployed frontend domain is).
-  // Do NOT rely on ORIGIN — Railway injects that as the backend's own URL.
-  const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
+  // ── Single source of truth for the default frontend URL ───────────────────
+  let defaultFrontend = (process.env.FRONTEND_URL || 'https://bubblespace.xyz').replace(/\/+$/, '');
+  // Always prefer the primary custom domain over the netlify subdomain
+  if (defaultFrontend.includes('bubblespace.netlify.app')) {
+    defaultFrontend = 'https://bubblespace.xyz';
+  }
+
+  const rawState = req.query.state as string | undefined;
+  const state    = rawState ? decodeURIComponent(rawState) : 'web';
+
+  // Extract return origin from state if provided (e.g. localhost for dev, bubblespace.xyz for prod)
+  let webFrontend = defaultFrontend;
+  if (state.includes('web_origin_')) {
+    try {
+      const afterOrigin = state.split('web_origin_')[1];
+      const rawOrigin = afterOrigin.split('_invite_')[0];
+      const decodedOrigin = decodeURIComponent(rawOrigin).replace(/\/+$/, '');
+      const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(decodedOrigin);
+      const isProdDomain = decodedOrigin === 'https://bubblespace.xyz' || decodedOrigin === 'https://bubblespace.netlify.app';
+      if (isLocalhost) {
+        webFrontend = decodedOrigin;
+      } else if (isProdDomain) {
+        webFrontend = 'https://bubblespace.xyz';
+      }
+    } catch (err) {
+      console.warn('Failed to parse web_origin_ from state:', err);
+    }
+  }
 
   try {
     const user = req.user;
     if (!user) {
-      res.redirect(`${FRONTEND}/login?error=auth_failed`);
+      res.redirect(`${webFrontend}/login?error=auth_failed`);
       return;
     }
 
@@ -979,10 +1002,7 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
 
     setAuthCookies(res, accessToken, refreshToken);
 
-    // ── Invite-code handling (unchanged logic) ────────────────────────────────
-    const rawState = req.query.state as string | undefined;
-    const state    = rawState ? decodeURIComponent(rawState) : 'web';
-
+    // ── Invite-code handling ──────────────────────────────────────────────────
     let inviteCode: string | undefined;
     if (state.includes('_invite_')) {
       const parts = state.split('_invite_');
@@ -1020,11 +1040,8 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
     const userJson = encodeURIComponent(JSON.stringify(formatUser(user)));
 
     // ── Routing decision: state flag ONLY, never user-agent ──────────────────
-    // Web flow sets state='web' (see authRoute.ts /google handler).
+    // Web flow sets state='web' or 'web_origin_<url>' (see authRoute.ts /google handler).
     // Native mobile sets state='mobile_<deeplink>' explicitly.
-    // We never sniff the User-Agent here because it belongs to the browser the
-    // web user is visiting bubblespace.xyz on — an Android Chrome user would
-    // incorrectly match 'Android' and get sent to a dead bubblechat:// link.
     const isMobileRequest = state.startsWith('mobile_');
 
     if (isMobileRequest) {
@@ -1035,24 +1052,36 @@ export const googleCallback = async (req: any, res: Response): Promise<void> => 
         `${deepLinkBase}${separator}access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
       );
     } else {
-      // Web: always redirect to the React frontend's /auth/google/callback page
+      // Web: redirect to the initiating frontend's /auth/google/callback page
       res.redirect(
-        `${FRONTEND}auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
+        `${webFrontend}/auth/google/callback?access_token=${accessToken}&refresh_token=${refreshToken}&user=${userJson}`
       );
     }
   } catch (err: any) {
     console.error('Google callback error:', err);
 
-    const FRONTEND = process.env.FRONTEND_URL || 'https://bubblespace.xyz';
-    const rawState = req.query.state as string | undefined;
-    const state    = rawState ? decodeURIComponent(rawState) : 'web';
+    let errorFrontend = defaultFrontend;
+    if (state.includes('web_origin_')) {
+      try {
+        const afterOrigin = state.split('web_origin_')[1];
+        const rawOrigin = afterOrigin.split('_invite_')[0];
+        const decodedOrigin = decodeURIComponent(rawOrigin).replace(/\/+$/, '');
+        const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(decodedOrigin);
+        const isProdDomain = decodedOrigin === 'https://bubblespace.xyz' || decodedOrigin === 'https://bubblespace.netlify.app';
+        if (isLocalhost) {
+          errorFrontend = decodedOrigin;
+        } else if (isProdDomain) {
+          errorFrontend = 'https://bubblespace.xyz';
+        }
+      } catch {}
+    }
 
     if (state.startsWith('mobile_')) {
       const deepLinkBase = state.replace(/^mobile_/, '') || 'bubblechat://';
       const separator    = deepLinkBase.includes('?') ? '&' : '?';
       res.redirect(`${deepLinkBase}${separator}error=server_error`);
     } else {
-      res.redirect(`${FRONTEND}/login?error=server_error`);
+      res.redirect(`${errorFrontend}/login?error=server_error`);
     }
   }
 };

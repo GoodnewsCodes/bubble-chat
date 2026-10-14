@@ -32,14 +32,17 @@ passport.use(new LocalStrategy(
 ));
 
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    const rawServerUrl = (process.env.SERVER_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    let resolvedCallback = (process.env.GOOGLE_CALLBACK_URL || `${rawServerUrl}/api/v1/auth/google/callback`).trim();
+    // Fix common localhost https typo: local dev servers run on HTTP
+    if (resolvedCallback.startsWith('https://localhost') || resolvedCallback.startsWith('https://127.0.0.1')) {
+        resolvedCallback = resolvedCallback.replace(/^https:/, 'http:');
+    }
+
     passport.use(new GoogleStrategy({
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        // Env-driven: set GOOGLE_CALLBACK_URL (or SERVER_URL) to the Bubble Space
-        // backend domain in production. No hardcoded host — must match the Authorized
-        // redirect URI in Google Cloud Console. Falls back to localhost for dev only.
-        callbackURL: process.env.GOOGLE_CALLBACK_URL ||
-            `${process.env.SERVER_URL || 'http://localhost:3000'}/api/v1/auth/google/callback`,
+        callbackURL: resolvedCallback,
         // proxy: true makes passport trust the exact callbackURL you specified,
         // preventing query-string drift like ?flowName=GeneralOAuthFlow
         proxy: true,

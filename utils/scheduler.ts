@@ -707,7 +707,7 @@ export const processHolidayReminders = async () => {
             new Date(h.startTime),
             new Date(h.endTime),
             h.description || `${h.title} is a public holiday.`,
-            'Bubblespace'
+            'BubbleSpace'
           );
         } catch (emailErr) {
           console.error(`[HolidayReminder] email to ${m.email} failed:`, emailErr);
