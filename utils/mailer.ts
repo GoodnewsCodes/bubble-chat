@@ -318,7 +318,7 @@ export const sendWelcomeNewMemberEmail = async (
   orgName: string,
   onboardingSummaryHtml: string
 ) => {
-  const subject = `Welcome to ${orgName} on Bubblespace!`;
+  const subject = `Welcome to ${orgName} on BubbleSpace!`;
   const html = `
     <div style="font-family: 'Poppins', 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #fbfbfe; border-radius: 28px; overflow: hidden; border: 1px solid #eae7fa; box-shadow: 0 15px 35px -5px rgba(108, 92, 231, 0.06);">
       <!-- Header -->
@@ -332,7 +332,7 @@ export const sendWelcomeNewMemberEmail = async (
         <h2 style="color: #1f2030; font-size: 22px; font-weight: 800; margin: 0 0 14px; font-family: 'Space Grotesk', 'Segoe UI', sans-serif;">Welcome aboard! 🚀</h2>
         <p style="font-size: 14.5px; line-height: 1.7; color: #4a5568; margin: 0 0 12px;">Hello ${name},</p>
         <p style="font-size: 14.5px; line-height: 1.7; color: #4a5568; margin: 0 0 24px;">
-          You have successfully joined <strong style="color: #6c5ce7;">${orgName}</strong> on Bubblespace. Here is a brief AI-compiled overview of the company to help get you up to speed instantly:
+          You have successfully joined <strong style="color: #6c5ce7;">${orgName}</strong> on BubbleSpace. Here is a brief AI-compiled overview of the company to help get you up to speed instantly:
         </p>
         
         <!-- Company Profile Box -->
@@ -449,7 +449,7 @@ export const sendCalendarEventEmail = async (
         </h2>
         <p style="font-size: 14.5px; line-height: 1.7; color: #4a5568; margin: 0 0 12px;">Hello ${userName},</p>
         <p style="font-size: 14.5px; line-height: 1.7; color: #4a5568; margin: 0 0 28px;">
-          ${creatorName || 'A teammate'} has scheduled a new ${eventType} on Bubblespace.
+          ${creatorName || 'A teammate'} has scheduled a new ${eventType} on BubbleSpace.
         </p>
 
         <!-- Event Card -->

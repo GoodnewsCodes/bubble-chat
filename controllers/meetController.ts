@@ -20,6 +20,13 @@ export const createCallLog = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
     const { roomId, type, label, duration, missed, agenda, notes } = req.body;
+    // The client can report the same completed room more than once (for example
+    // after reconnecting). A room represents one call event for a user, so reuse
+    // its log instead of creating a duplicate history card.
+    const existingLog = await CallLog.findOne({ user: userId, roomId }).lean();
+    if (existingLog) {
+      return res.status(200).json({ log: existingLog, duplicate: true });
+    }
     const log = await CallLog.create({
       user: userId,
       roomId,
@@ -228,7 +235,7 @@ export const saveTranscriptChunk = async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-}; 
+};
 
 // NEW: GET /api/v1/meet/livekit-token
 // POST /api/v1/meet/invite-link — sign a shareable, tamper-evident join link for a room.
@@ -283,4 +290,4 @@ export const getLiveKitToken = async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-}; 
+};
