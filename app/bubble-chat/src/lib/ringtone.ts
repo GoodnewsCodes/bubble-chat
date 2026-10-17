@@ -27,7 +27,8 @@ export class RingtonePlayer {
     configureAudioMode();
 
     try {
-      const player = createAudioPlayer(SOURCES[type]);
+      const src = SOURCES[type] || SOURCES.incoming;
+      const player = createAudioPlayer(src);
       player.loop = true;
       player.volume = 1;
       player.play();

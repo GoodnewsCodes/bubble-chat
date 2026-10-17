@@ -699,6 +699,25 @@ export default function LiveKitCallRoom({
       connect={true}
       audio={false}
       video={isVideo}
+      options={{
+        adaptiveStream: true,
+        dynacast: true,
+        audioCaptureDefaults: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        videoCaptureDefaults: {
+          resolution: { width: 960, height: 540 },
+          frameRate: 24,
+        },
+        publishDefaults: {
+          simulcast: true,
+          videoCodec: 'vp8',
+          backupCodec: true,
+          dtx: true,
+        },
+      }}
       onConnected={onConnected}
       onDisconnected={onDisconnected}
       onError={onError}

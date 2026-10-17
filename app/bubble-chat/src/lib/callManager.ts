@@ -182,42 +182,49 @@ export const acceptIncomingCall = async () => {
   if (callTimeout) clearTimeout(callTimeout);
   stopRingtone();
 
-  // Emit call answer
+  // Emit call answer immediately
   socket.emit('call_answer', {
     toUserId: state.callerId,
     roomId: state.roomId
   });
 
-  // Create meeting in database
-  let dbId: string | null = null;
-  let host: { hostId: string | null; isHost: boolean } = { hostId: null, isHost: true };
-  try {
-    const res = await createMeeting({
-      roomId: state.roomId,
-      title: `${state.type === 'video' ? 'Video' : 'Voice'} Call`,
-      type: state.type
-    });
-    dbId = res?.meeting?._id || res?._id || null;
-    host = await resolveHost(res);
-    if (dbId) {
-      socket.emit('meeting_started', { roomId: state.roomId, meetingId: dbId });
-    }
-  } catch (err) {
-    console.warn('Failed to create meeting record:', err);
-  }
-
+  // Transition UI to in_call immediately with 0 delay
   setCallState({
     status: 'in_call',
     user: { name: state.callerName, avatar: state.callerAvatar, id: state.callerId },
     type: state.type,
     roomId: state.roomId,
     duration: 0,
-    meetingDbId: dbId,
-    hostId: host.hostId,
-    isHost: host.isHost,
+    meetingDbId: null,
+    hostId: null,
+    isHost: false,
   });
 
   startDurationTimer();
+
+  // Create or sync meeting record in database in parallel without delaying the call transition
+  createMeeting({
+    roomId: state.roomId,
+    title: `${state.type === 'video' ? 'Video' : 'Voice'} Call`,
+    type: state.type
+  }).then(async (res) => {
+    const dbId = res?.meeting?._id || res?._id || null;
+    const host = await resolveHost(res);
+    if (dbId) {
+      socket.emit('meeting_started', { roomId: state.roomId, meetingId: dbId });
+    }
+    const current = currentCallState;
+    if (current.status === 'in_call' && current.roomId === state.roomId) {
+      setCallState({
+        ...current,
+        meetingDbId: dbId,
+        hostId: host.hostId,
+        isHost: host.isHost,
+      });
+    }
+  }).catch((err) => {
+    console.warn('Failed to create meeting record:', err);
+  });
 };
 
 export const declineIncomingCall = () => {

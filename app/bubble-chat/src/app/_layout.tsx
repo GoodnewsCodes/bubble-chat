@@ -202,7 +202,7 @@ function GlobalCallOverlay() {
     const unsubscribe = subscribeCallState((state) => {
       setCallState(state);
       if (state.status === 'calling_out' || state.status === 'calling_in') {
-        setIsMuted(true);
+        setIsMuted(false);
         setIsSpeaker(false);
         setIsCameraActive(state.type === 'video');
         setIsMinimized(false);
